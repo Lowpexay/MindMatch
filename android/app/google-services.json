@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "1033810261503",
+    "project_id": "mindmatch-ba671",
+    "storage_bucket": "mindmatch-ba671.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1033810261503:android:edc5bba01b1501549fe3ca",
+        "android_client_info": {
+          "package_name": "com.company.mindmatch"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1033810261503-c37to5fpq5gsq1ln1q648uc4hr61m1a3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.company.mindmatch",
+            "certificate_hash": "189c72d7affd5ad6b257f915ffa0499863743905"
+          }
+        },
+        {
+          "client_id": "1033810261503-him6itlpbsqcik2j4bcqghmnislcsnd9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAybtUIEKLhMCn1ouUCKjy2gw_GliKeFoI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1033810261503-him6itlpbsqcik2j4bcqghmnislcsnd9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1033810261503-2keb13frb267nlm2qmhvvjhjtbp0fglm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.company.mindmatch"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

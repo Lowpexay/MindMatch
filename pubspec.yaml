@@ -1,0 +1,65 @@
+name: mindmatch
+description: A Flutter app for meaningful human connections with AI support.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Firebase
+  firebase_core: ^2.32.0
+  firebase_auth: ^4.15.3
+  cloud_firestore: ^4.13.6
+  firebase_storage: ^11.5.6
+  
+  # Authentication
+  google_sign_in: ^6.1.6
+  # sign_in_with_apple: ^5.0.0  # Temporariamente desabilitado
+  
+  # UI & Navigation
+  cupertino_icons: ^1.0.8
+  go_router: ^12.1.3
+  flutter_svg: ^2.0.9
+  image_picker: ^1.0.4
+  
+  # HTTP & API
+  http: ^1.1.2
+  dio: ^5.3.4
+  
+  # Storage
+  shared_preferences: ^2.2.2
+  
+  # State Management
+  provider: ^6.1.1
+  
+  # UI Components
+  flutter_chip_tags: ^2.0.2
+  cached_network_image: ^3.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # The "flutter_lints" package below contains a set of recommended lints to
+  # encourage good coding practices. The lint set provided by the package is
+  # activated in the `analysis_options.yaml` file located at the root of your
+  # package. See that file for information about deactivating specific lint
+  # rules and activating additional ones.
+  flutter_lints: ^5.0.0
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/icons/
+  #
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/to/font-from-package

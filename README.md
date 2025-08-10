@@ -455,35 +455,6 @@ dependencies:
 
 ---
 
-## 🗺️ Roadmap
-
-### 📅 **Q1 2025**
-- [x] ✅ Sistema básico de chat
-- [x] ✅ Algoritmo de compatibilidade
-- [x] ✅ Integração com IA
-- [ ] 🔄 Sistema de perfis completo
-- [ ] 🔄 Notificações push
-
-### 📅 **Q2 2025**
-- [ ] 🎯 Dashboard de analytics
-- [ ] 🎯 Sistema de gamificação
-- [ ] 🎯 Recursos sociais avançados
-- [ ] 🎯 Versão Web
-
-### 📅 **Q3 2025**
-- [ ] 🔮 Modo offline
-- [ ] 🔮 Integração wearables
-- [ ] 🔮 IA conversacional avançada
-- [ ] 🔮 Recursos de acessibilidade
-
-### 📅 **Q4 2025**
-- [ ] 🚀 Lançamento na Play Store
-- [ ] 🚀 Lançamento na App Store
-- [ ] 🚀 Marketing e crescimento
-- [ ] 🚀 Parcerias estratégicas
-
----
-
 ## 📊 Status do Projeto
 
 <div align="center">

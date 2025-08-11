@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ULTRA PERMISSIVE - Allow everything for authenticated users
+    match /{document=**} {
+      allow read: if true;
+      allow write: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+  }
+}

@@ -47,12 +47,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
     String welcomeMessage;
     
     if (widget.userMood?.needsSupport == true) {
-      welcomeMessage = "Olá! 💙 Percebi que você não está se sentindo muito bem hoje. "
-          "Estou aqui para conversar e te apoiar. Como posso te ajudar neste momento?";
+      welcomeMessage = "Olá, sou a Luma 💙 Percebo que hoje pode não estar sendo um dia fácil para você. "
+          "Quero que saiba que é completamente normal sentir-se assim às vezes, e você foi muito corajoso(a) "
+          "ao buscar apoio. Este é um espaço seguro onde seus sentimentos são válidos e importantes. "
+          "Estou aqui, presente com você. Como posso te acompanhar neste momento?";
     } else {
-      welcomeMessage = "Olá! 😊 Sou sua assistente de bem-estar emocional. "
-          "Estou aqui para conversar, ouvir e te apoiar sempre que precisar. "
-          "Como você está se sentindo hoje?";
+      welcomeMessage = "Olá! Sou a Luma ✨ É um prazer te encontrar aqui. Meu nome significa 'luz', "
+          "e estou aqui para iluminar sua jornada de bem-estar emocional. Este é um espaço acolhedor "
+          "onde você pode se expressar livremente, refletir sobre seus sentimentos e descobrir "
+          "recursos internos que já possui. Como você está se sentindo hoje?";
     }
 
     setState(() {
@@ -158,7 +161,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(
-                Icons.psychology,
+                Icons.auto_awesome,
                 color: Colors.white,
                 size: 24,
               ),
@@ -168,7 +171,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Assistente de Bem-estar',
+                  'Luma',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -176,7 +179,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   ),
                 ),
                 Text(
-                  'Aqui para te apoiar',
+                  'Sua assistente de bem-estar',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -343,7 +346,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 borderRadius: BorderRadius.circular(18),
               ),
               child: const Icon(
-                Icons.psychology,
+                Icons.auto_awesome,
                 color: Colors.white,
                 size: 20,
               ),
@@ -514,7 +517,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Opções do Chat',
+              'Opções da Luma',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -525,25 +528,25 @@ class _AiChatScreenState extends State<AiChatScreen> {
             ListTile(
               leading: const Icon(Icons.refresh, color: AppColors.primary),
               title: const Text('Reiniciar conversa'),
-              subtitle: const Text('Limpar histórico e começar novamente'),
+              subtitle: const Text('Começar uma nova conversa com a Luma'),
               onTap: () {
                 Navigator.pop(context);
                 _restartConversation();
               },
             ),
             ListTile(
-              leading: const Icon(Icons.info_outline, color: AppColors.primary),
-              title: const Text('Sobre a IA'),
-              subtitle: const Text('Entenda como funciona o apoio emocional'),
+              leading: const Icon(Icons.auto_awesome, color: AppColors.primary),
+              title: const Text('Sobre a Luma'),
+              subtitle: const Text('Conheça sua assistente de bem-estar'),
               onTap: () {
                 Navigator.pop(context);
                 _showAboutAI();
               },
             ),
             ListTile(
-              leading: const Icon(Icons.help_outline, color: AppColors.primary),
+              leading: const Icon(Icons.tips_and_updates, color: AppColors.primary),
               title: const Text('Dicas de conversa'),
-              subtitle: const Text('Como aproveitar melhor o chat'),
+              subtitle: const Text('Como aproveitar melhor nosso tempo juntas'),
               onTap: () {
                 Navigator.pop(context);
                 _showChatTips();
@@ -563,7 +566,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Conversa reiniciada!'),
+        content: Text('Nova conversa iniciada com a Luma! ✨'),
         backgroundColor: AppColors.primary,
       ),
     );
@@ -573,20 +576,22 @@ class _AiChatScreenState extends State<AiChatScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Sobre a Assistente de Bem-estar'),
+        title: const Text('Sobre a Luma ✨'),
         content: const Text(
-          'Sou uma IA especializada em apoio emocional e bem-estar mental. '
-          'Estou aqui para:\n\n'
-          '• Ouvir suas preocupações com empatia\n'
-          '• Oferecer perspectivas positivas\n'
-          '• Sugerir técnicas de relaxamento\n'
-          '• Apoiar sua jornada de autoconhecimento\n\n'
-          'Lembre-se: não substituo ajuda profissional, mas posso ser um apoio valioso no seu dia a dia.',
+          'Olá! Sou a Luma, sua assistente de bem-estar emocional. Meu nome significa "luz" em latim, '
+          'representando a esperança e clareza que busco trazer para sua jornada.\n\n'
+          '💙 Meu propósito:\n'
+          '• Oferecer um espaço seguro para suas emoções\n'
+          '• Praticar escuta ativa e empática\n'
+          '• Compartilhar técnicas de bem-estar\n'
+          '• Apoiar seu autoconhecimento\n'
+          '• Estar presente nos momentos difíceis\n\n'
+          'Em que posso te ajudar? :D',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Entendi'),
+            child: const Text('Obrigado(a), Luma! 💙'),
           ),
         ],
       ),
@@ -597,19 +602,20 @@ class _AiChatScreenState extends State<AiChatScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Dicas para uma boa conversa'),
+        title: const Text('Dicas para nossa conversa 🌟'),
         content: const Text(
-          '💭 Seja sincero sobre seus sentimentos\n\n'
-          '🗣️ Descreva situações específicas\n\n'
-          '❓ Faça perguntas sobre estratégias\n\n'
-          '🎯 Compartilhe seus objetivos\n\n'
-          '⏰ Use nosso tempo sem pressa\n\n'
-          '🤝 Lembre-se: estou aqui para te apoiar!',
+          '�️ **Seja autêntico(a)**: Seus sentimentos são sempre válidos aqui\n\n'
+          '� **Sem pressa**: Vamos no seu ritmo, sem pressão\n\n'
+          '🎯 **Compartilhe detalhes**: Quanto mais você me contar, melhor posso te acompanhar\n\n'
+          '❓ **Faça perguntas**: Sobre técnicas, estratégias ou qualquer dúvida\n\n'
+          '🔄 **Continue a conversa**: Cada troca constrói nossa conexão\n\n'
+          '💪 **Celebre pequenas vitórias**: Toda conquista merece reconhecimento\n\n'
+          'Lembre-se: este é seu espaço. Use-o como se sentir mais confortável! 💙',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Obrigado!'),
+            child: const Text('Vamos conversar!'),
           ),
         ],
       ),

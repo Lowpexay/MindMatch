@@ -224,8 +224,8 @@ firestore/
 
 1. **Clone o repositório**
    ```bash
-   git clone https://github.com/seu-usuario/mindmatch-app.git
-   cd mindmatch-app
+   git clone https://github.com/Lowpexay/MindMatch.git
+   cd MindMatch
    ```
 
 2. **Instale as dependências**

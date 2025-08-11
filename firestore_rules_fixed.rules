@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users podem ler/escrever seus próprios dados
+    match /users/{userId} {
+      // Permite criar documento se o usuário autenticado tem o mesmo UID
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // Permite ler/atualizar se for o próprio usuário
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      
+      // Permite deletar apenas o próprio perfil
+      allow delete: if request.auth != null && request.auth.uid == userId;
+      
+      // Subcoleção de moods
+      match /moods/{moodId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+    
+    // Conversations - usuários podem acessar apenas conversas que participam
+    match /conversations/{conversationId} {
+      // Permite criar conversa se o usuário autenticado está na lista de participantes
+      allow create: if request.auth != null && 
+        request.auth.uid in request.resource.data.participants;
+      
+      // Permite ler/atualizar se o usuário está nos participantes
+      allow read, update: if request.auth != null && 
+        request.auth.uid in resource.data.participants;
+      
+      match /messages/{messageId} {
+        // Permite criar mensagem se o usuário está na conversa
+        allow create: if request.auth != null && 
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+          
+        // Permite ler mensagens se o usuário está na conversa
+        allow read: if request.auth != null && 
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+      }
+    }
+
+    // Manter também as regras para chats (caso ainda sejam usadas)
+    match /chats/{chatId} {
+      // Permite criar chat se o usuário autenticado está na lista de participantes
+      allow create: if request.auth != null && 
+        request.auth.uid in request.resource.data.participants;
+      
+      // Permite ler/atualizar se o usuário está nos participantes
+      allow read, update: if request.auth != null && 
+        request.auth.uid in resource.data.participants;
+      
+      match /messages/{messageId} {
+        // Permite criar mensagem se o usuário está no chat
+        allow create: if request.auth != null && 
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+          
+        // Permite ler mensagens se o usuário está no chat
+        allow read: if request.auth != null && 
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+      }
+    }
+  }
+}

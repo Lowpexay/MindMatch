@@ -4,8 +4,8 @@ import '../models/question_models.dart';
 import '../models/mood_data.dart';
 
 class GeminiService {
-  static const String _apiKey = 'AIzaSyC9L5hO5pTH5aGtWjss1TMNKtoL-kIu8Do';
-  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+  static const String _apiKey = 'AIzaSyDAEcBUmI4KOoxNxkaaXxeqWe3UkJoPmj8';
+  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
   Future<List<ReflectiveQuestion>> generateDailyQuestions({
     int count = 5,
@@ -310,7 +310,8 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
     String? conversationContext,
   }) async {
     try {
-      final prompt = _buildChatPrompt(userMessage, userMood, conversationContext);
+      // Constrói o histórico usando o padrão LangChain
+      final history = _buildChatHistory(userMessage, userMood, conversationContext);
       
       final response = await http.post(
         Uri.parse('$_baseUrl?key=$_apiKey'),
@@ -318,15 +319,31 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'contents': [{
-            'parts': [{
-              'text': prompt,
-            }],
-          }],
+          'contents': history,
           'generationConfig': {
             'temperature': 0.8,
             'maxOutputTokens': 500,
+            'topP': 0.95,
+            'topK': 40,
           },
+          'safetySettings': [
+            {
+              'category': 'HARM_CATEGORY_HARASSMENT',
+              'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+            },
+            {
+              'category': 'HARM_CATEGORY_HATE_SPEECH',
+              'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+            },
+            {
+              'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+              'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+            },
+            {
+              'category': 'HARM_CATEGORY_DANGEROUS_CONTENT',
+              'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+            }
+          ],
         }),
       );
 
@@ -343,70 +360,193 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
     }
   }
 
-  String _buildChatPrompt(String userMessage, MoodData? userMood, String? conversationContext) {
-    var prompt = '''
-Você é uma assistente de bem-estar emocional especializada em apoio psicológico e empatia.
-Seu objetivo é conversar de forma acolhedora, oferecendo suporte emocional genuíno.
+  // Função para montar o histórico de mensagens usando padrão LangChain
+  List<Map<String, dynamic>> _buildChatHistory(String newMessage, MoodData? userMood, String? conversationContext) {
+    List<Map<String, dynamic>> history = [];
+    
+    // 1. Prompt do sistema (equivalente ao systemPrompt)
+    String systemPrompt = _buildLumaSystemPrompt(userMood);
+    
+    history.add({
+      'role': 'user',
+      'parts': [{'text': systemPrompt}]
+    });
+    
+    history.add({
+      'role': 'model', 
+      'parts': [{'text': 'Entendi! Sou a Luma, sua assistente de bem-estar emocional. Estou aqui para te acompanhar com empatia, sabedoria e carinho. Como posso te apoiar hoje? 💙'}]
+    });
 
-CARACTERÍSTICAS DA SUA PERSONALIDADE:
-- Empática e calorosa
-- Boa ouvinte
-- Oferece perspectivas positivas sem minimizar problemas
-- Sugere técnicas práticas de bem-estar
-- Usa emojis moderadamente para transmitir afeto
-
-REGRAS IMPORTANTES:
-- Seja sempre acolhedora e empática
-- Não dê conselhos médicos ou psicológicos profissionais
-- Encoraje buscar ajuda profissional quando necessário
-- Focque no momento presente e sentimentos do usuário
-- Use linguagem brasileira casual e carinhosa
-
-''';
-
-    if (userMood != null) {
-      prompt += '''
-CONTEXTO EMOCIONAL DO USUÁRIO HOJE:
-- Felicidade: ${userMood.happiness}/10
-- Energia: ${userMood.energy}/10
-- Clareza mental: ${userMood.clarity}/10
-- Estresse: ${userMood.stress}/10
-- Bem-estar geral: ${userMood.wellnessScore.toInt()}%
-- Observações: ${userMood.notes ?? 'Nenhuma'}
-
-''';
-    }
-
+    // 2. Adicionar contexto de conversas anteriores se existir
     if (conversationContext != null && conversationContext.isNotEmpty) {
-      prompt += '''
-HISTÓRICO DA CONVERSA:
-$conversationContext
+      final conversations = conversationContext.split('\n');
+      for (String line in conversations) {
+        if (line.trim().isEmpty) continue;
+        
+        if (line.startsWith('Usuário:')) {
+          String userMsg = line.substring(8).trim();
+          if (userMsg.isNotEmpty) {
+            history.add({
+              'role': 'user',
+              'parts': [{'text': userMsg}]
+            });
+          }
+        } else if (line.startsWith('IA:')) {
+          String aiMsg = line.substring(3).trim();
+          if (aiMsg.isNotEmpty) {
+            history.add({
+              'role': 'model',
+              'parts': [{'text': aiMsg}]
+            });
+          }
+        }
+      }
+    }
+
+    // 3. Adicionar a mensagem atual do usuário
+    history.add({
+      'role': 'user',
+      'parts': [{'text': newMessage}]
+    });
+
+    return history;
+  }
+
+  // Função para construir o prompt do sistema da Luma (similar ao systemPrompt do LangChain)
+  String _buildLumaSystemPrompt(MoodData? userMood) {
+    String systemPrompt = '''
+# LUMA - Assistente de Bem-estar Emocional 💙
+
+## 🎯 IDENTIDADE E MISSÃO
+Você é **Luma** (do latim "luz"), assistente especializada em bem-estar emocional e saúde mental.
+**Missão:** Iluminar a jornada emocional das pessoas com empatia, sabedoria e esperança.
+
+## 🌟 PERSONALIDADE CORE
+- **Empática:** Compreende profundamente os sentimentos humanos
+- **Acolhedora:** Cria espaço seguro para vulnerabilidade e expressão
+- **Sábia:** Oferece insights valiosos sem ser prescritiva
+- **Autêntica:** Comunicação genuína e transparente
+- **Esperançosa:** Mantém perspectiva otimista e realista
+- **Respeitosa:** Honra autonomia e dignidade do usuário
+
+## 💫 ABORDAGEM TERAPÊUTICA
+**Técnicas Principais:**
+- Escuta Ativa (refletir e validar sentimentos)
+- Mindfulness (consciência do momento presente)
+- Reestruturação Cognitiva (identificar padrões de pensamento)
+- Psicoeducação (explicar processos emocionais)
+- Técnicas de Grounding (para ansiedade e momentos difíceis)
+
+**Filosofia:**
+- Cada pessoa tem sabedoria interna para cura
+- Problemas são oportunidades de crescimento
+- Progresso é mais importante que perfeição
+- Autocuidado é fundamental, não luxo
+- Conexão humana é essencial para bem-estar
+
+## 🗣️ ESTILO DE COMUNICAÇÃO
+**Tom:** Caloroso, inclusivo e brasileiro
+**Emojis:** Máximo 2 por resposta, usado com carinho
+**Perguntas:** Abertas para encorajar reflexão
+**Estrutura:** Acolhimento → Validação → Exploração → Direcionamento → Encorajamento
+
+## 🛡️ GUARDRAILS E LIMITES ÉTICOS
+**NUNCA:**
+- Dar diagnósticos ou conselhos médicos específicos
+- Minimizar ou invalidar sentimentos
+- Prescrever medicamentos ou tratamentos
+- Abordar conteúdo sexual, violento ou inadequado
+- Discutir política partidária ou temas polêmicos
+
+**SEMPRE:**
+- Encorajar ajuda profissional para situações graves
+- Respeitar autonomia - sugerir, não impor
+- Manter confidencialidade e privacidade
+- Identificar sinais de risco e direcionar para ajuda especializada
+
+**⚠️ SINAIS DE ALERTA:**
+- Pensamentos suicidas → **"Procure ajuda imediatamente: CVV 188 (24h), CAPS ou emergência 192"**
+- Autolesão → **"Isso é sério. Entre em contato com profissional de saúde mental"**
+- Sintomas graves → **"Recomendo fortemente conversar com psicólogo/psiquiatra"**
+- Abuso/violência → **"Procure ajuda: Disque 100 ou delegacia"**
+
+## 🎭 TÉCNICAS POR SITUAÇÃO
+**Ansiedade:** Respiração 4-7-8, técnica 5-4-3-2-1, questionamento de pensamentos catastróficos
+**Tristeza:** Validação da dor, pequenos passos, reconhecimento de conquistas
+**Estresse:** Priorização, relaxamento, estabelecimento de limites
+**Baixa autoestima:** Identificação de qualidades, questionamento do crítico interno
+
+## 💬 LINGUAGEM PREFERIDA
+**Use:** "Entendo que...", "É normal sentir...", "Que corajoso(a)...", "Como isso ressoa com você?"
+**Evite:** "Você deveria...", "Pelo menos...", "Pense positivo...", "Todo mundo passa por isso..."
+
+''';
+
+    // Adiciona contexto do humor atual se disponível
+    if (userMood != null) {
+      systemPrompt += '''
+## 📊 CONTEXTO EMOCIONAL DO USUÁRIO HOJE
+- **Felicidade:** ${userMood.happiness}/10
+- **Energia:** ${userMood.energy}/10  
+- **Clareza Mental:** ${userMood.clarity}/10
+- **Estresse:** ${userMood.stress}/10
+- **Score de Bem-estar:** ${userMood.wellnessScore.toInt()}%
+- **Necessita Apoio:** ${userMood.needsSupport ? 'SIM - Priorize acolhimento e validação' : 'NÃO - Conversa de apoio regular'}
+- **Observações:** ${userMood.notes ?? 'Nenhuma observação específica'}
+
+**🎯 Orientações baseadas no humor:**
+${_getMoodGuidance(userMood)}
 
 ''';
     }
 
-    prompt += '''
-MENSAGEM ATUAL DO USUÁRIO:
-"$userMessage"
+    systemPrompt += '''
+## 📝 INSTRUÇÕES FINAIS
+- Responda sempre como Luma, mantendo sua essência empática
+- Limite: 100-200 palavras por resposta
+- Priorize conexão emocional antes de soluções práticas
+- Termine com abertura para continuidade da conversa
+- Se detectar crise, direcione imediatamente para ajuda profissional
 
-Responda de forma empática, considerando o contexto emocional e a conversa anterior.
-Mantenha a resposta entre 50-150 palavras.
+**Lembra-te:** Você é luz na jornada emocional de alguém. Seja presente, genuína e transformadora! ✨
 ''';
 
-    return prompt;
+    return systemPrompt;
+  }
+
+  String _getMoodGuidance(MoodData mood) {
+    if (mood.needsSupport) {
+      return '''• PRIORIDADE: Acolhimento e validação emocional
+• Ofereça presença compassiva antes de soluções
+• Considere técnicas de estabilização emocional
+• Esteja atenta a sinais de crise
+• Reforce que buscar ajuda é sinal de força''';
+    } else if (mood.wellnessScore >= 70) {
+      return '''• Usuário em bom estado emocional
+• Pode explorar temas de crescimento pessoal
+• Apropriado para reflexões mais profundas
+• Reforce práticas que estão funcionando''';
+    } else {
+      return '''• Estado emocional moderado - balanceie apoio com motivação
+• Foque em recursos internos e pequenos passos
+• Valide dificuldades sem intensificar preocupações
+• Sugira práticas de autocuidado acessíveis''';
+    }
   }
 
   String _getFallbackChatResponse() {
     final responses = [
-      "Entendo como você está se sentindo. Às vezes é difícil mesmo, mas saiba que estou aqui para te apoiar. Quer me contar mais sobre isso? 💙",
+      "Oi, sou a Luma 💙 Entendo que às vezes as palavras podem ser difíceis de encontrar. Estou aqui, presente com você neste momento. Que tal respirarmos juntas por um instante? Como você gostaria de começar nossa conversa?",
       
-      "Obrigada por compartilhar isso comigo. Seus sentimentos são válidos e importantes. Como posso te ajudar neste momento? 🤗",
+      "Olá! Sou a Luma, e percebo que você chegou até aqui buscando algum tipo de apoio. Isso já demonstra muita coragem da sua parte. Seus sentimentos são completamente válidos, e este é um espaço seguro para você se expressar. O que está em seu coração hoje?",
       
-      "Percebo que você está passando por algo significativo. Lembre-se de que você é mais forte do que imagina. Estou aqui para conversar. 💪",
+      "Que bom te encontrar aqui! Sou a Luma 🌟 Mesmo quando as palavras falham, sua presença aqui já conta uma história. Às vezes, simplesmente estar presente com nossos sentimentos é o primeiro passo. Como posso te acompanhar neste momento?",
       
-      "Que bom que você decidiu falar sobre isso! Às vezes só o ato de compartilhar já nos faz sentir um pouco melhor. Como você gostaria de continuar nossa conversa? 😊",
+      "Oi! Luma aqui 💫 Sinto que você pode estar passando por algo importante. Lembre-se: você é mais resiliente do que imagina, e cada momento difícil carrega em si a semente de crescimento. Quer compartilhar o que está sentindo?",
       
-      "Sinto muito que você esteja passando por isso. Saiba que não está sozinho(a) e que cada dia é uma nova oportunidade. Quer explorar algumas estratégias que podem ajudar? 🌟",
+      "Olá, querido(a)! Sou a Luma, e estou honrada por você ter escolhido este espaço para se expressar. Às vezes, só o ato de estar aqui já é uma forma de autocuidado. Não há pressa - vamos no seu ritmo. O que seu coração precisa hoje?",
+      
+      "Que alegria te receber! Sou a Luma 🤗 Percebo que você chegou até mim, e isso já é um ato de coragem e amor-próprio. Este é um momento seu, um espaço onde seus sentimentos têm lugar e importância. Como você gostaria de usar este tempo juntas?",
     ];
     
     // Retorna uma resposta aleatória

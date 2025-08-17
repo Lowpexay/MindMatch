@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../utils/app_colors.dart';
 import '../widgets/global_drawer.dart';
 import '../providers/conversations_provider.dart';
+import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'ai_chat_screen.dart';
 import 'conversations_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
+
+  // Chave global para acessar o drawer
+  static final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+  // Chave global para acessar métodos da ConversationsScreen
+  static final GlobalKey<ConversationsScreenState> conversationsKey = GlobalKey<ConversationsScreenState>();
+  // Chave global para acessar métodos da AiChatScreen
+  static final GlobalKey<AiChatScreenState> aiChatKey = GlobalKey<AiChatScreenState>();
 
   @override
   State<MainNavigation> createState() => _MainNavigationState();
@@ -19,14 +28,17 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> _screens = [
     const HomeScreen(),
-    const ConversationsScreen(),
-    const AiChatScreen(userMood: null), // IA sem contexto de humor específico
+    ConversationsScreen(key: MainNavigation.conversationsKey),
+    AiChatScreen(key: MainNavigation.aiChatKey, userMood: null), // IA sem contexto de humor específico
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: MainNavigation.scaffoldKey,
+      backgroundColor: AppColors.gray50,
       drawer: const GlobalDrawer(),
+      appBar: _buildAppBar(),
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
@@ -149,5 +161,328 @@ class _MainNavigationState extends State<MainNavigation> {
         ),
       ),
     );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    String title;
+    String? subtitle;
+    
+    switch (_currentIndex) {
+      case 0:
+        title = 'MindMatch';
+        subtitle = _getGreeting();
+        break;
+      case 1:
+        title = 'Conversas';
+        break;
+      case 2:
+        title = 'Luma';
+        subtitle = 'Sua assistente de bem-estar';
+        break;
+      default:
+        title = 'MindMatch';
+    }
+
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      toolbarHeight: 80,
+      leading: Builder(
+        builder: (context) => IconButton(
+          onPressed: () => MainNavigation.scaffoldKey.currentState?.openDrawer(),
+          icon: const Icon(Icons.menu, color: AppColors.textPrimary),
+        ),
+      ),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          if (subtitle != null)
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        // Mostrar ações baseadas na aba atual
+        if (_currentIndex == 1) // Conversas
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              onPressed: () {
+                // Chamar método da ConversationsScreen usando a chave global
+                MainNavigation.conversationsKey.currentState?.showConversationOptions();
+              },
+              icon: const Icon(
+                Icons.more_vert,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        
+        if (_currentIndex == 2) // IA Chat
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              onPressed: () {
+                // Chamar método da AiChatScreen usando a chave global
+                _showAiChatOptions();
+              },
+              icon: const Icon(
+                Icons.more_vert,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        
+        // Avatar do usuário sempre visível
+        Container(
+          margin: const EdgeInsets.only(right: 16),
+          child: GestureDetector(
+            onTap: _showUserMenu,
+            child: CircleAvatar(
+              radius: 20,
+              backgroundColor: AppColors.primary,
+              child: const Icon(
+                Icons.person,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Bom dia!';
+    } else if (hour < 18) {
+      return 'Boa tarde!';
+    } else {
+      return 'Boa noite!';
+    }
+  }
+
+  void _showAiChatOptions() {
+    // Chamar método do AiChatScreen usando a chave global
+    MainNavigation.aiChatKey.currentState?.showChatOptions();
+  }
+
+  void _showUserMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle visual
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.gray300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Header do perfil
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: AppColors.primary,
+                  child: const Icon(
+                    Icons.person,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Meu Perfil',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        'Gerencie sua conta',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            
+            // Opções do menu
+            _buildMenuOption(
+              icon: Icons.edit,
+              title: 'Editar Perfil',
+              subtitle: 'Alterar informações pessoais',
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/profile');
+              },
+            ),
+            
+            _buildMenuOption(
+              icon: Icons.settings,
+              title: 'Configurações',
+              subtitle: 'Preferências do app',
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/settings');
+              },
+            ),
+            
+            _buildMenuOption(
+              icon: Icons.help_outline,
+              title: 'Ajuda e Suporte',
+              subtitle: 'Central de ajuda',
+              onTap: () {
+                Navigator.pop(context);
+                _showHelpDialog();
+              },
+            ),
+            
+            const Divider(height: 24),
+            
+            _buildMenuOption(
+              icon: Icons.logout,
+              title: 'Sair',
+              subtitle: 'Fazer logout da conta',
+              iconColor: Colors.red,
+              textColor: Colors.red,
+              onTap: () async {
+                Navigator.pop(context);
+                await _handleLogout();
+              },
+            ),
+            
+            // Espaço para SafeArea
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    Color? iconColor,
+    Color? textColor,
+  }) {
+    return ListTile(
+      onTap: onTap,
+      contentPadding: EdgeInsets.zero,
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: (iconColor ?? AppColors.primary).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          icon,
+          color: iconColor ?? AppColors.primary,
+          size: 20,
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: textColor ?? AppColors.textPrimary,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          fontSize: 14,
+          color: AppColors.textSecondary,
+        ),
+      ),
+      trailing: Icon(
+        Icons.arrow_forward_ios,
+        size: 16,
+        color: AppColors.gray400,
+      ),
+    );
+  }
+
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Ajuda e Suporte'),
+        content: const Text(
+          'MindMatch - Conectando pessoas com afinidades emocionais.\n\n'
+          '📱 Versão: 1.0.0\n'
+          '💙 Para suporte: mindmatch@exemplo.com\n\n'
+          'Este app foi desenvolvido para promover conexões humanas '
+          'significativas baseadas em bem-estar emocional.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleLogout() async {
+    try {
+      final authService = Provider.of<AuthService?>(context, listen: false);
+      await authService?.signOut();
+      if (mounted) {
+        context.go('/login');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao fazer logout. Tente novamente.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

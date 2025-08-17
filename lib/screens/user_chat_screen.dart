@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
+import '../providers/conversations_provider.dart';
 import '../models/conversation_models.dart';
 import '../utils/app_colors.dart';
+import 'dart:async';
 
 class UserChatScreen extends StatefulWidget {
   final ChatUser otherUser;
@@ -22,7 +25,6 @@ class _UserChatScreenState extends State<UserChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocus = FocusNode();
   
-  List<ChatMessage> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
   String? _conversationId;
@@ -44,8 +46,8 @@ class _UserChatScreenState extends State<UserChatScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _firebaseService = Provider.of<FirebaseService>(context);
-    _authService = Provider.of<AuthService>(context);
+    _firebaseService = Provider.of<FirebaseService>(context, listen: false);
+    _authService = Provider.of<AuthService>(context, listen: false);
     
     print('🔧 didChangeDependencies called');
     print('🔥 FirebaseService: ${_firebaseService != null ? "✅ Available" : "❌ NULL"}');
@@ -84,14 +86,7 @@ class _UserChatScreenState extends State<UserChatScreen> {
       });
 
       if (conversationId != null) {
-        print('✅ Loading messages...');
-        // Carregar mensagens
-        await _loadMessages();
-        
-        print('👂 Setting up message listener...');
-        // Escutar novas mensagens em tempo real
-        _firebaseService?.listenToMessages(conversationId, _onNewMessage);
-        
+        print('✅ Chat initialized with conversation ID: $conversationId');
         // Marcar mensagens como lidas
         await _firebaseService?.markMessagesAsRead(conversationId, userId);
         print('✅ Chat initialized successfully');
@@ -108,38 +103,67 @@ class _UserChatScreenState extends State<UserChatScreen> {
     }
   }
 
-  Future<void> _loadMessages() async {
-    if (_conversationId == null) return;
-    
-    try {
-      final messages = await _firebaseService?.getMessages(_conversationId!) ?? [];
-      setState(() {
-        _messages = messages;
-      });
-      _scrollToBottom();
-    } catch (e) {
-      print('❌ Error loading messages: $e');
+  // StreamBuilder para tempo real - MELHORIA IMPLEMENTADA
+  Stream<List<ChatMessage>> _messagesStream() {
+    if (_conversationId == null) {
+      return Stream.value([]);
     }
+    
+    print('📬 Setting up messages stream for conversation: $_conversationId');
+    
+    return FirebaseFirestore.instance
+        .collection('conversations')
+        .doc(_conversationId)
+        .collection('messages')
+        .orderBy('timestamp', descending: false)
+        .snapshots()
+        .map((snapshot) {
+          print('📨 Stream received ${snapshot.docs.length} messages');
+          
+          final messages = snapshot.docs.map((doc) {
+            final data = doc.data();
+            
+            // Tratar timestamp de forma mais robusta
+            DateTime timestamp;
+            final timestampData = data['timestamp'];
+            if (timestampData is Timestamp) {
+              timestamp = timestampData.toDate();
+            } else if (timestampData is int) {
+              timestamp = DateTime.fromMillisecondsSinceEpoch(timestampData);
+            } else if (timestampData is String) {
+              timestamp = DateTime.tryParse(timestampData) ?? DateTime.now();
+            } else {
+              timestamp = DateTime.now();
+            }
+            
+            return ChatMessage(
+              id: doc.id,
+              conversationId: _conversationId!,
+              senderId: data['senderId'] ?? '',
+              receiverId: data['receiverId'] ?? '',
+              content: data['content'] ?? '',
+              timestamp: timestamp,
+              type: MessageType.values.firstWhere(
+                (type) => type.toString().split('.').last == data['type'],
+                orElse: () => MessageType.text,
+              ),
+            );
+          }).toList();
+          
+          // Mark as read when new messages arrive
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _markConversationAsRead();
+            _scrollToBottom();
+          });
+          
+          return messages;
+        });
   }
 
-  void _onNewMessage(ChatMessage message) {
-    // Verificar se a mensagem já existe para evitar duplicação
-    final messageExists = _messages.any((existingMessage) => existingMessage.id == message.id);
-    
-    if (!messageExists) {
-      print('📨 New message received: ${message.id}');
-      setState(() {
-        _messages.add(message);
-      });
-      _scrollToBottom();
-    } else {
-      print('⚠️ Message ${message.id} already exists, skipping...');
-    }
-    
-    // Marcar como lida se não foi enviada por mim
-    final userId = _authService?.currentUser?.uid;
-    if (message.senderId != userId && _conversationId != null) {
-      _firebaseService?.markMessagesAsRead(_conversationId!, userId!);
+  void _markConversationAsRead() {
+    if (_conversationId != null) {
+      final conversationsProvider = Provider.of<ConversationsProvider>(context, listen: false);
+      conversationsProvider.markConversationAsRead(_conversationId!);
     }
   }
 
@@ -178,11 +202,6 @@ class _UserChatScreenState extends State<UserChatScreen> {
       );
 
       print('📝 Created message object: ${message.id}');
-
-      // Adicionar mensagem localmente primeiro (UX mais rápida)
-      setState(() {
-        _messages.add(message);
-      });
       
       _messageController.clear();
       _scrollToBottom();
@@ -194,11 +213,6 @@ class _UserChatScreenState extends State<UserChatScreen> {
 
     } catch (e) {
       print('❌ Error sending message: $e');
-      
-      // Remover mensagem local se falhou
-      setState(() {
-        _messages.removeLast();
-      });
       
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -306,26 +320,45 @@ class _UserChatScreenState extends State<UserChatScreen> {
           ? _buildLoadingState()
           : Column(
               children: [
-                // Lista de mensagens
+                // Lista de mensagens com StreamBuilder - MELHORIA IMPLEMENTADA
                 Expanded(
-                  child: _messages.isEmpty
-                      ? _buildEmptyState()
-                      : ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _messages.length,
-                          itemBuilder: (context, index) {
-                            final message = _messages[index];
-                            final showDate = _shouldShowDateHeader(index);
-                            
-                            return Column(
-                              children: [
-                                if (showDate) _buildDateHeader(message.timestamp),
-                                _buildMessageBubble(message),
-                              ],
-                            );
-                          },
-                        ),
+                  child: StreamBuilder<List<ChatMessage>>(
+                    stream: _messagesStream(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return _buildLoadingState();
+                      }
+                      
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Text('Erro ao carregar mensagens: ${snapshot.error}'),
+                        );
+                      }
+                      
+                      final messages = snapshot.data ?? [];
+                      
+                      if (messages.isEmpty) {
+                        return _buildEmptyState();
+                      }
+                      
+                      return ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: messages.length,
+                        itemBuilder: (context, index) {
+                          final message = messages[index];
+                          final showDate = _shouldShowDateHeader(index, messages);
+                          
+                          return Column(
+                            children: [
+                              if (showDate) _buildDateHeader(message.timestamp),
+                              _buildMessageBubble(message),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
                 
                 // Campo de entrada de mensagem
@@ -612,11 +645,11 @@ class _UserChatScreenState extends State<UserChatScreen> {
     );
   }
 
-  bool _shouldShowDateHeader(int index) {
+  bool _shouldShowDateHeader(int index, List<ChatMessage> messages) {
     if (index == 0) return true;
     
-    final currentMessage = _messages[index];
-    final previousMessage = _messages[index - 1];
+    final currentMessage = messages[index];
+    final previousMessage = messages[index - 1];
     
     final currentDate = DateTime(
       currentMessage.timestamp.year,
@@ -769,9 +802,6 @@ class _UserChatScreenState extends State<UserChatScreen> {
     
     try {
       await _firebaseService?.clearConversation(_conversationId!);
-      setState(() {
-        _messages.clear();
-      });
       
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/conversation_models.dart';
 import '../services/firebase_service.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 
 class ConversationsProvider with ChangeNotifier {
   final FirebaseService _firebaseService;
@@ -29,6 +30,26 @@ class ConversationsProvider with ChangeNotifier {
   
   void _onConversationsUpdate(List<Conversation> conversations) {
     print('📱 ConversationsProvider: Received ${conversations.length} conversations');
+    
+    // Detectar novas mensagens para notificações
+    for (final newConv in conversations) {
+      final oldConv = _conversations.where((c) => c.id == newConv.id).firstOrNull;
+      
+      // Se é uma nova conversa ou tem mensagens não lidas novas
+      if (oldConv == null || (newConv.unreadCount > 0 && newConv.lastMessage != null && 
+          newConv.lastMessage!.senderId != _currentUserId)) {
+        
+        // Mostrar notificação apenas se não foi enviada por mim
+        if (newConv.lastMessage != null && newConv.lastMessage!.senderId != _currentUserId) {
+          NotificationService().showChatNotification(
+            senderName: newConv.otherUser.name,
+            message: newConv.lastMessage!.content,
+            conversationId: newConv.id,
+          );
+        }
+      }
+    }
+    
     _conversations = conversations;
     _isLoading = false;
     notifyListeners();

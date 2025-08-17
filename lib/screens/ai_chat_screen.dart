@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../services/gemini_service.dart';
+import '../services/elevenlabs_service.dart';
+import '../services/preferences_service.dart';
 import '../models/mood_data.dart';
 import '../utils/app_colors.dart';
 import '../utils/scaffold_utils.dart';
+import '../widgets/luma_voice_widget.dart';
 
 class AiChatScreen extends StatefulWidget {
   final MoodData? userMood;
@@ -24,16 +27,115 @@ class AiChatScreenState extends State<AiChatScreen> {
   List<ChatMessage> _messages = [];
   bool _isLoading = false;
   late GeminiService _geminiService;
+  
+  // Configurações de voz simplificadas
+  ElevenLabsService? _elevenLabsService;
+  String _interactionMode = 'text'; // 'text' ou 'voice'
+  bool _hasConfigured = false;
+  bool _hasInitialized = false; // Para evitar inicialização múltipla
+  
+  // Controle do modo visual de voz
+  bool _isVisualVoiceMode = false;
+  String? _currentSpeechText;
+  bool _isSpeakingNow = false;
 
   @override
   void initState() {
     super.initState();
     _geminiService = GeminiService();
     
-    // Enviar mensagem inicial de boas-vindas baseada no humor
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Inicializar ElevenLabs
+    try {
+      _elevenLabsService = ElevenLabsService();
+      print('✅ ElevenLabs inicializado');
+    } catch (e) {
+      print('⚠️ ElevenLabs não disponível: $e');
+    }
+    
+    // NÃO inicializar automaticamente - aguardar o usuário acessar a tela
+  }
+
+  /// Verifica se a tela está visível e inicializa a Luma apenas quando necessário
+  Future<void> _checkAndInitializeLuma() async {
+    // Verificar se já foi configurado
+    _hasConfigured = await PreferencesService.hasConfiguredLuma();
+    
+    if (_hasConfigured) {
+      // Carregar configurações salvas
+      _interactionMode = await PreferencesService.getLumaInteractionMode();
+      
+      // Se for modo voz, ativar modo visual
+      if (_interactionMode == 'voice') {
+        _isVisualVoiceMode = true;
+      }
+      
+      setState(() {});
+      
       _sendWelcomeMessage();
+    } else {
+      // Primeira vez - mostrar modal de configuração apenas se a tela estiver visível
+      if (mounted) {
+        _showInitialSetupModal();
+      }
+    }
+  }
+
+  /// Manipula o toque na Luma no modo voz
+  void _handleLumaTap() {
+    if (_isSpeakingNow) {
+      // Se estiver falando, parar
+      _elevenLabsService?.stop();
+      setState(() {
+        _isSpeakingNow = false;
+        _currentSpeechText = null;
+      });
+    }
+  }
+
+  /// Alterna para modo texto
+  Future<void> _switchToTextMode() async {
+    // Parar qualquer operação em andamento
+    _elevenLabsService?.stop();
+    
+    // Cancelar loading se estiver em progresso
+    if (_isLoading) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+    
+    await PreferencesService.setLumaInteractionMode('text');
+    setState(() {
+      _interactionMode = 'text';
+      _isVisualVoiceMode = false;
+      _isSpeakingNow = false;
+      _currentSpeechText = null;
     });
+    
+    ScaffoldUtils.showSuccessSnackBar('Modo de chat por texto ativado 💬');
+  }
+
+  /// Alterna para modo voz
+  Future<void> _switchToVoiceMode() async {
+    // Parar qualquer operação em andamento
+    _elevenLabsService?.stop();
+    
+    // Cancelar loading se estiver em progresso
+    if (_isLoading) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+    
+    await PreferencesService.setLumaInteractionMode('voice');
+    setState(() {
+      _interactionMode = 'voice';
+      _isVisualVoiceMode = true;
+      _isSpeakingNow = false;
+      _currentSpeechText = null;
+    });
+    
+    ScaffoldUtils.showSuccessSnackBar('Modo de conversa por voz ativado 🗣️🦊');
   }
 
   @override
@@ -53,10 +155,17 @@ class AiChatScreenState extends State<AiChatScreen> {
           "ao buscar apoio. Este é um espaço seguro onde seus sentimentos são válidos e importantes. "
           "Estou aqui, presente com você. Como posso te acompanhar neste momento?";
     } else {
-      welcomeMessage = "Olá! Sou a Luma ✨ É um prazer te encontrar aqui. Meu nome significa 'luz', "
-          "e estou aqui para iluminar sua jornada de bem-estar emocional. Este é um espaço acolhedor "
-          "onde você pode se expressar livremente, refletir sobre seus sentimentos e descobrir "
-          "recursos internos que já possui. Como você está se sentindo hoje?";
+      // Personalizar mensagem baseada no modo de interação
+      if (_interactionMode == 'voice') {
+        welcomeMessage = "Olá! Sou a Luma ✨ É um prazer te encontrar aqui. Meu nome significa 'luz', "
+            "e estou aqui para iluminar sua jornada de bem-estar emocional com minha voz. "
+            "Este é um espaço acolhedor onde você pode se expressar livremente. Como você está se sentindo hoje?";
+      } else {
+        welcomeMessage = "Olá! Sou a Luma ✨ É um prazer te encontrar aqui. Meu nome significa 'luz', "
+            "e estou aqui para iluminar sua jornada de bem-estar emocional. Este é um espaço acolhedor "
+            "onde você pode se expressar livremente, refletir sobre seus sentimentos e descobrir "
+            "recursos internos que já possui. Como você está se sentindo hoje?";
+      }
     }
 
     setState(() {
@@ -66,6 +175,11 @@ class AiChatScreenState extends State<AiChatScreen> {
         timestamp: DateTime.now(),
       ));
     });
+
+    _scrollToBottom();
+
+    // NÃO falar mensagem de boas-vindas automaticamente
+    // A Luma só fala quando o usuário enviar uma mensagem
   }
 
   Future<void> _sendMessage() async {
@@ -107,6 +221,12 @@ class AiChatScreenState extends State<AiChatScreen> {
       });
 
       _scrollToBottom();
+
+      // 🔊 FALAR RESPOSTA SE MODO VOZ ATIVO
+      if (_interactionMode == 'voice') {
+        await _speakMessage(response);
+      }
+
     } catch (e) {
       setState(() {
         _messages.add(ChatMessage(
@@ -136,9 +256,105 @@ class AiChatScreenState extends State<AiChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.gray50,
-      child: Column(
+    // Verificar se precisa inicializar quando a tela for construída
+    if (!_hasInitialized) {
+      _hasInitialized = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkAndInitializeLuma();
+      });
+    }
+    
+    // Se estiver no modo visual de voz, mostrar a interface da Luma
+    if (_isVisualVoiceMode) {
+      return Scaffold(
+        backgroundColor: AppColors.gray50,
+        body: Column(
+          children: [
+            // Interface visual da Luma
+            Expanded(
+              child: LumaVoiceWidget(
+                isSpeaking: _isSpeakingNow,
+                currentMessage: _currentSpeechText,
+                onTap: _handleLumaTap,
+              ),
+            ),
+            
+            // Input de texto para modo voz
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 4,
+                    offset: Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      focusNode: _messageFocus,
+                      decoration: InputDecoration(
+                        hintText: 'Digite sua mensagem para a Luma...',
+                        hintStyle: TextStyle(color: AppColors.textSecondary),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide(color: AppColors.gray300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide(color: AppColors.gray300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide(color: AppColors.primary),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                      maxLines: null,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _sendMessage(),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.send, color: Colors.white),
+                      onPressed: _isLoading ? null : _sendMessage,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Modo texto normal
+    return Scaffold(
+      backgroundColor: AppColors.gray50,
+      body: Column(
         children: [
           // Status do humor do usuário (se disponível)
           if (widget.userMood != null) _buildMoodStatusBar(),
@@ -450,6 +666,144 @@ class AiChatScreenState extends State<AiChatScreen> {
     }
   }
 
+  // 🆕 MODAL SIMPLES PARA ESCOLHA VOZ/TEXTO
+
+  void _showInitialSetupModal() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary,
+                    AppColors.primary.withOpacity(0.7),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.auto_awesome,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text('Olá! Sou a Luma'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Como você gostaria de conversar comigo?',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Opção Texto
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.gray300),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.text_fields, color: AppColors.primary),
+                title: const Text('Chat por Texto'),
+                subtitle: const Text('Conversaremos apenas escrevendo'),
+                onTap: () => _finishSetup('text'),
+              ),
+            ),
+            
+            const SizedBox(height: 12),
+            
+            // Opção Voz
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.gray300),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.record_voice_over, color: AppColors.primary),
+                title: const Text('Chat por Voz'),
+                subtitle: const Text('Eu falarei minhas respostas para você'),
+                onTap: () => _finishSetup('voice'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _finishSetup(String mode) async {
+    Navigator.pop(context);
+    
+    // Salvar configurações
+    await PreferencesService.setLumaInteractionMode(mode);
+    await PreferencesService.setLumaConfigured();
+    
+    // Atualizar estado local
+    setState(() {
+      _interactionMode = mode;
+      _hasConfigured = true;
+      
+      // Se escolheu voz, ativar modo visual
+      if (mode == 'voice') {
+        _isVisualVoiceMode = true;
+      }
+    });
+    
+    // Mostrar mensagem de confirmação
+    ScaffoldUtils.showSuccessSnackBar(
+      mode == 'voice' 
+        ? 'Ótimo! Agora você verá a Luma e ela falará com você 🗣️🦊' 
+        : 'Perfeito! Vamos conversar por texto 💬'
+    );
+    
+    // Enviar mensagem de boas-vindas
+    _sendWelcomeMessage();
+  }
+
+  /// Atualiza o método de fala para funcionar com o modo visual
+  Future<void> _speakMessage(String text) async {
+    if (_interactionMode != 'voice' || _elevenLabsService == null) return;
+    
+    try {
+      // Atualizar estado visual
+      setState(() {
+        _isSpeakingNow = true;
+        _currentSpeechText = text;
+      });
+      
+      print('🌐 Falando com ElevenLabs: $text');
+      await _elevenLabsService!.speak(text, voiceId: '21m00Tcm4TlvDq8ikWAM');
+      
+      // Limpar estado visual após falar
+      setState(() {
+        _isSpeakingNow = false;
+        _currentSpeechText = null;
+      });
+      
+    } catch (e) {
+      print('❌ Erro ao falar: $e');
+      setState(() {
+        _isSpeakingNow = false;
+        _currentSpeechText = null;
+      });
+      ScaffoldUtils.showErrorSnackBar('Erro ao reproduzir áudio');
+    }
+  }
+
   void showChatOptions() {
     showModalBottomSheet(
       context: context,
@@ -458,15 +812,38 @@ class AiChatScreenState extends State<AiChatScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Opções da Luma',
-              style: TextStyle(
+            Text(
+              _isVisualVoiceMode ? 'Opções da Conversa por Voz' : 'Opções da Luma',
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 20),
+            
+            // Opção para alternar modo
+            if (_isVisualVoiceMode)
+              ListTile(
+                leading: const Icon(Icons.chat_bubble_outline, color: AppColors.primary),
+                title: const Text('Voltar ao Chat por Texto'),
+                subtitle: const Text('Conversar com balões de mensagem'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _switchToTextMode();
+                },
+              )
+            else
+              ListTile(
+                leading: const Icon(Icons.record_voice_over, color: AppColors.primary),
+                title: const Text('Chat por Voz'),
+                subtitle: const Text('Conversar com a Luma visualmente'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _switchToVoiceMode();
+                },
+              ),
+            
             ListTile(
               leading: const Icon(Icons.refresh, color: AppColors.primary),
               title: const Text('Reiniciar conversa'),
@@ -476,6 +853,18 @@ class AiChatScreenState extends State<AiChatScreen> {
                 _restartConversation();
               },
             ),
+            
+            // Opção para parar fala (só no modo voz)
+            if (_isVisualVoiceMode)
+              ListTile(
+                leading: const Icon(Icons.volume_off, color: AppColors.error),
+                title: const Text('Parar fala atual'),
+                subtitle: const Text('Interromper a Luma se estiver falando'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _handleLumaTap();
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.auto_awesome, color: AppColors.primary),
               title: const Text('Sobre a Luma'),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/gemini_service.dart';
 import '../models/mood_data.dart';
 import '../utils/app_colors.dart';
+import '../utils/scaffold_utils.dart';
 
 class AiChatScreen extends StatefulWidget {
   final MoodData? userMood;
@@ -12,10 +13,10 @@ class AiChatScreen extends StatefulWidget {
   });
 
   @override
-  State<AiChatScreen> createState() => _AiChatScreenState();
+  State<AiChatScreen> createState() => AiChatScreenState();
 }
 
-class _AiChatScreenState extends State<AiChatScreen> {
+class AiChatScreenState extends State<AiChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocus = FocusNode();
@@ -135,68 +136,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.gray50,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: Builder(
-          builder: (context) => IconButton(
-            onPressed: () => Scaffold.of(context).openDrawer(),
-            icon: const Icon(Icons.menu, color: AppColors.textPrimary),
-          ),
-        ),
-        title: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary,
-                    AppColors.primary.withOpacity(0.7),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(
-                Icons.auto_awesome,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Luma',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                Text(
-                  'Sua assistente de bem-estar',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            onPressed: _showChatOptions,
-            icon: const Icon(Icons.more_vert, color: AppColors.textPrimary),
-          ),
-        ],
-      ),
-      body: Column(
+    return Container(
+      color: AppColors.gray50,
+      child: Column(
         children: [
           // Status do humor do usuário (se disponível)
           if (widget.userMood != null) _buildMoodStatusBar(),
@@ -508,7 +450,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     }
   }
 
-  void _showChatOptions() {
+  void showChatOptions() {
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
@@ -564,11 +506,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
     });
     _sendWelcomeMessage();
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Nova conversa iniciada com a Luma! ✨'),
-        backgroundColor: AppColors.primary,
-      ),
+    ScaffoldUtils.showSnackBar(
+      'Nova conversa iniciada com a Luma! ✨',
+      backgroundColor: AppColors.primary,
     );
   }
 
@@ -604,8 +544,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Dicas para nossa conversa 🌟'),
         content: const Text(
-          '�️ **Seja autêntico(a)**: Seus sentimentos são sempre válidos aqui\n\n'
-          '� **Sem pressa**: Vamos no seu ritmo, sem pressão\n\n'
+          '🗣️ **Seja autêntico(a)**: Seus sentimentos são sempre válidos aqui\n\n'
+          '⏰ **Sem pressa**: Vamos no seu ritmo, sem pressão\n\n'
           '🎯 **Compartilhe detalhes**: Quanto mais você me contar, melhor posso te acompanhar\n\n'
           '❓ **Faça perguntas**: Sobre técnicas, estratégias ou qualquer dúvida\n\n'
           '🔄 **Continue a conversa**: Cada troca constrói nossa conexão\n\n'

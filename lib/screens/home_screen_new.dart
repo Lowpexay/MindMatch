@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import '../services/gemini_service.dart';
@@ -782,7 +783,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               title: const Text('Sair'),
               onTap: () async {
                 Navigator.pop(context);
-                await _authService.signOut();
+                try {
+                  await _authService.signOut();
+                  if (context.mounted) {
+                    context.go('/login');
+                  }
+                } catch (e) {
+                  print('Erro no logout: $e');
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Erro ao sair. Tente novamente.'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
               },
             ),
           ],

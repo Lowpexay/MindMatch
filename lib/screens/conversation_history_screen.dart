@@ -192,7 +192,6 @@ class _ConversationHistoryScreenState extends State<ConversationHistoryScreen> {
                     children: [
                       // Nome do usuário
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
                             child: Text(
@@ -205,6 +204,7 @@ class _ConversationHistoryScreenState extends State<ConversationHistoryScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          const SizedBox(width: 8),
                           // Horário da última mensagem
                           Text(
                             conversation.formattedLastMessageTime,

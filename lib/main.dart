@@ -86,7 +86,7 @@ final GoRouter _router = GoRouter(
     ),
     GoRoute(
       path: '/home',
-      builder: (context, state) => const MainNavigation(),
+      builder: (context, state) => MainNavigation(key: MainNavigation.mainNavigationKey),
     ),
   ],
 );

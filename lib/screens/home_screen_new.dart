@@ -10,6 +10,7 @@ import '../utils/app_colors.dart';
 import '../widgets/mood_check_widget.dart';
 import '../widgets/reflective_questions_widget.dart';
 import '../widgets/compatible_users_widget.dart';
+import '../screens/main_navigation.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -334,10 +335,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           const SizedBox(height: 12),
           ElevatedButton.icon(
             onPressed: () {
-              // TODO: Abrir chat de apoio emocional
+              MainNavigation.navigateToAIChat();
             },
-            icon: const Icon(Icons.chat, size: 16),
-            label: const Text('Conversar com IA'),
+            icon: const Icon(Icons.psychology, size: 16),
+            label: const Text('Falar com a Luma'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
               foregroundColor: Colors.white,

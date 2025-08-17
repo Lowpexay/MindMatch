@@ -12,12 +12,22 @@ import 'conversations_screen.dart';
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
+  // Chave global para acessar a própria MainNavigation
+  static final GlobalKey<_MainNavigationState> mainNavigationKey = GlobalKey<_MainNavigationState>();
   // Chave global para acessar o drawer
   static final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
   // Chave global para acessar métodos da ConversationsScreen
   static final GlobalKey<ConversationsScreenState> conversationsKey = GlobalKey<ConversationsScreenState>();
   // Chave global para acessar métodos da AiChatScreen
   static final GlobalKey<AiChatScreenState> aiChatKey = GlobalKey<AiChatScreenState>();
+
+  // Método estático para navegar para a aba do chat IA
+  static void navigateToAIChat() {
+    final state = mainNavigationKey.currentState;
+    if (state != null) {
+      state.switchToTab(2); // Índice 2 é a aba do AI Chat
+    }
+  }
 
   @override
   State<MainNavigation> createState() => _MainNavigationState();
@@ -31,6 +41,15 @@ class _MainNavigationState extends State<MainNavigation> {
     ConversationsScreen(key: MainNavigation.conversationsKey),
     AiChatScreen(key: MainNavigation.aiChatKey, userMood: null), // IA sem contexto de humor específico
   ];
+
+  // Método para trocar de aba programaticamente
+  void switchToTab(int index) {
+    if (index >= 0 && index < _screens.length) {
+      setState(() {
+        _currentIndex = index;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

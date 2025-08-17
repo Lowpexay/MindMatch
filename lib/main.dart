@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'services/firebase_service.dart';
+import 'services/notification_service.dart';
 import 'providers/conversations_provider.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/login_screen.dart';
@@ -21,6 +22,10 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     print('✅ Firebase initialized successfully with proper options');
+    
+    // Inicializar o serviço de notificações
+    await NotificationService().initialize();
+    print('✅ Notification service initialized');
   } catch (e) {
     print('❌ Error initializing Firebase: $e');
   }
@@ -81,7 +86,7 @@ final GoRouter _router = GoRouter(
     ),
     GoRoute(
       path: '/home',
-      builder: (context, state) => const MainNavigation(),
+      builder: (context, state) => MainNavigation(key: MainNavigation.mainNavigationKey),
     ),
   ],
 );

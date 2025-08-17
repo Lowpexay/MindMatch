@@ -6,15 +6,16 @@ import '../providers/conversations_provider.dart';
 import '../utils/app_colors.dart';
 import '../models/conversation_models.dart';
 import 'user_chat_screen.dart';
+import '../utils/scaffold_utils.dart';
 
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
 
   @override
-  State<ConversationsScreen> createState() => _ConversationsScreenState();
+  State<ConversationsScreen> createState() => ConversationsScreenState();
 }
 
-class _ConversationsScreenState extends State<ConversationsScreen> {
+class ConversationsScreenState extends State<ConversationsScreen> {
   bool _isLoading = true;
   List<Conversation> _conversations = [];
   FirebaseService? _firebaseService;
@@ -40,33 +41,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.gray50,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: Builder(
-          builder: (context) => IconButton(
-            onPressed: () => Scaffold.of(context).openDrawer(),
-            icon: const Icon(Icons.menu, color: AppColors.textPrimary),
-          ),
-        ),
-        title: const Text(
-          'Conversas',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        actions: [
-          IconButton(
-            onPressed: _showConversationOptions,
-            icon: const Icon(Icons.more_vert, color: AppColors.textPrimary),
-          ),
-        ],
-      ),
-      body: _isLoading
+    return Container(
+      color: AppColors.gray50,
+      child: _isLoading
           ? _buildLoadingState()
           : _conversations.isEmpty
               ? _buildEmptyState()
@@ -370,7 +347,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     );
   }
 
-  void _showConversationOptions() {
+  void showConversationOptions() {
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
@@ -405,56 +382,6 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showArchivedConversations() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Funcionalidade em desenvolvimento'),
-        backgroundColor: AppColors.primary,
-      ),
-    );
-  }
-
-  void _showBlockedUsers() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Funcionalidade em desenvolvimento'),
-        backgroundColor: AppColors.primary,
-      ),
-    );
-  }
-
-  void _showChatSettings() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Funcionalidade em desenvolvimento'),
-        backgroundColor: AppColors.primary,
-      ),
-    );
-  }
-
-  void _showHelp() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Ajuda - Conversas'),
-        content: const Text(
-          'Como usar as conversas:\n\n'
-          '• Encontre pessoas compatíveis na tela inicial\n'
-          '• Clique em "Conversar" para iniciar um chat\n'
-          '• Suas conversas ficam salvas aqui\n'
-          '• Use o menu lateral para mais opções\n'
-          '• Notificações mostram mensagens não lidas',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Entendi'),
-          ),
-        ],
       ),
     );
   }
@@ -498,19 +425,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       final conversationsProvider = Provider.of<ConversationsProvider>(context, listen: false);
       conversationsProvider.updateUser(userId);
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Todas as conversas marcadas como lidas'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      ScaffoldUtils.showSuccessSnackBar('Todas as conversas marcadas como lidas');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erro ao marcar conversas como lidas'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldUtils.showErrorSnackBar('Erro ao marcar conversas como lidas');
     }
   }
 }

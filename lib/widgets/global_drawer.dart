@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import '../utils/app_colors.dart';
 
@@ -443,9 +444,29 @@ class GlobalDrawer extends StatelessWidget {
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
-              final authService = Provider.of<AuthService>(context, listen: false);
-              await authService.signOut();
+              try {
+                final authService = Provider.of<AuthService>(context, listen: false);
+                
+                // Fazer logout
+                await authService.signOut();
+                print('✅ SignOut realizado com sucesso');
+                
+                // Usar GoRouter para limpar toda a pilha e ir para login
+                if (context.mounted) {
+                  print('✅ Navegando para /login');
+                  context.go('/login');
+                }
+              } catch (e) {
+                print('❌ Erro no logout: $e');
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Erro ao sair. Tente novamente.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Sair'),

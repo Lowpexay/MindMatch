@@ -40,17 +40,8 @@ class GlobalNotificationService {
   Future<void> _setupGlobalListeners() async {
     if (_currentUserId == null) return;
 
-    // Escutar mudanças nas conversações em tempo real
-    print('👂 Setting up global conversations listener');
-    _conversationsSubscription = _firestore
-        .collection('conversations')
-        .where('participants', arrayContains: _currentUserId)
-        .snapshots()
-        .listen((snapshot) async {
-      await _processConversationChanges(snapshot);
-    });
-
-    // Escutar notificações diretas do usuário
+    // REMOVIDO: Escuta de conversações (deixar para o ConversationsProvider)
+    // Apenas escutar notificações diretas do usuário
     print('👂 Setting up global notifications listener');
     _notificationsSubscription = _firestore
         .collection('users')
@@ -63,37 +54,6 @@ class GlobalNotificationService {
         .listen((snapshot) async {
       await _processNotificationChanges(snapshot);
     });
-  }
-
-  Future<void> _processConversationChanges(QuerySnapshot snapshot) async {
-    for (var docChange in snapshot.docChanges) {
-      if (docChange.type == DocumentChangeType.modified) {
-        final data = docChange.doc.data() as Map<String, dynamic>;
-        final lastMessage = data['lastMessage'];
-        
-        if (lastMessage != null) {
-          final senderId = lastMessage['senderId'];
-          final content = lastMessage['content'];
-          final conversationId = docChange.doc.id;
-          
-          // Só mostrar notificação se:
-          // 1. A mensagem não foi enviada por mim
-          // 2. Não estou na tela do chat atual
-          // 3. A mensagem é nova (verificar timestamp)
-          if (senderId != _currentUserId && 
-              _currentChatScreen != conversationId &&
-              content != null && content.isNotEmpty) {
-            
-            await _showConversationNotification(
-              conversationId: conversationId,
-              senderId: senderId,
-              content: content,
-              timestamp: lastMessage['timestamp'],
-            );
-          }
-        }
-      }
-    }
   }
 
   Future<void> _processNotificationChanges(QuerySnapshot snapshot) async {
@@ -114,35 +74,6 @@ class GlobalNotificationService {
           }
         }
       }
-    }
-  }
-
-  Future<void> _showConversationNotification({
-    required String conversationId,
-    required String senderId,
-    required String content,
-    required int timestamp,
-  }) async {
-    try {
-      // Buscar nome do remetente
-      final senderDoc = await _firestore
-          .collection('users')
-          .doc(senderId)
-          .get();
-
-      final senderName = senderDoc.exists 
-          ? (senderDoc.data()?['name'] ?? 'Usuário')
-          : 'Usuário';
-
-      await _notificationService.showChatNotification(
-        senderName: senderName,
-        message: content,
-        conversationId: conversationId,
-      );
-
-      print('🔔 Global notification shown: $senderName -> $content');
-    } catch (e) {
-      print('❌ Error showing global notification: $e');
     }
   }
 

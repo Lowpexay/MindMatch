@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
+import '../services/global_notification_service.dart';
 import '../providers/conversations_provider.dart';
 import '../models/conversation_models.dart';
 import '../utils/app_colors.dart';
@@ -31,6 +32,7 @@ class _UserChatScreenState extends State<UserChatScreen> {
   
   FirebaseService? _firebaseService;
   AuthService? _authService;
+  GlobalNotificationService? _globalNotificationService;
 
   @override
   void initState() {
@@ -48,6 +50,7 @@ class _UserChatScreenState extends State<UserChatScreen> {
     super.didChangeDependencies();
     _firebaseService = Provider.of<FirebaseService>(context, listen: false);
     _authService = Provider.of<AuthService>(context, listen: false);
+    _globalNotificationService = Provider.of<GlobalNotificationService>(context, listen: false);
     
     print('🔧 didChangeDependencies called');
     print('🔥 FirebaseService: ${_firebaseService != null ? "✅ Available" : "❌ NULL"}');
@@ -57,6 +60,8 @@ class _UserChatScreenState extends State<UserChatScreen> {
 
   @override
   void dispose() {
+    // Limpar a tela ativa de chat ao sair
+    _globalNotificationService?.setActiveChatScreen(null);
     _messageController.dispose();
     _scrollController.dispose();
     _messageFocus.dispose();
@@ -87,6 +92,10 @@ class _UserChatScreenState extends State<UserChatScreen> {
 
       if (conversationId != null) {
         print('✅ Chat initialized with conversation ID: $conversationId');
+        
+        // Informar ao GlobalNotificationService qual chat está ativo
+        _globalNotificationService?.setActiveChatScreen(conversationId);
+        
         // Marcar mensagens como lidas
         await _firebaseService?.markMessagesAsRead(conversationId, userId);
         print('✅ Chat initialized successfully');

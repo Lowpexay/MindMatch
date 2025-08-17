@@ -8,6 +8,7 @@ import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'services/firebase_service.dart';
 import 'services/notification_service.dart';
+import 'services/global_notification_service.dart';
 import 'providers/conversations_provider.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/login_screen.dart';
@@ -42,6 +43,7 @@ class MindMatchApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()),
         Provider(create: (_) => FirebaseService()),
+        Provider(create: (_) => GlobalNotificationService()),
         ChangeNotifierProxyProvider2<AuthService, FirebaseService, ConversationsProvider>(
           create: (context) => ConversationsProvider(
             Provider.of<FirebaseService>(context, listen: false),

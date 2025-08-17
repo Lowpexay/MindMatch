@@ -32,7 +32,6 @@ class AiChatScreenState extends State<AiChatScreen> {
   ElevenLabsService? _elevenLabsService;
   String _interactionMode = 'text'; // 'text' ou 'voice'
   bool _hasConfigured = false;
-  bool _hasInitialized = false; // Para evitar inicialização múltipla
   
   // Controle do modo visual de voz
   bool _isVisualVoiceMode = false;
@@ -53,6 +52,13 @@ class AiChatScreenState extends State<AiChatScreen> {
     }
     
     // NÃO inicializar automaticamente - aguardar o usuário acessar a tela
+  }
+
+  /// Método público chamado pelo MainNavigation quando a aba se torna ativa
+  Future<void> checkAndInitializeWhenActive() async {
+    if (!_hasConfigured) {
+      await _checkAndInitializeLuma();
+    }
   }
 
   /// Verifica se a tela está visível e inicializa a Luma apenas quando necessário
@@ -256,13 +262,8 @@ class AiChatScreenState extends State<AiChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Verificar se precisa inicializar quando a tela for construída
-    if (!_hasInitialized) {
-      _hasInitialized = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _checkAndInitializeLuma();
-      });
-    }
+    // REMOVIDO: Inicialização automática quando a tela é construída
+    // Agora só inicializa quando o usuário realmente acessa a aba
     
     // Se estiver no modo visual de voz, mostrar a interface da Luma
     if (_isVisualVoiceMode) {

@@ -5,6 +5,7 @@ import '../utils/app_colors.dart';
 import '../widgets/global_drawer.dart';
 import '../providers/conversations_provider.dart';
 import '../services/auth_service.dart';
+import '../services/global_notification_service.dart';
 import 'home_screen.dart';
 import 'ai_chat_screen.dart';
 import 'conversations_screen.dart';
@@ -35,6 +36,7 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
+  bool _notificationServiceInitialized = false;
 
   final List<Widget> _screens = [
     const HomeScreen(),
@@ -42,12 +44,44 @@ class _MainNavigationState extends State<MainNavigation> {
     AiChatScreen(key: MainNavigation.aiChatKey, userMood: null), // IA sem contexto de humor específico
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeGlobalNotifications();
+    });
+  }
+
+  Future<void> _initializeGlobalNotifications() async {
+    if (_notificationServiceInitialized) return;
+
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final globalNotificationService = Provider.of<GlobalNotificationService>(context, listen: false);
+      
+      if (authService.isAuthenticated) {
+        await globalNotificationService.initialize(authService);
+        _notificationServiceInitialized = true;
+        print('✅ Global notification service initialized');
+      }
+    } catch (e) {
+      print('❌ Error initializing global notification service: $e');
+    }
+  }
+
   // Método para trocar de aba programaticamente
   void switchToTab(int index) {
     if (index >= 0 && index < _screens.length) {
       setState(() {
         _currentIndex = index;
       });
+      
+      // Notificar AiChatScreen quando se tornar ativo
+      if (index == 2) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          MainNavigation.aiChatKey.currentState?.checkAndInitializeWhenActive();
+        });
+      }
     }
   }
 
@@ -116,6 +150,13 @@ class _MainNavigationState extends State<MainNavigation> {
         setState(() {
           _currentIndex = index;
         });
+        
+        // Notificar AiChatScreen quando for selecionado
+        if (index == 2) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            MainNavigation.aiChatKey.currentState?.checkAndInitializeWhenActive();
+          });
+        }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

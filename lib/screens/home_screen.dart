@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import '../services/gemini_service.dart';
@@ -10,8 +11,8 @@ import '../utils/app_colors.dart';
 import '../widgets/mood_check_widget.dart';
 import '../widgets/reflective_questions_widget.dart';
 import '../widgets/compatible_users_widget.dart';
-import '../screens/ai_chat_screen.dart';
 import '../screens/user_chat_screen.dart';
+import '../screens/main_navigation.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -205,63 +206,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.gray50,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        toolbarHeight: 80, // Aumentando altura para mais espaço
-        leading: Builder(
-          builder: (context) => IconButton(
-            onPressed: () => Scaffold.of(context).openDrawer(),
-            icon: const Icon(Icons.menu, color: AppColors.textPrimary),
-          ),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'MindMatch',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 4), // Espaçamento entre título e saudação
-            Text(
-              _getGreeting(),
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          // Wellness score indicator
-          if (_todayMood != null)
-            _buildWellnessIndicator(),
-          
-          const SizedBox(width: 8), // Espaçamento antes do ícone de perfil
-          
-          IconButton(
-            onPressed: _showProfileMenu,
-            icon: CircleAvatar(
-              radius: 18, // Ligeiramente maior
-              backgroundColor: AppColors.primary,
-              child: Icon(
-                Icons.person,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-          ),
-          
-          const SizedBox(width: 8), // Espaçamento na direita
-        ],
-      ),
-      body: _isLoading
+    return Container(
+      color: AppColors.gray50,
+      child: _isLoading
           ? _buildLoadingState()
           : SingleChildScrollView( // Mudança principal: ScrollView unificado
               padding: const EdgeInsets.all(16),
@@ -502,15 +449,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 12),
           ElevatedButton.icon(
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AiChatScreen(userMood: _todayMood),
-                ),
-              );
+              MainNavigation.navigateToAIChat();
             },
-            icon: const Icon(Icons.chat, size: 16),
-            label: const Text('Conversar com IA'),
+            icon: const Icon(Icons.psychology, size: 16),
+            label: const Text('Falar com a Luma'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue,
               foregroundColor: Colors.white,
@@ -1378,7 +1320,22 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('Sair'),
               onTap: () async {
                 Navigator.pop(context);
-                await _authService?.signOut();
+                try {
+                  await _authService?.signOut();
+                  if (context.mounted) {
+                    context.go('/login');
+                  }
+                } catch (e) {
+                  print('Erro no logout: $e');
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Erro ao sair. Tente novamente.'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
               },
             ),
           ],

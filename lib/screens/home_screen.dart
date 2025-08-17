@@ -12,7 +12,6 @@ import '../widgets/mood_check_widget.dart';
 import '../widgets/reflective_questions_widget.dart';
 import '../widgets/compatible_users_widget.dart';
 import '../screens/user_chat_screen.dart';
-import '../screens/main_navigation.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ReflectiveQuestion> _dailyQuestions = [];
   List<Map<String, dynamic>> _compatibleUsers = [];
   Map<String, bool> _questionAnswers = {};
-  String? _supportMessage;
+  // Removido: _supportMessage - mensagens da Luma agora só aparecem na aba dela
   
   // Services
   FirebaseService? _firebaseService;
@@ -86,13 +85,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _todayMood = mood;
       });
 
-      // Se precisa de apoio emocional, gerar mensagem
-      if (mood?.needsSupport == true) {
-        final supportMsg = await _geminiService.generateEmotionalSupport(mood!);
-        setState(() {
-          _supportMessage = supportMsg;
-        });
-      }
+      // Removido: geração automática de mensagem de apoio emocional
+      // As mensagens da Luma agora só aparecem quando o usuário vai para a aba dela
     } catch (e) {
       print('❌ Error loading mood: $e');
     }
@@ -215,12 +209,6 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Support message if needed - só para quem está mal
-                  if (_supportMessage != null && _todayMood?.needsSupport == true) ...[
-                    _buildSupportMessage(),
-                    const SizedBox(height: 24),
-                  ],
-                  
                   // Mood Check Section
                   _buildSectionCard(
                     icon: Icons.mood,
@@ -392,74 +380,6 @@ class _HomeScreenState extends State<HomeScreen> {
               fontSize: 12,
               fontWeight: FontWeight.bold,
               color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSupportMessage() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.blue.withOpacity(0.1),
-            Colors.purple.withOpacity(0.1),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.blue.withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.psychology,
-                color: Colors.blue,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Apoio Emocional',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            _supportMessage!,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.5,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-            onPressed: () {
-              MainNavigation.navigateToAIChat();
-            },
-            icon: const Icon(Icons.psychology, size: 16),
-            label: const Text('Falar com a Luma'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
             ),
           ),
         ],
@@ -928,13 +848,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _todayMood = updatedMood;
       });
 
-      // Verificar se precisa de apoio
-      if (updatedMood.needsSupport && _supportMessage == null) {
-        final supportMsg = await _geminiService.generateEmotionalSupport(updatedMood);
-        setState(() {
-          _supportMessage = supportMsg;
-        });
-      }
+      // Removido: geração automática de apoio emocional
+      // As mensagens da Luma agora só aparecem quando o usuário vai para a aba dela
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

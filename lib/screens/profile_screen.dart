@@ -26,9 +26,7 @@ class ProfileScreen extends StatelessWidget {
         title: Text(
           "Perfil",
           style: TextStyle(
-            color:AppColorsProfile.whiteBack,
-            fontWeight: FontWeight.bold
-          ),
+              color: AppColorsProfile.whiteBack, fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
@@ -42,7 +40,30 @@ class ProfileScreen extends StatelessWidget {
         centerTitle: true,
         backgroundColor: AppColorsProfile.purpleBack,
       ),
-      body: Container(),
+      body: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: MediaQuery.of(context).size.width,
+              height: MediaQuery.of(context).size.height * 0.4,
+              decoration: BoxDecoration(
+                  color: AppColorsProfile.purpleBack,
+                  borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(12),
+                      bottomRight: Radius.circular(12))),
+            ),
+            Container(
+              width: MediaQuery.of(context).size.width,
+              height: MediaQuery.of(context).size.height,
+              decoration: BoxDecoration(
+                  border: Border.all(
+                      color: Colors.black, width: 2, style: BorderStyle.solid)),
+            )
+          ],
+        ),
+      ),
     );
   }
 }

@@ -530,6 +530,34 @@ class FirebaseService {
     }
   }
 
+  // Método para obter apenas as perguntas criadas hoje
+  Future<List<ReflectiveQuestion>> getTodayQuestions() async {
+    try {
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      print('🔍 Getting questions from ${startOfDay.toIso8601String()} to ${endOfDay.toIso8601String()}');
+
+      final query = await _firestore
+          .collection('questions')
+          .where('createdAt', isGreaterThanOrEqualTo: startOfDay.millisecondsSinceEpoch)
+          .where('createdAt', isLessThan: endOfDay.millisecondsSinceEpoch)
+          .orderBy('createdAt')
+          .get();
+
+      final questions = query.docs
+          .map((doc) => ReflectiveQuestion.fromMap(doc.data()))
+          .toList();
+      
+      print('📊 Found ${questions.length} questions for today');
+      return questions;
+    } catch (e) {
+      print('❌ Error getting today questions: $e');
+      return [];
+    }
+  }
+
   Future<List<QuestionResponse>> getUserResponses(String userId) async {
     try {
       final query = await _firestore
@@ -542,6 +570,34 @@ class FirebaseService {
           .toList();
     } catch (e) {
       print('Error getting user responses: $e');
+      return [];
+    }
+  }
+
+  // Método para obter apenas as respostas do usuário para hoje
+  Future<List<QuestionResponse>> getTodayUserResponses(String userId) async {
+    try {
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      print('🔍 Getting user responses from ${startOfDay.toIso8601String()} to ${endOfDay.toIso8601String()}');
+
+      final query = await _firestore
+          .collection('question_responses')
+          .where('userId', isEqualTo: userId)
+          .where('answeredAt', isGreaterThanOrEqualTo: startOfDay.millisecondsSinceEpoch)
+          .where('answeredAt', isLessThan: endOfDay.millisecondsSinceEpoch)
+          .get();
+
+      final responses = query.docs
+          .map((doc) => QuestionResponse.fromMap(doc.data()))
+          .toList();
+      
+      print('📊 Found ${responses.length} responses for today');
+      return responses;
+    } catch (e) {
+      print('❌ Error getting today user responses: $e');
       return [];
     }
   }

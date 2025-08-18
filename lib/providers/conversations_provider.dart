@@ -35,24 +35,46 @@ class ConversationsProvider with ChangeNotifier {
     for (final newConv in conversations) {
       final oldConv = _conversations.where((c) => c.id == newConv.id).firstOrNull;
       
-      // Se é uma nova conversa ou tem mensagens não lidas novas
-      if (oldConv == null || (newConv.unreadCount > 0 && newConv.lastMessage != null && 
-          newConv.lastMessage!.senderId != _currentUserId)) {
+      // Verificar se há uma nova mensagem
+      bool hasNewMessage = false;
+      
+      if (oldConv == null) {
+        // Nova conversa - só notificar se a última mensagem não foi enviada por mim
+        hasNewMessage = newConv.lastMessage != null && 
+                       newConv.lastMessage!.senderId != _currentUserId;
+      } else {
+        // Conversa existente - verificar se a última mensagem mudou
+        final oldLastMessage = oldConv.lastMessage;
+        final newLastMessage = newConv.lastMessage;
         
-        // Mostrar notificação apenas se não foi enviada por mim
-        if (newConv.lastMessage != null && newConv.lastMessage!.senderId != _currentUserId) {
-          NotificationService().showChatNotification(
-            senderName: newConv.otherUser.name,
-            message: newConv.lastMessage!.content,
-            conversationId: newConv.id,
-          );
+        if (newLastMessage != null && oldLastMessage != null) {
+          // Verificar se é uma mensagem diferente (por ID ou timestamp)
+          hasNewMessage = newLastMessage.id != oldLastMessage.id &&
+                         newLastMessage.senderId != _currentUserId;
+        } else if (newLastMessage != null && oldLastMessage == null) {
+          // Primeira mensagem na conversa
+          hasNewMessage = newLastMessage.senderId != _currentUserId;
         }
+      }
+      
+      // Mostrar notificação se há nova mensagem
+      if (hasNewMessage && newConv.lastMessage != null) {
+        print('🔔 Showing notification for new message from ${newConv.otherUser.name}');
+        NotificationService().showChatNotification(
+          senderName: newConv.otherUser.name,
+          message: newConv.lastMessage!.content,
+          conversationId: newConv.id,
+        );
       }
     }
     
     _conversations = conversations;
     _isLoading = false;
     notifyListeners();
+    
+    // Debug: Imprimir contagem de não lidas
+    final totalUnread = conversations.fold(0, (sum, conv) => sum + conv.unreadCount);
+    print('📊 Total unread count: $totalUnread');
   }
   
   // Marcar conversa como lida

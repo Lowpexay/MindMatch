@@ -13,6 +13,7 @@ import 'providers/conversations_provider.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_navigation.dart';
+import 'screens/profile_screen.dart';
 import 'utils/app_colors.dart';
 
 void main() async {
@@ -89,6 +90,10 @@ final GoRouter _router = GoRouter(
     GoRoute(
       path: '/home',
       builder: (context, state) => MainNavigation(key: MainNavigation.mainNavigationKey),
+    ),
+    GoRoute(
+      path: '/profile',
+      builder: (context, state) => const ProfileScreen(),
     ),
   ],
 );

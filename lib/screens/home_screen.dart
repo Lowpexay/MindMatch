@@ -94,13 +94,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadDailyQuestions() async {
     try {
-      // Apenas carregar perguntas existentes do dia e respostas do usuário
-      var questions = await _firebaseService?.getAllQuestions() ?? [];
+      // Carregar apenas perguntas criadas hoje
+      var questions = await _firebaseService?.getTodayQuestions() ?? [];
       
-      // Carregar respostas do usuário
+      // Carregar apenas respostas do usuário para hoje
       final userId = _authService?.currentUser?.uid;
       if (userId != null) {
-        final responses = await _firebaseService?.getUserResponses(userId) ?? [];
+        final responses = await _firebaseService?.getTodayUserResponses(userId) ?? [];
         final answersMap = <String, bool>{};
         for (var response in responses) {
           answersMap[response.questionId] = response.answer;
@@ -110,9 +110,11 @@ class _HomeScreenState extends State<HomeScreen> {
           _dailyQuestions = questions;
           _questionAnswers = answersMap;
         });
+        
+        print('📱 Loaded ${questions.length} questions and ${responses.length} responses for today');
       }
     } catch (e) {
-      print('❌ Error loading questions: $e');
+      print('❌ Error loading daily questions: $e');
     }
   }
 

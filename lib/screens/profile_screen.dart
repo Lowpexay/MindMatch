@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 
+<<<<<<< HEAD
 class AppColorsProfile {
   static const Color whiteBack = Color(0xFFF9FAFA);
   static const Color purpleBack = Color(0xFF6365F1);
 }
 
+=======
+>>>>>>> 0d94b621915f181fdb5d4de3f1095f1994610f9c
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< HEAD
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -67,3 +71,12 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 }
+=======
+    return const Scaffold(
+      body: Center(
+        child: Text("Profile Screen"),
+      ),
+    );
+  }
+}
+>>>>>>> 0d94b621915f181fdb5d4de3f1095f1994610f9c

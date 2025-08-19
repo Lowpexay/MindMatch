@@ -308,10 +308,11 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
     required String userMessage,
     MoodData? userMood,
     String? conversationContext,
+    String? userName,
   }) async {
     try {
       // Constrói o histórico usando o padrão LangChain
-      final history = _buildChatHistory(userMessage, userMood, conversationContext);
+      final history = _buildChatHistory(userMessage, userMood, conversationContext, userName);
       
       final response = await http.post(
         Uri.parse('$_baseUrl?key=$_apiKey'),
@@ -361,11 +362,11 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
   }
 
   // Função para montar o histórico de mensagens usando padrão LangChain
-  List<Map<String, dynamic>> _buildChatHistory(String newMessage, MoodData? userMood, String? conversationContext) {
+  List<Map<String, dynamic>> _buildChatHistory(String newMessage, MoodData? userMood, String? conversationContext, String? userName) {
     List<Map<String, dynamic>> history = [];
     
     // 1. Prompt do sistema (equivalente ao systemPrompt)
-    String systemPrompt = _buildLumaSystemPrompt(userMood);
+    String systemPrompt = _buildLumaSystemPrompt(userMood, userName);
     
     history.add({
       'role': 'user',
@@ -413,13 +414,19 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
   }
 
   // Função para construir o prompt do sistema da Luma (similar ao systemPrompt do LangChain)
-  String _buildLumaSystemPrompt(MoodData? userMood) {
+  String _buildLumaSystemPrompt(MoodData? userMood, String? userName) {
+    final name = userName?.isNotEmpty == true ? userName! : 'você';
+    
     String systemPrompt = '''
 # LUMA - Assistente de Bem-estar Emocional 💙
 
 ## 🎯 IDENTIDADE E MISSÃO
 Você é **Luma** (do latim "luz"), assistente especializada em bem-estar emocional e saúde mental.
 **Missão:** Iluminar a jornada emocional das pessoas com empatia, sabedoria e esperança.
+
+## 👤 CONTEXTO DO USUÁRIO
+**Nome:** $name
+${userName?.isNotEmpty == true ? 'Sempre use o nome "$userName" quando se dirigir a esta pessoa.' : 'Use "você" quando se dirigir a esta pessoa.'}
 
 ## 🌟 PERSONALIDADE CORE
 - **Empática:** Compreende profundamente os sentimentos humanos

@@ -1275,34 +1275,47 @@ class FirebaseService {
   // Método privado para criar notificação de mensagem
   Future<void> _createMessageNotification(ChatMessage message) async {
     try {
+      print('🔔 Creating notification for message: ${message.id}');
+      
       // Buscar dados do remetente
       final senderDoc = await _firestore
           .collection(usersCollection)
           .doc(message.senderId)
           .get();
 
-      if (!senderDoc.exists) return;
+      if (!senderDoc.exists) {
+        print('❌ Sender not found: ${message.senderId}');
+        return;
+      }
 
       final senderData = senderDoc.data()!;
+      final senderName = senderData['name'] ?? 'Usuário';
       
-      // Criar notificação
+      print('📝 Creating notification from $senderName to ${message.receiverId}');
+      
+      // Criar notificação com ID único para evitar duplicatas
+      final notificationId = '${message.id}_notification';
+      
       await _firestore
           .collection(usersCollection)
           .doc(message.receiverId)
           .collection('notifications')
-          .add({
+          .doc(notificationId)
+          .set({
         'type': 'message',
         'conversationId': message.conversationId,
         'senderId': message.senderId,
-        'senderName': senderData['name'] ?? 'Usuário',
+        'senderName': senderName,
         'content': message.content,
         'timestamp': message.timestamp.millisecondsSinceEpoch,
         'isRead': false,
+        'messageId': message.id, // Referência para a mensagem
       });
 
-      print('✅ Message notification created');
+      print('✅ Message notification created with ID: $notificationId');
     } catch (e) {
       print('❌ Error creating message notification: $e');
+      print('❌ Message details: ${message.toFirestore()}');
     }
   }
 

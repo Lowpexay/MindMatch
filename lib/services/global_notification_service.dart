@@ -60,18 +60,31 @@ class GlobalNotificationService {
     for (var docChange in snapshot.docChanges) {
       if (docChange.type == DocumentChangeType.added) {
         final data = docChange.doc.data() as Map<String, dynamic>;
+        final notificationId = docChange.doc.id;
+        
+        print('🔔 Processing new notification: $notificationId');
+        print('📋 Notification data: ${data['type']} from ${data['senderName']}');
         
         if (data['type'] == 'message') {
           final conversationId = data['conversationId'];
+          final senderName = data['senderName'] ?? 'Usuário';
+          final content = data['content'] ?? 'Nova mensagem';
           
           // Evitar notificação se estiver no chat ativo
           if (_currentChatScreen != conversationId) {
+            print('📢 Showing notification for conversation: $conversationId');
             await _notificationService.showChatNotification(
-              senderName: data['senderName'] ?? 'Usuário',
-              message: data['content'] ?? 'Nova mensagem',
+              senderName: senderName,
+              message: content,
               conversationId: conversationId,
             );
+          } else {
+            print('🚫 Skipping notification - user is in active chat: $conversationId');
           }
+          
+          // Marcar como lida automaticamente após mostrar
+          await Future.delayed(Duration(milliseconds: 100));
+          await markNotificationAsRead(notificationId);
         }
       }
     }

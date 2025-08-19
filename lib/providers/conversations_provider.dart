@@ -40,26 +40,40 @@ class ConversationsProvider with ChangeNotifier {
       
       if (oldConv == null) {
         // Nova conversa - só notificar se a última mensagem não foi enviada por mim
+        // E se tem unread count > 0 (significa que há mensagens não lidas)
         hasNewMessage = newConv.lastMessage != null && 
-                       newConv.lastMessage!.senderId != _currentUserId;
+                       newConv.lastMessage!.senderId != _currentUserId &&
+                       newConv.unreadCount > 0;
       } else {
         // Conversa existente - verificar se a última mensagem mudou
         final oldLastMessage = oldConv.lastMessage;
         final newLastMessage = newConv.lastMessage;
         
-        if (newLastMessage != null && oldLastMessage != null) {
-          // Verificar se é uma mensagem diferente (por ID ou timestamp)
-          hasNewMessage = newLastMessage.id != oldLastMessage.id &&
-                         newLastMessage.senderId != _currentUserId;
-        } else if (newLastMessage != null && oldLastMessage == null) {
-          // Primeira mensagem na conversa
-          hasNewMessage = newLastMessage.senderId != _currentUserId;
+        if (newLastMessage != null) {
+          // Mensagem é nova se:
+          // 1. Não havia mensagem antes, OU
+          // 2. O ID da mensagem é diferente, OU
+          // 3. O timestamp é mais recente
+          bool isDifferentMessage = oldLastMessage == null ||
+                                   newLastMessage.id != oldLastMessage.id ||
+                                   newLastMessage.timestamp.isAfter(oldLastMessage.timestamp);
+          
+          // Só notificar se:
+          // - É uma mensagem diferente
+          // - Não foi enviada por mim
+          // - O unread count aumentou
+          hasNewMessage = isDifferentMessage &&
+                         newLastMessage.senderId != _currentUserId &&
+                         newConv.unreadCount > (oldConv.unreadCount);
         }
       }
       
       // Mostrar notificação se há nova mensagem
       if (hasNewMessage && newConv.lastMessage != null) {
         print('🔔 Showing notification for new message from ${newConv.otherUser.name}');
+        print('📋 Message: ${newConv.lastMessage!.content}');
+        print('📊 Unread count: ${newConv.unreadCount}');
+        
         NotificationService().showChatNotification(
           senderName: newConv.otherUser.name,
           message: newConv.lastMessage!.content,

@@ -5,6 +5,7 @@ import '../utils/app_colors.dart';
 import '../widgets/global_drawer.dart';
 import '../providers/conversations_provider.dart';
 import '../services/auth_service.dart';
+import '../services/firebase_service.dart';
 import '../services/global_notification_service.dart';
 import 'home_screen.dart';
 import 'ai_chat_screen.dart';
@@ -37,6 +38,7 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
   bool _notificationServiceInitialized = false;
+  String _userName = ''; // Nome do usuário
 
   final List<Widget> _screens = [
     const HomeScreen(),
@@ -49,7 +51,30 @@ class _MainNavigationState extends State<MainNavigation> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeGlobalNotifications();
+      _loadUserName();
     });
+  }
+
+  Future<void> _loadUserName() async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+      final userId = authService.currentUser?.uid;
+      
+      if (userId != null) {
+        final userProfile = await firebaseService.getUserProfile(userId);
+        setState(() {
+          _userName = userProfile?['name'] ?? authService.currentUser?.displayName ?? '';
+        });
+        print('👤 Nome do usuário carregado no header: $_userName');
+      }
+    } catch (e) {
+      print('❌ Error loading user name in header: $e');
+      final authService = Provider.of<AuthService>(context, listen: false);
+      setState(() {
+        _userName = authService.currentUser?.displayName ?? '';
+      });
+    }
   }
 
   Future<void> _initializeGlobalNotifications() async {
@@ -328,12 +353,14 @@ class _MainNavigationState extends State<MainNavigation> {
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
+    final name = _userName.isNotEmpty ? ', $_userName' : '';
+    
     if (hour < 12) {
-      return 'Bom dia!';
+      return 'Bom dia$name!';
     } else if (hour < 18) {
-      return 'Boa tarde!';
+      return 'Boa tarde$name!';
     } else {
-      return 'Boa noite!';
+      return 'Boa noite$name!';
     }
   }
 

@@ -12,6 +12,8 @@ import '../widgets/mood_check_widget.dart';
 import '../widgets/reflective_questions_widget.dart';
 import '../widgets/compatible_users_widget.dart';
 import '../screens/user_chat_screen.dart';
+import '../screens/ai_chat_screen.dart';
+import '../screens/main_navigation.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ReflectiveQuestion> _dailyQuestions = [];
   List<Map<String, dynamic>> _compatibleUsers = [];
   Map<String, bool> _questionAnswers = {};
+  String _userName = ''; // Nome do usuário
   // Removido: _supportMessage - mensagens da Luma agora só aparecem na aba dela
   
   // Services
@@ -64,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Carregar dados em paralelo
       await Future.wait([
+        _loadUserName(userId),
         _loadTodayMood(userId),
         _loadDailyQuestions(),
         _loadCompatibleUsers(userId),
@@ -74,6 +78,21 @@ class _HomeScreenState extends State<HomeScreen> {
     } finally {
       setState(() {
         _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadUserName(String userId) async {
+    try {
+      final userProfile = await _firebaseService?.getUserProfile(userId);
+      setState(() {
+        _userName = userProfile?['name'] ?? _authService?.currentUser?.displayName ?? 'Usuário';
+      });
+      print('👤 Nome do usuário carregado: $_userName');
+    } catch (e) {
+      print('❌ Error loading user name: $e');
+      setState(() {
+        _userName = _authService?.currentUser?.displayName ?? 'Usuário';
       });
     }
   }
@@ -211,6 +230,12 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Support Message Section - aparece quando bem-estar <= 50%
+                  if (_todayMood != null && _todayMood!.wellnessScore <= 50) ...[
+                    _buildSupportMessageCard(),
+                    const SizedBox(height: 24),
+                  ],
+                  
                   // Mood Check Section
                   _buildSectionCard(
                     icon: Icons.mood,
@@ -821,11 +846,195 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildSupportMessageCard() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF6C63FF).withOpacity(0.1),
+            const Color(0xFF4ECDC4).withOpacity(0.1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header com ícone e avatar da Luma
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    image: const DecorationImage(
+                      image: AssetImage('assets/images/luma_chat_avatar.png'),
+                      fit: BoxFit.cover,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Mensagem da Luma',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        'Sua assistente de bem-estar',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.favorite,
+                  color: Colors.pink.withOpacity(0.7),
+                  size: 20,
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Mensagem de apoio
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Olá! Percebi que você está passando por um momento difícil. 💙',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Lembre-se de que é completamente normal ter dias mais desafiadores. Você não está sozinho(a) nessa jornada. Estou aqui para conversar, ouvir e ajudar você a encontrar maneiras de se sentir melhor.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Que tal conversarmos um pouco? Às vezes, dividir nossos sentimentos pode trazer alívio e clareza. ✨',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Botão para conversar com a Luma
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  // Navegar para o chat com a Luma
+                  _navigateToLumaChat();
+                },
+                icon: const Icon(
+                  Icons.chat_bubble_outline,
+                  size: 20,
+                ),
+                label: const Text(
+                  'Conversar com a Luma',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToLumaChat() {
+    // Usar a navegação estática da MainNavigation para ir para a aba do AI Chat
+    // Importar MainNavigation se necessário
+    try {
+      // Navegar para a aba 2 (AI Chat) da MainNavigation
+      // Como estamos usando IndexedStack na MainNavigation, podemos usar o método estático
+      MainNavigation.navigateToAIChat();
+    } catch (e) {
+      print('❌ Erro ao navegar para o chat da Luma: $e');
+      // Fallback: tentar navegar diretamente
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AiChatScreen(userMood: _todayMood),
+        ),
+      );
+    }
+  }
+
   String _getGreeting() {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Bom dia!';
-    if (hour < 18) return 'Boa tarde!';
-    return 'Boa noite!';
+    final name = _userName.isNotEmpty ? ', $_userName' : '';
+    
+    if (hour < 12) return 'Bom dia$name!';
+    if (hour < 18) return 'Boa tarde$name!';
+    return 'Boa noite$name!';
   }
 
   Future<void> _handleMoodSubmission(MoodData moodData) async {

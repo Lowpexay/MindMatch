@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/gemini_service.dart';
 import '../services/elevenlabs_service.dart';
 import '../services/preferences_service.dart';
+import '../services/firebase_service.dart';
+import '../services/auth_service.dart';
 import '../models/mood_data.dart';
 import '../utils/app_colors.dart';
 import '../utils/scaffold_utils.dart';
@@ -27,6 +30,11 @@ class AiChatScreenState extends State<AiChatScreen> {
   List<ChatMessage> _messages = [];
   bool _isLoading = false;
   late GeminiService _geminiService;
+  String _userName = ''; // Nome do usuário
+  
+  // Services
+  FirebaseService? _firebaseService;
+  AuthService? _authService;
   
   // Configurações de voz simplificadas
   ElevenLabsService? _elevenLabsService;
@@ -52,6 +60,34 @@ class AiChatScreenState extends State<AiChatScreen> {
     }
     
     // NÃO inicializar automaticamente - aguardar o usuário acessar a tela
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _firebaseService = Provider.of<FirebaseService>(context);
+    _authService = Provider.of<AuthService>(context);
+    
+    // Carregar nome do usuário
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    try {
+      final userId = _authService?.currentUser?.uid;
+      if (userId != null) {
+        final userProfile = await _firebaseService?.getUserProfile(userId);
+        setState(() {
+          _userName = userProfile?['name'] ?? _authService?.currentUser?.displayName ?? '';
+        });
+        print('👤 Nome do usuário carregado no chat: $_userName');
+      }
+    } catch (e) {
+      print('❌ Error loading user name in chat: $e');
+      setState(() {
+        _userName = _authService?.currentUser?.displayName ?? '';
+      });
+    }
   }
 
   /// Método público chamado pelo MainNavigation quando a aba se torna ativa
@@ -154,20 +190,21 @@ class AiChatScreenState extends State<AiChatScreen> {
 
   void _sendWelcomeMessage() {
     String welcomeMessage;
+    final name = _userName.isNotEmpty ? _userName : 'você';
     
     if (widget.userMood?.needsSupport == true) {
-      welcomeMessage = "Olá, sou a Luma 💙 Percebo que hoje pode não estar sendo um dia fácil para você. "
+      welcomeMessage = "Olá $name, sou a Luma 💙 Percebo que hoje pode não estar sendo um dia fácil para você. "
           "Quero que saiba que é completamente normal sentir-se assim às vezes, e você foi muito corajoso(a) "
           "ao buscar apoio. Este é um espaço seguro onde seus sentimentos são válidos e importantes. "
           "Estou aqui, presente com você. Como posso te acompanhar neste momento?";
     } else {
       // Personalizar mensagem baseada no modo de interação
       if (_interactionMode == 'voice') {
-        welcomeMessage = "Olá! Sou a Luma ✨ É um prazer te encontrar aqui. Meu nome significa 'luz', "
+        welcomeMessage = "Olá $name! Sou a Luma ✨ É um prazer te encontrar aqui. Meu nome significa 'luz', "
             "e estou aqui para iluminar sua jornada de bem-estar emocional com minha voz. "
             "Este é um espaço acolhedor onde você pode se expressar livremente. Como você está se sentindo hoje?";
       } else {
-        welcomeMessage = "Olá! Sou a Luma ✨ É um prazer te encontrar aqui. Meu nome significa 'luz', "
+        welcomeMessage = "Olá $name! Sou a Luma ✨ É um prazer te encontrar aqui. Meu nome significa 'luz', "
             "e estou aqui para iluminar sua jornada de bem-estar emocional. Este é um espaço acolhedor "
             "onde você pode se expressar livremente, refletir sobre seus sentimentos e descobrir "
             "recursos internos que já possui. Como você está se sentindo hoje?";
@@ -216,6 +253,7 @@ class AiChatScreenState extends State<AiChatScreen> {
         userMessage: messageText,
         userMood: widget.userMood,
         conversationContext: conversationContext,
+        userName: _userName.isNotEmpty ? _userName : null,
       );
 
       setState(() {

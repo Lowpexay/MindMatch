@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import '../utils/app_colors.dart';
+import '../screens/quick_eventlog_test.dart';
+import '../screens/security_reports_screen.dart';
 
 class GlobalDrawer extends StatelessWidget {
   const GlobalDrawer({super.key});
@@ -179,6 +181,17 @@ class GlobalDrawer extends StatelessWidget {
                   },
                 ),
                 
+                _buildMenuItem(
+                  context,
+                  icon: Icons.network_check,
+                  title: 'Teste EventLog',
+                  subtitle: 'Testar conexão API',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _testEventLog(context);
+                  },
+                ),
+                
                 const Divider(height: 32),
                 
                 _buildMenuItem(
@@ -328,25 +341,10 @@ class GlobalDrawer extends StatelessWidget {
   }
 
   void _showReports(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Relatórios Personalizados'),
-        content: const Text(
-          'Acesse análises detalhadas sobre seu bem-estar, '
-          'compatibilidade com outros usuários e insights '
-          'gerados pela IA.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fechar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Ver Relatórios'),
-          ),
-        ],
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SecurityReportsScreen(),
       ),
     );
   }
@@ -424,6 +422,15 @@ class GlobalDrawer extends StatelessWidget {
             child: const Text('Fechar'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _testEventLog(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const QuickEventLogTest(),
       ),
     );
   }

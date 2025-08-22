@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class AppColorsProfile {
   static const Color whiteBack = Color(0xFFF9FAFA);
@@ -35,7 +36,7 @@ class ProfileScreen extends StatelessWidget {
             icon: Icon(Icons.edit),
             color: AppColorsProfile.whiteBack,
             onPressed: () {
-              print("editar");
+              context.go('/profileEdit');
             },
           )
         ],

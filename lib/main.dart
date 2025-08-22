@@ -15,6 +15,7 @@ import 'providers/conversations_provider.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_navigation.dart';
+import 'screens/profile_screen.dart';
 import 'utils/app_colors.dart';
 
 void main() async {

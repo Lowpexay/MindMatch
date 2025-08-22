@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../utils/app_colors.dart';
 import '../widgets/global_drawer.dart';
+import '../widgets/checkup_heart_widget.dart';
 import '../providers/conversations_provider.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
@@ -35,10 +36,12 @@ class MainNavigation extends StatefulWidget {
   State<MainNavigation> createState() => _MainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
+class _MainNavigationState extends State<MainNavigation> with TickerProviderStateMixin {
   int _currentIndex = 0;
   bool _notificationServiceInitialized = false;
   String _userName = ''; // Nome do usuário
+  PageController _pageController = PageController();
+  late AnimationController _animationController;
 
   final List<Widget> _screens = [
     const HomeScreen(),
@@ -49,10 +52,22 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: 0);
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeGlobalNotifications();
       _loadUserName();
     });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUserName() async {
@@ -97,6 +112,12 @@ class _MainNavigationState extends State<MainNavigation> {
   // Método para trocar de aba programaticamente
   void switchToTab(int index) {
     if (index >= 0 && index < _screens.length) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOutCubic,
+      );
+      
       setState(() {
         _currentIndex = index;
       });
@@ -117,8 +138,20 @@ class _MainNavigationState extends State<MainNavigation> {
       backgroundColor: AppColors.gray50,
       drawer: const GlobalDrawer(),
       appBar: _buildAppBar(),
-      body: IndexedStack(
-        index: _currentIndex,
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+          
+          // Notificar AiChatScreen quando se tornar ativo
+          if (index == 2) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              MainNavigation.aiChatKey.currentState?.checkAndInitializeWhenActive();
+            });
+          }
+        },
         children: _screens,
       ),
       bottomNavigationBar: Container(
@@ -172,6 +205,12 @@ class _MainNavigationState extends State<MainNavigation> {
     
     return GestureDetector(
       onTap: () {
+        _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOutCubic,
+        );
+        
         setState(() {
           _currentIndex = index;
         });
@@ -300,6 +339,13 @@ class _MainNavigationState extends State<MainNavigation> {
         ],
       ),
       actions: [
+        // Coração de streak - apenas na tela principal
+        if (_currentIndex == 0)
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: const CheckupHeartWidget(),
+          ),
+        
         // Mostrar ações baseadas na aba atual
         if (_currentIndex == 1) // Conversas
           Container(

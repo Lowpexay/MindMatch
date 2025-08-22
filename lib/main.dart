@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:mindmatch/screens/profile_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,10 +10,11 @@ import 'services/firebase_service.dart';
 import 'services/notification_service.dart';
 import 'services/global_notification_service.dart';
 import 'providers/conversations_provider.dart';
+import 'screens/profile_edit_screen.dart';
+import 'screens/profile_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_navigation.dart';
-import 'screens/profile_screen.dart';
 import 'utils/app_colors.dart';
 
 void main() async {
@@ -96,6 +96,11 @@ final GoRouter _router = GoRouter(
       path: '/profile',
       builder: (context, state) => const ProfileScreen(),
     ),
+    GoRoute(
+      path: '/profileEdit',
+      builder: (context, state) => const ProfileEditScreen(),
+    ),
+
   ],
 );
 

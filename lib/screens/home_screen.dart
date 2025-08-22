@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
-import '../services/gemini_service.dart';
+import '../services/checkup_streak_service.dart';
 import '../models/mood_data.dart';
 import '../models/question_models.dart';
 import '../models/conversation_models.dart';
@@ -35,13 +35,11 @@ class _HomeScreenState extends State<HomeScreen> {
   
   // Services
   FirebaseService? _firebaseService;
-  late GeminiService _geminiService;
   AuthService? _authService;
 
   @override
   void initState() {
     super.initState();
-    _geminiService = GeminiService();
     
     // Aguardar um frame antes de carregar dados
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -168,57 +166,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return true; // Todas as perguntas foram respondidas
   }
 
-  // Inicia a análise diária - gera perguntas personalizadas
-  void _startDailyAnalysis() async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-
-      final userId = _authService?.currentUser?.uid;
-      if (userId == null) return;
-
-      // Gerar perguntas aleatórias personalizadas para o usuário
-      final questions = await _geminiService.generateDailyQuestions(
-        count: 20, // Aumentado para 20 perguntas
-        userMood: _todayMood,
-        userId: userId, // Passa o userId para tornar as perguntas únicas
-      );
-      
-      // Salvar as novas perguntas
-      for (var question in questions) {
-        await _firebaseService?.saveQuestion(question);
-      }
-
-      setState(() {
-        _dailyQuestions = questions;
-        _questionAnswers.clear(); // Limpar respostas anteriores
-      });
-
-      // Mostrar mensagem de sucesso
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✨ Perguntas personalizadas geradas! Vamos começar a análise.'),
-          backgroundColor: AppColors.primary,
-          duration: Duration(seconds: 2),
-        ),
-      );
-
-    } catch (e) {
-      print('❌ Error starting daily analysis: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erro ao gerar análise. Tente novamente.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -254,68 +201,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         // Se já registrou, mostra apenas um resumo com botão para alterar
                         else 
                           _buildMoodSummaryCard(),
-                        
-                        // Botão de análise do dia - só aparece se o humor foi registrado E não há perguntas ainda
-                        if (_todayMood != null && _dailyQuestions.isEmpty) ...[
-                          const SizedBox(height: 16),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: AppColors.primary.withOpacity(0.3),
-                              ),
-                            ),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.psychology,
-                                  color: AppColors.primary,
-                                  size: 28,
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Análise do Dia',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Quer fazer uma reflexão mais profunda sobre seu dia?',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 12),
-                                ElevatedButton(
-                                  onPressed: () => _startDailyAnalysis(),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primary,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Gostaria de fazer a análise do seu dia?',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -1055,6 +940,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
       await _firebaseService?.saveMoodData(updatedMood);
       
+      // Marcar checkup como completo
+      final streakService = Provider.of<CheckupStreakService>(context, listen: false);
+      await streakService.completeCheckup();
+      
       setState(() {
         _todayMood = updatedMood;
       });
@@ -1064,7 +953,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Estado emocional registrado!'),
+          content: Text('Estado emocional registrado! 💖'),
           backgroundColor: Colors.green,
         ),
       );

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../security/eventlog_service.dart';
 // import 'package:sign_in_with_apple/sign_in_with_apple.dart'; // Temporariamente desabilitado
 
 class AuthService extends ChangeNotifier {
@@ -35,20 +36,53 @@ class AuthService extends ChangeNotifier {
 
   // Email and Password Sign In
   Future<UserCredential?> signInWithEmail(String email, String password) async {
+    String? userId;
+    String userName = email.split('@')[0]; // Nome baseado no email
+    
     try {
       final userCredential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+      
+      userId = userCredential.user?.uid;
+      
+      // Log successful login attempt
+      if (userId != null) {
+        await EventLogService.logLoginAttempt(
+          userId: userId,
+          userName: userName,
+          deviceInfo: kIsWeb ? 'web_browser' : 'mobile_device',
+          isSuccessful: true,
+          ipAddress: 'dynamic',
+        );
+        
+        // Configure security alerts for first-time users
+        await EventLogService.configureSecurityAlerts(userId);
+      }
+      
       return userCredential;
     } on FirebaseAuthException catch (e) {
       debugPrint('Error signing in: ${e.message}');
+      
+      // Log failed login attempt
+      await EventLogService.logLoginAttempt(
+        userId: userId ?? 'unknown',
+        userName: userName,
+        deviceInfo: kIsWeb ? 'web_browser' : 'mobile_device',
+        isSuccessful: false,
+        ipAddress: 'dynamic',
+      );
+      
       throw e;
     }
   }
 
   // Google Sign In
   Future<UserCredential?> signInWithGoogle() async {
+    String? userId;
+    String userName = 'google_user';
+    
     try {
       debugPrint('🔐 Iniciando Google Sign-In...');
       
@@ -62,6 +96,7 @@ class AuthService extends ChangeNotifier {
         return null;
       }
       
+      userName = googleUser.displayName ?? googleUser.email.split('@')[0];
       debugPrint('🔐 Usuário Google selecionado: ${googleUser.email}');
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
@@ -79,10 +114,35 @@ class AuthService extends ChangeNotifier {
       );
 
       final userCredential = await _auth.signInWithCredential(credential);
+      userId = userCredential.user?.uid;
+      
+      // Log successful login attempt
+      if (userId != null) {
+        await EventLogService.logLoginAttempt(
+          userId: userId,
+          userName: userName,
+          deviceInfo: kIsWeb ? 'web_browser' : 'mobile_device',
+          isSuccessful: true,
+          ipAddress: 'dynamic',
+        );
+        
+        // Configure security alerts for first-time users
+        await EventLogService.configureSecurityAlerts(userId);
+      }
+      
       debugPrint('✅ Google Sign In successful: ${userCredential.user?.email}');
       return userCredential;
     } catch (e) {
       debugPrint('❌ Error signing in with Google: $e');
+      
+      // Log failed login attempt
+      await EventLogService.logLoginAttempt(
+        userId: userId ?? 'unknown',
+        userName: userName,
+        deviceInfo: kIsWeb ? 'web_browser' : 'mobile_device',
+        isSuccessful: false,
+        ipAddress: 'dynamic',
+      );
       
       if (e.toString().contains('ApiException: 10')) {
         throw Exception('Erro de configuração do Google Sign-In. É necessário configurar as chaves SHA-1 no Firebase Console.');

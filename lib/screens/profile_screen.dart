@@ -21,9 +21,7 @@ class ProfileScreen extends StatelessWidget {
           color: Color(0xFFF9FAFA),
           tooltip: "Voltar",
           onPressed: () {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Voltar')));
+            context.go('/home');
           },
         ),
         title: Text(
@@ -36,7 +34,7 @@ class ProfileScreen extends StatelessWidget {
             icon: Icon(Icons.edit),
             color: AppColorsProfile.whiteBack,
             onPressed: () {
-              context.go('/profileEdit');
+              context.push('/profileEdit');
             },
           )
         ],
@@ -49,7 +47,6 @@ class ProfileScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            //Quadrado de cima
             Container(
               width: MediaQuery.of(context).size.width,
               height: MediaQuery.of(context).size.height * 0.3,

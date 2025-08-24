@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
+import '../services/firebase_service.dart';
+import '../services/auth_service.dart';
 
 class AppColorsProfile {
   static const Color whiteBack = Color(0xFFF9FAFA);
@@ -29,6 +33,10 @@ class _ProfileEditScreen extends State<ProfileEditScreen> {
   final TextEditingController instagramController = TextEditingController();
   final TextEditingController twitterController = TextEditingController();
 
+  File? _imageFile;
+  String? _existingImageUrl;
+  bool _isLoading = false;
+
   @override
   void dispose() {
     nomeController.dispose();
@@ -39,6 +47,49 @@ class _ProfileEditScreen extends State<ProfileEditScreen> {
     instagramController.dispose();
     twitterController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCurrentProfile());
+  }
+
+  Future<void> _loadCurrentProfile() async {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+
+    final user = auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final profile = await firebaseService.getUserProfile(user.uid);
+      if (profile != null) {
+        setState(() {
+          nomeController.text = (profile['name'] ?? '') as String;
+          emailController.text = (profile['email'] ?? '') as String;
+          cidadeController.text = (profile['city'] ?? '') as String;
+          bioController.text = (profile['bio'] ?? '') as String;
+          instagramController.text = (profile['instagram'] ?? '') as String;
+          twitterController.text = (profile['twitter'] ?? '') as String;
+          if (profile['birthdate'] != null) {
+            final ts = profile['birthdate'];
+            if (ts is int) {
+              final dt = DateTime.fromMillisecondsSinceEpoch(ts);
+              selectedDate = dt;
+              birthdayController.text = DateFormat('dd/MM/yyyy').format(dt);
+            } else if (ts is String) {
+              birthdayController.text = ts;
+            }
+          }
+          _existingImageUrl = profile['profileImageUrl'] as String?;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao carregar perfil: $e')));
+      }
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -52,8 +103,69 @@ class _ProfileEditScreen extends State<ProfileEditScreen> {
     if (picked != null) {
       setState(() {
         selectedDate = picked;
-        birthdayController.text = DateFormat("dd/MM/yyyy").format(picked);
+        birthdayController.text = DateFormat('dd/MM/yyyy').format(picked);
       });
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+    final user = auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Usuário não autenticado')));
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      String? uploadedUrl;
+      if (_imageFile != null) {
+        uploadedUrl = await firebaseService.uploadProfilePicture(_imageFile!, user.uid);
+      }
+
+      final updates = <String, dynamic>{};
+      if (nomeController.text.trim().isNotEmpty) updates['name'] = nomeController.text.trim();
+      if (emailController.text.trim().isNotEmpty) updates['email'] = emailController.text.trim();
+      if (cidadeController.text.trim().isNotEmpty) updates['city'] = cidadeController.text.trim();
+      if (bioController.text.trim().isNotEmpty) updates['bio'] = bioController.text.trim();
+      if (instagramController.text.trim().isNotEmpty) updates['instagram'] = instagramController.text.trim();
+      if (twitterController.text.trim().isNotEmpty) updates['twitter'] = twitterController.text.trim();
+      if (selectedDate != null) updates['birthdate'] = selectedDate!.millisecondsSinceEpoch;
+      if (uploadedUrl != null && uploadedUrl.isNotEmpty) updates['profileImageUrl'] = uploadedUrl;
+
+      if (updates.isNotEmpty) {
+        await firebaseService.updateUserProfile(user.uid, updates);
+      }
+
+      // Update firebase auth profile for displayName/photoURL
+      await auth.updateUserProfile(displayName: nomeController.text.trim().isEmpty ? null : nomeController.text.trim(), photoURL: uploadedUrl);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Perfil salvo com sucesso')));
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao salvar perfil: $e')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -66,144 +178,94 @@ class _ProfileEditScreen extends State<ProfileEditScreen> {
             context.push('/profile');
           },
           icon: const Icon(Icons.cancel_outlined),
-          tooltip: "Cancelar",
+          tooltip: 'Cancelar',
           color: AppColorsProfile.whiteBack,
         ),
         title: Text(
-          "Editar Perfil",
-          style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-              color: AppColorsProfile.whiteBack),
+          'Editar Perfil',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColorsProfile.whiteBack),
         ),
         actions: [
-          IconButton(
-              onPressed: () => {print("Editar")},
-              icon: Icon(Icons.done),
-              tooltip: "Salvar",
-              color: AppColorsProfile.whiteBack)
+          IconButton(onPressed: _isLoading ? null : _saveProfile, icon: const Icon(Icons.done), color: AppColorsProfile.whiteBack)
         ],
         centerTitle: true,
         backgroundColor: AppColorsProfile.purpleBack,
       ),
       body: SingleChildScrollView(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SingleChildScrollView(
-                child: Container(
-              width: MediaQuery.of(context).size.width,
-              padding: EdgeInsets.all(30),
-              decoration: BoxDecoration(color: AppColorsProfile.purpleBack),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
+        child: Container(
+          width: MediaQuery.of(context).size.width,
+          padding: const EdgeInsets.all(30),
+          decoration: const BoxDecoration(color: AppColorsProfile.purpleBack),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Column(
                 children: [
-                  Column(
-                    children: [
-                      AvatarPicker(),
-                      Text(
-                        "Adicionar Foto",
-                        style: TextStyle(
-                            color: AppColorsProfile.whiteBack,
-                            fontWeight: FontWeight.bold),
-                      )
-                    ],
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: CircleAvatar(
+                      radius: 60,
+                      backgroundColor: Colors.grey.shade300,
+                      backgroundImage: _imageFile != null
+                          ? FileImage(_imageFile!) as ImageProvider
+                          : (_existingImageUrl != null && _existingImageUrl!.isNotEmpty)
+                              ? NetworkImage(_existingImageUrl!)
+                              : null,
+                      child: (_imageFile == null && (_existingImageUrl == null || _existingImageUrl!.isEmpty))
+                          ? const Icon(Icons.add_a_photo, size: 30, color: Colors.white)
+                          : null,
+                    ),
                   ),
-                  SizedBox(height: 25),
-                  Column(
-                    children: [
-                      InputDadoPerfil(
-                          icon: Icons.person_outline,
-                          label: "Nome:",
-                          controller: nomeController),
-                      SizedBox(height: 25),
-                      Column(
-                        spacing: 3,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Data de nascimento:",
-                            style: TextStyle(
-                                color: AppColorsProfile.whiteBack,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16),
-                          ),
-                          TextField(
-                            controller: birthdayController,
-                            readOnly: true,
-                            decoration: InputDecoration(
-                                filled: true,
-                                fillColor: AppColorsProfile.whiteBack,
-                                border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(
-                                        color: AppColorsProfile.lightGreyFont)),
-                                prefixIcon: Icon(
-                                  Icons.calendar_today_outlined,
-                                  color: AppColorsProfile.purpleBack,
-                                )),
-                            onTap: () => _selectDate(context),
-                          )
-                        ],
-                      ),
-                      SizedBox(height: 25),
-                      InputDadoPerfil(
-                          icon: Icons.location_on_outlined,
-                          label: "Cidade:",
-                          controller: cidadeController),
-                      SizedBox(height: 25),
-                      InputDadoPerfil(
-                          icon: Icons.email,
-                          label: "Email:",
-                          controller: emailController),
-                      SizedBox(height: 25),
-                      Column(
-                        spacing: 3,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Bio: ",
-                            style: TextStyle(
-                                color: AppColorsProfile.whiteBack,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16),
-                          ),
-                          TextField(
-                            controller: bioController,
-                            maxLines: 5,
-                            minLines: 3,
-                            keyboardType: TextInputType.multiline,
-                            decoration: InputDecoration(
-                              hintText: "Bio",
-                              hintStyle: TextStyle(
-                                  color: AppColorsProfile.lightGreyFont),
-                              filled: true,
-                              fillColor: AppColorsProfile.whiteBack,
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                      color: AppColorsProfile.lightGreyFont)),
-                            ),
-                          )
-                        ],
-                      ),
-                      SizedBox(height: 25),
-                      InputDadoPerfil(
-                          icon: Icons.camera_alt_outlined,
-                          label: "Instagram:",
-                          controller: instagramController),
-                      SizedBox(height: 25),
-                      InputDadoPerfil(
-                          icon: Icons.wifi_tethering_outlined,
-                          label: "Twitter:",
-                          controller: twitterController),
-                    ],
+                  const SizedBox(height: 8),
+                  const Text('Adicionar Foto', style: TextStyle(color: AppColorsProfile.whiteBack, fontWeight: FontWeight.bold))
+                ],
+              ),
+              const SizedBox(height: 25),
+              InputDadoPerfil(icon: Icons.person_outline, label: 'Nome:', controller: nomeController),
+              const SizedBox(height: 25),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Data de nascimento:', style: TextStyle(color: AppColorsProfile.whiteBack, fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: birthdayController,
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: AppColorsProfile.whiteBack,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColorsProfile.lightGreyFont)),
+                      prefixIcon: Icon(Icons.calendar_today_outlined, color: AppColorsProfile.purpleBack),
+                    ),
+                    onTap: () => _selectDate(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 25),
+              InputDadoPerfil(icon: Icons.location_on_outlined, label: 'Cidade:', controller: cidadeController),
+              const SizedBox(height: 25),
+              InputDadoPerfil(icon: Icons.email, label: 'Email:', controller: emailController),
+              const SizedBox(height: 25),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Bio:', style: TextStyle(color: AppColorsProfile.whiteBack, fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: bioController,
+                    maxLines: 5,
+                    minLines: 3,
+                    keyboardType: TextInputType.multiline,
+                    decoration: const InputDecoration(hintText: 'Bio', filled: true, fillColor: AppColorsProfile.whiteBack),
                   )
                 ],
               ),
-            ))
-          ],
+              const SizedBox(height: 25),
+              InputDadoPerfil(icon: Icons.camera_alt_outlined, label: 'Instagram:', controller: instagramController),
+              const SizedBox(height: 25),
+              InputDadoPerfil(icon: Icons.wifi_tethering_outlined, label: 'Twitter:', controller: twitterController),
+            ],
+          ),
         ),
       ),
     );
@@ -215,83 +277,28 @@ class InputDadoPerfil extends StatelessWidget {
   final String label;
   final TextEditingController controller;
 
-  // ignore: use_super_parameters
-  const InputDadoPerfil({
-    Key? key,
-    required this.icon,
-    required this.label,
-    required this.controller,
-  }) : super(key: key);
+  const InputDadoPerfil({Key? key, required this.icon, required this.label, required this.controller}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      spacing: 3,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-              color: AppColorsProfile.whiteBack,
-              fontWeight: FontWeight.bold,
-              fontSize: 16),
-        ),
+        Text(label, style: const TextStyle(color: AppColorsProfile.whiteBack, fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 8),
         TextField(
           controller: controller,
           decoration: InputDecoration(
-              hintText: label,
-              hintStyle: TextStyle(color: AppColorsProfile.lightGreyFont),
-              filled: true,
-              fillColor: AppColorsProfile.whiteBack,
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      BorderSide(color: AppColorsProfile.lightGreyFont)),
-              prefixIcon: Icon(
-                icon,
-                color: AppColorsProfile.purpleBack,
-              )),
+            hintText: label,
+            hintStyle: const TextStyle(color: AppColorsProfile.lightGreyFont),
+            filled: true,
+            fillColor: AppColorsProfile.whiteBack,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColorsProfile.lightGreyFont)),
+            prefixIcon: Icon(icon, color: AppColorsProfile.purpleBack),
+          ),
         )
       ],
     );
   }
 }
 
-class AvatarPicker extends StatefulWidget {
-  const AvatarPicker({super.key});
-
-  @override
-  _AvatarPickerState createState() => _AvatarPickerState();
-}
-
-class _AvatarPickerState extends State<AvatarPicker> {
-  File? _imageFile;
-  final ImagePicker _picker = ImagePicker();
-
-  Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-
-    if (pickedFile != null) {
-      setState(() {
-        _imageFile = File(pickedFile.path);
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: GestureDetector(
-        onTap: _pickImage,
-        child: CircleAvatar(
-          radius: 60,
-          backgroundImage: _imageFile != null ? FileImage(_imageFile!) : null,
-          backgroundColor: Colors.grey.shade300,
-          child: _imageFile == null
-              ? Icon(Icons.add_a_photo, size: 30, color: Colors.white)
-              : null,
-        ),
-      ),
-    );
-  }
-}

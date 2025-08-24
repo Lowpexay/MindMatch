@@ -46,7 +46,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1033810261503',
     projectId: 'mindmatch-ba671',
     authDomain: 'mindmatch-ba671.firebaseapp.com',
-    storageBucket: 'mindmatch-ba671.firebasestorage.app',
+  storageBucket: 'mindmatch-ba671.appspot.com',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -54,7 +54,7 @@ class DefaultFirebaseOptions {
     appId: '1:1033810261503:android:edc5bba01b1501549fe3ca',
     messagingSenderId: '1033810261503',
     projectId: 'mindmatch-ba671',
-    storageBucket: 'mindmatch-ba671.firebasestorage.app',
+  storageBucket: 'mindmatch-ba671.appspot.com',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
@@ -62,7 +62,7 @@ class DefaultFirebaseOptions {
     appId: '1:1033810261503:ios:edc5bba01b1501549fe3ca',
     messagingSenderId: '1033810261503',
     projectId: 'mindmatch-ba671',
-    storageBucket: 'mindmatch-ba671.firebasestorage.app',
+  storageBucket: 'mindmatch-ba671.appspot.com',
     iosBundleId: 'com.company.mindmatch',
   );
 
@@ -71,7 +71,7 @@ class DefaultFirebaseOptions {
     appId: '1:1033810261503:ios:edc5bba01b1501549fe3ca',
     messagingSenderId: '1033810261503',
     projectId: 'mindmatch-ba671',
-    storageBucket: 'mindmatch-ba671.firebasestorage.app',
+  storageBucket: 'mindmatch-ba671.appspot.com',
     iosBundleId: 'com.company.mindmatch',
   );
 
@@ -81,6 +81,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1033810261503',
     projectId: 'mindmatch-ba671',
     authDomain: 'mindmatch-ba671.firebaseapp.com',
-    storageBucket: 'mindmatch-ba671.firebasestorage.app',
+  storageBucket: 'mindmatch-ba671.appspot.com',
   );
 }

@@ -17,7 +17,7 @@
 	<key>PROJECT_ID</key>
 	<string>mindmatch-ba671</string>
 	<key>STORAGE_BUCKET</key>
-	<string>mindmatch-ba671.firebasestorage.app</string>
+	<string>mindmatch-ba671.appspot.com</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>

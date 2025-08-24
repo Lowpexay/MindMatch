@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../widgets/user_avatar.dart';
 import '../utils/app_colors.dart';
 
 class CompatibleUsersWidget extends StatelessWidget {
@@ -144,9 +148,11 @@ class CompatibleUsersWidget extends StatelessWidget {
   }
 
   Widget _buildPodiumUser(Map<String, dynamic> user, int position, Color medalColor) {
-    final compatibility = user['compatibility'] as double;
-    final name = user['name'] ?? 'Usuário';
-    final profileImage = user['profileImageUrl'] as String?;
+  final compatibility = user['compatibility'] as double;
+  final name = user['name'] ?? 'Usuário';
+  final profileImage = user['profileImageUrl'] as String?;
+  final profileImageBase64 = user['profileImageBase64'] as String?;
+  final Uint8List? imageBytes = (profileImageBase64 != null && profileImageBase64.isNotEmpty) ? base64Decode(profileImageBase64) : null;
     
     return GestureDetector(
       onTap: () => onUserTapped(user),
@@ -166,17 +172,11 @@ class CompatibleUsersWidget extends StatelessWidget {
                     width: 3,
                   ),
                 ),
-                child: CircleAvatar(
+                child: UserAvatar(
+                  imageUrl: profileImage,
+                  imageBytes: imageBytes,
                   radius: position == 1 ? 35 : 30,
-                  backgroundColor: AppColors.gray200,
-                  backgroundImage: profileImage != null ? NetworkImage(profileImage) : null,
-                  child: profileImage == null
-                      ? Icon(
-                          Icons.person,
-                          size: position == 1 ? 35 : 30,
-                          color: AppColors.gray500,
-                        )
-                      : null,
+                  // no fallback asset; use default icon when missing
                 ),
               ),
               Positioned(
@@ -244,12 +244,14 @@ class CompatibleUsersWidget extends StatelessWidget {
   }
 
   Widget _buildUserCard(Map<String, dynamic> user) {
-    final compatibility = user['compatibility'] as double;
-    final name = user['name'] ?? 'Usuário';
-    final age = user['age'] as int?;
-    final city = user['city'] as String?;
-    final bio = user['bio'] as String?;
-    final profileImage = user['profileImageUrl'] as String?;
+  final compatibility = user['compatibility'] as double;
+  final name = user['name'] ?? 'Usuário';
+  final age = user['age'] as int?;
+  final city = user['city'] as String?;
+  final bio = user['bio'] as String?;
+  final profileImage = user['profileImageUrl'] as String?;
+  final profileImageBase64 = user['profileImageBase64'] as String?;
+  final Uint8List? imageBytes = (profileImageBase64 != null && profileImageBase64.isNotEmpty) ? base64Decode(profileImageBase64) : null;
     
     // Parse tags
     final tags = <String>[];
@@ -283,17 +285,11 @@ class CompatibleUsersWidget extends StatelessWidget {
                 // Avatar com porcentagem
                 Stack(
                   children: [
-                    CircleAvatar(
+                    UserAvatar(
+                      imageUrl: profileImage,
+                      imageBytes: imageBytes,
                       radius: 30,
-                      backgroundColor: AppColors.gray200,
-                      backgroundImage: profileImage != null ? NetworkImage(profileImage) : null,
-                      child: profileImage == null
-                          ? const Icon(
-                              Icons.person,
-                              size: 30,
-                              color: AppColors.gray500,
-                            )
-                          : null,
+                      // no fallback asset; use default icon when missing
                     ),
                     Positioned(
                       bottom: -2,

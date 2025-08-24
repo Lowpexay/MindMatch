@@ -3,6 +3,7 @@ class ConversationHistory {
   final String otherUserId;
   final String otherUserName;
   final String? otherUserAvatar;
+  final String? otherUserAvatarBase64;
   final String? lastMessage;
   final DateTime? lastMessageTime;
   final String? lastMessageSenderId;
@@ -14,6 +15,7 @@ class ConversationHistory {
     required this.otherUserId,
     required this.otherUserName,
     this.otherUserAvatar,
+  this.otherUserAvatarBase64,
     this.lastMessage,
     this.lastMessageTime,
     this.lastMessageSenderId,
@@ -32,6 +34,7 @@ class ConversationHistory {
       otherUserId: otherUserId,
       otherUserName: data['otherUserName'] ?? 'Usuário',
       otherUserAvatar: data['otherUserAvatar'],
+  otherUserAvatarBase64: data['otherUserAvatarBase64'],
       lastMessage: lastMessage?['content'],
       lastMessageTime: lastMessage?['timestamp'] != null 
           ? DateTime.fromMillisecondsSinceEpoch(lastMessage!['timestamp'])

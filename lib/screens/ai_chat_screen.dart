@@ -9,6 +9,9 @@ import '../models/mood_data.dart';
 import '../utils/app_colors.dart';
 import '../utils/scaffold_utils.dart';
 import '../widgets/luma_voice_widget.dart';
+import 'dart:typed_data';
+import 'dart:convert';
+import '../widgets/user_avatar.dart';
 
 class AiChatScreen extends StatefulWidget {
   final MoodData? userMood;
@@ -31,6 +34,7 @@ class AiChatScreenState extends State<AiChatScreen> {
   bool _isLoading = false;
   late GeminiService _geminiService;
   String _userName = ''; // Nome do usuário
+  Uint8List? _userImageBytes;
   
   // Services
   FirebaseService? _firebaseService;
@@ -70,6 +74,29 @@ class AiChatScreenState extends State<AiChatScreen> {
     
     // Carregar nome do usuário
     _loadUserName();
+    // Carregar imagem do usuário (base64 fallback)
+    _loadUserImage();
+  }
+
+  Future<void> _loadUserImage() async {
+    try {
+      final userId = _authService?.currentUser?.uid;
+      if (userId == null) return;
+      final profile = await _firebaseService?.getUserProfile(userId);
+      final base64 = profile?['profileImageBase64'] as String?;
+      if (base64 != null && base64.isNotEmpty) {
+        try {
+          final bytes = base64Decode(base64);
+          setState(() {
+            _userImageBytes = bytes;
+          });
+        } catch (_) {
+          // ignore decode errors
+        }
+      }
+    } catch (e) {
+      print('❌ Error loading user image in AI chat: $e');
+    }
   }
 
   Future<void> _loadUserName() async {
@@ -311,11 +338,11 @@ class AiChatScreenState extends State<AiChatScreen> {
           children: [
             // Interface visual da Luma
             Expanded(
-              child: LumaVoiceWidget(
-                isSpeaking: _isSpeakingNow,
-                currentMessage: _currentSpeechText,
-                onTap: _handleLumaTap,
-              ),
+                      child: LumaVoiceWidget(
+                                isSpeaking: _isSpeakingNow,
+                                currentMessage: _currentSpeechText,
+                                onTap: _handleLumaTap,
+                              ),
             ),
             
             // Input de texto para modo voz
@@ -600,15 +627,11 @@ class AiChatScreenState extends State<AiChatScreen> {
           
           if (message.isUser) ...[
             const SizedBox(width: 12),
-            // Avatar do usuário
-            CircleAvatar(
+            // Avatar do usuário (use profile image bytes if available)
+            UserAvatar(
+              imageBytes: _userImageBytes,
               radius: 18,
-              backgroundColor: AppColors.gray300,
-              child: Icon(
-                Icons.person,
-                color: AppColors.gray600,
-                size: 20,
-              ),
+              useAuthPhoto: true,
             ),
           ],
         ],

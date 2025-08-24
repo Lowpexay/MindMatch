@@ -122,7 +122,7 @@ class _LumaVoiceWidgetState extends State<LumaVoiceWidget>
                         ),
                       ),
                       child: Center(
-                        child: Container(
+                          child: Container(
                           width: 140,
                           height: 140,
                           decoration: BoxDecoration(

@@ -14,6 +14,10 @@ class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  // If true, on Android try putData (non-resumable) first to avoid resumable session issues.
+  final bool forcePutDataOnAndroid;
+
+  FirebaseService({this.forcePutDataOnAndroid = true});
 
   // Collections
   static const String usersCollection = 'users';
@@ -404,8 +408,14 @@ class FirebaseService {
         }
         final metadata = SettableMetadata(contentType: contentType);
 
-        // On first attempt use putFile (streaming, efficient). On retry use putData as a fallback
-        final bool usePutData = attempt > 1;
+        // Decide whether to use putData (non-resumable) or putFile (resumable).
+        // If configured to force putData on Android, use putData from the first attempt.
+        bool usePutData = attempt > 1;
+        try {
+          if (forcePutDataOnAndroid && Platform.isAndroid) {
+            usePutData = true;
+          }
+        } catch (_) {}
         if (usePutData) {
           print('⬆️ Attempting upload via putData fallback for $path (attempt $attempt)');
         }
@@ -455,7 +465,9 @@ class FirebaseService {
             await Future.delayed(Duration(milliseconds: 500 * attempt));
             continue;
           }
-          rethrow;
+          // Do not rethrow here; allow REST fallback to run after SDK attempts fail.
+          print('⚠️ SDK upload attempts exhausted for $path — will try REST fallback');
+          break;
         }
       } catch (e, st) {
         print('❌ Error uploading file to $path (attempt $attempt): $e\n$st');
@@ -470,7 +482,9 @@ class FirebaseService {
           await Future.delayed(Duration(milliseconds: 500 * attempt));
           continue;
         }
-        rethrow;
+        // Do not rethrow here to allow REST fallback below to execute.
+        print('⚠️ Final SDK attempt failed for $path — will fall back to REST upload');
+        break;
       }
     }
 
@@ -513,18 +527,18 @@ class FirebaseService {
         return false;
       }
 
-      final idToken = await _auth.currentUser?.getIdToken();
+  // Refresh token to increase chance the token is valid for REST call
+  final idToken = await _auth.currentUser?.getIdToken(true);
       if (idToken == null) {
         print('⚠️ _uploadViaSimpleRest: user is not authenticated (no idToken)');
         return false;
       }
-
-      final uri = Uri.parse('https://firebasestorage.googleapis.com/v0/b/$bucket/o?uploadType=media&name=${Uri.encodeComponent(path)}');
-      print('🔁 Attempting non-resumable REST upload to $uri');
+  final uriPrimary = Uri.parse('https://firebasestorage.googleapis.com/v0/b/$bucket/o?uploadType=media&name=${Uri.encodeComponent(path)}');
+  print('🔁 Attempting non-resumable REST upload to $uriPrimary');
 
       final bytes = await file.readAsBytes();
-      final httpClient = HttpClient();
-      final request = await httpClient.postUrl(uri);
+  final httpClient = HttpClient();
+  final request = await httpClient.postUrl(uriPrimary);
       request.headers.set('Authorization', 'Bearer $idToken');
       request.headers.set('Content-Type', contentType);
       request.add(bytes);
@@ -533,10 +547,33 @@ class FirebaseService {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         print('✅ REST upload succeeded: ${response.statusCode} body=$body');
         return true;
-      } else {
-        print('❌ REST upload failed: status=${response.statusCode} body=$body');
-        return false;
       }
+
+      // If primary returned 404 Not Found, try an alternate bucket naming pattern used by GCS
+      if (response.statusCode == 404 && bucket.contains('.firebasestorage.app')) {
+        final altBucket = bucket.replaceAll('.firebasestorage.app', '.appspot.com');
+        final uriAlt = Uri.parse('https://firebasestorage.googleapis.com/v0/b/$altBucket/o?uploadType=media&name=${Uri.encodeComponent(path)}');
+        print('🔁 Primary REST upload returned 404; trying alternate bucket name: $uriAlt');
+
+        // retry with same bytes
+        final httpClient2 = HttpClient();
+        final request2 = await httpClient2.postUrl(uriAlt);
+        request2.headers.set('Authorization', 'Bearer $idToken');
+        request2.headers.set('Content-Type', contentType);
+        request2.add(bytes);
+        final response2 = await request2.close().timeout(Duration(seconds: 30));
+        final body2 = await utf8.decodeStream(response2);
+        if (response2.statusCode >= 200 && response2.statusCode < 300) {
+          print('✅ REST upload (alt bucket) succeeded: ${response2.statusCode} body=$body2');
+          return true;
+        } else {
+          print('❌ REST upload (alt bucket) failed: status=${response2.statusCode} body=$body2');
+          return false;
+        }
+      }
+
+      print('❌ REST upload failed: status=${response.statusCode} body=$body');
+      return false;
     } catch (e, st) {
       print('❌ _uploadViaSimpleRest error: $e\n$st');
       return false;
@@ -1561,13 +1598,15 @@ class FirebaseService {
             
         if (!otherUserDoc.exists) continue;
         
-        final otherUserData = otherUserDoc.data()!;
-        
-        // Criar objeto de histórico com dados do outro usuário
-        final enrichedData = Map<String, dynamic>.from(data);
-        enrichedData['otherUserName'] = otherUserData['name'] ?? 'Usuário';
-        enrichedData['otherUserAvatar'] = otherUserData['profilePicture'];
-        enrichedData['otherUserOnline'] = otherUserData['isOnline'] ?? false;
+  final otherUserData = otherUserDoc.data()!;
+
+  // Criar objeto de histórico com dados do outro usuário
+  final enrichedData = Map<String, dynamic>.from(data);
+  enrichedData['otherUserName'] = otherUserData['name'] ?? 'Usuário';
+  // Prefer explicit profile image URL fields but also carry base64 fallback when present
+  enrichedData['otherUserAvatar'] = otherUserData['profileImageUrl'] ?? otherUserData['profilePicture'];
+  enrichedData['otherUserAvatarBase64'] = otherUserData['profileImageBase64'];
+  enrichedData['otherUserOnline'] = otherUserData['isOnline'] ?? false;
         
         final conversation = ConversationHistory.fromFirestore(enrichedData, userId);
         conversations.add(conversation);
@@ -1609,11 +1648,12 @@ class FirebaseService {
           if (!otherUserDoc.exists) continue;
           
           final otherUserData = otherUserDoc.data()!;
-          
+
           // Criar objeto de histórico com dados do outro usuário
           final enrichedData = Map<String, dynamic>.from(data);
           enrichedData['otherUserName'] = otherUserData['name'] ?? 'Usuário';
-          enrichedData['otherUserAvatar'] = otherUserData['profilePicture'];
+          enrichedData['otherUserAvatar'] = otherUserData['profileImageUrl'] ?? otherUserData['profilePicture'];
+          enrichedData['otherUserAvatarBase64'] = otherUserData['profileImageBase64'];
           enrichedData['otherUserOnline'] = otherUserData['isOnline'] ?? false;
           
           final conversation = ConversationHistory.fromFirestore(enrichedData, userId);

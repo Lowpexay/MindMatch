@@ -1,9 +1,12 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
+import '../widgets/user_avatar.dart';
 
 class AppColorsProfile {
   static const Color whiteBack = Color(0xFFF9FAFA);
@@ -58,6 +61,8 @@ class ProfileScreen extends StatelessWidget {
                 final tagsString = data['tags_string'] ?? '';
                 final goal = data['goal'] ?? '';
                 final profileImageUrl = data['profileImageUrl'] ?? '';
+                final profileImageBase64 = data['profileImageBase64'] ?? '';
+                final Uint8List? profileImageBytes = profileImageBase64 is String && profileImageBase64.isNotEmpty ? base64Decode(profileImageBase64) : null;
 
                 return SingleChildScrollView(
                   child: Column(
@@ -77,9 +82,10 @@ class ProfileScreen extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              CircleAvatar(
+                              UserAvatar(
+                                imageUrl: profileImageUrl != null && profileImageUrl.isNotEmpty ? profileImageUrl : null,
+                                imageBytes: profileImageBytes,
                                 radius: 50,
-                                backgroundImage: profileImageUrl != null && profileImageUrl.isNotEmpty ? NetworkImage(profileImageUrl) : const AssetImage('assets/images/luma_chat_avatar.png') as ImageProvider,
                               ),
                               Text(name, textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColorsProfile.whiteBack)),
                               Text(data['birthdate'] != null ? '${_ageFromBirthdate(data['birthdate'])} Anos' : '', style: const TextStyle(fontSize: 20, color: AppColorsProfile.whiteBack)),
@@ -110,7 +116,7 @@ class ProfileScreen extends StatelessWidget {
                             spacing: 12,
                             runSpacing: 12,
                             children: (tagsString as String).isNotEmpty
-                                ? (tagsString as String).split(',').map((t) => InteressesLabel(dado: t)).toList()
+                                ? tagsString.split(',').map((t) => InteressesLabel(dado: t)).toList()
                                 : [],
                           ),
                           const SizedBox(height: 25),

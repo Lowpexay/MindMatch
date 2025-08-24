@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:provider/provider.dart';
 import '../services/firebase_service.dart';
 import '../services/auth_service.dart';
 import '../models/conversation_history.dart';
+import '../widgets/user_avatar.dart';
 import '../models/user_model.dart';
 import '../utils/app_colors.dart';
 import 'user_chat_screen.dart';
@@ -145,24 +148,12 @@ class _ConversationHistoryScreenState extends State<ConversationHistoryScreen> {
                 // Avatar
                 Stack(
                   children: [
-                    CircleAvatar(
+                    UserAvatar(
+                      imageUrl: conversation.otherUserAvatar,
+                      imageBytes: (conversation.otherUserAvatarBase64 != null && conversation.otherUserAvatarBase64!.isNotEmpty) ? base64Decode(conversation.otherUserAvatarBase64!) : null,
                       radius: 28,
-                      backgroundColor: AppColors.primary.withOpacity(0.1),
-                      backgroundImage: conversation.otherUserAvatar != null
-                          ? NetworkImage(conversation.otherUserAvatar!)
-                          : null,
-                      child: conversation.otherUserAvatar == null
-                          ? Text(
-                              conversation.otherUserName.isNotEmpty
-                                  ? conversation.otherUserName[0].toUpperCase()
-                                  : '?',
-                              style: const TextStyle(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 20,
-                              ),
-                            )
-                          : null,
+                      // no fallback asset; default icon if no image
+                      useAuthPhoto: false,
                     ),
                     // Indicador online
                     if (conversation.isOnline)

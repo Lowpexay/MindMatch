@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:provider/provider.dart';
+import 'dart:math';
+import '../services/firebase_service.dart';
 import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
+import '../widgets/user_avatar.dart';
 import '../utils/app_colors.dart';
 import '../screens/quick_eventlog_test.dart';
 import '../screens/security_reports_screen.dart';
@@ -17,9 +22,11 @@ class GlobalDrawer extends StatelessWidget {
     return Drawer(
       child: Column(
         children: [
-          // Header do drawer
-          Container(
-            height: 200,
+          // Header do drawer — responsive height to avoid overflow on small screens
+          Builder(builder: (context) {
+            final headerHeight = min(200.0, MediaQuery.of(context).size.height * 0.25);
+            return Container(
+              height: headerHeight,
             width: double.infinity,
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -34,45 +41,90 @@ class GlobalDrawer extends StatelessWidget {
             child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundColor: Colors.white.withOpacity(0.2),
-                      backgroundImage: user?.photoURL != null 
-                          ? NetworkImage(user!.photoURL!) 
-                          : null,
-                      child: user?.photoURL == null
-                          ? Icon(
-                              Icons.person,
-                              size: 40,
-                              color: Colors.white,
-                            )
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      user?.displayName ?? 'Usuário',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      user?.email ?? '',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withOpacity(0.8),
-                      ),
-                    ),
-                  ],
-                ),
+                child: Builder(builder: (context) {
+                  // Avatar size scales with header height to avoid vertical overflow
+                  final avatarDiameter = min(80.0, headerHeight * 0.5);
+                  final avatarRadius = avatarDiameter / 2;
+                  return FutureBuilder<Map<String, dynamic>?>(
+                    future: user != null
+                        ? Provider.of<FirebaseService>(context, listen: false).getUserProfile(user.uid)
+                        : Future.value(null),
+                    builder: (context, snapshot) {
+                      String? imageUrlFromDoc;
+                      Uint8List? imageBytes;
+                      String? nameFromDoc;
+                      String? emailFromDoc;
+                      if (snapshot.hasData && snapshot.data != null) {
+                        final profile = snapshot.data!;
+                        imageUrlFromDoc = (profile['profileImageUrl'] ?? profile['photoURL']) as String?;
+                        nameFromDoc = (profile['displayName'] ?? profile['name']) as String?;
+                        emailFromDoc = (profile['email']) as String?;
+                        final base64 = profile['profileImageBase64'] as String?;
+                        if (base64 != null && base64.isNotEmpty) {
+                          try {
+                            imageBytes = base64Decode(base64);
+                          } catch (_) {
+                            imageBytes = null;
+                          }
+                        }
+                      }
+
+                      final effectiveUrl = imageUrlFromDoc ?? user?.photoURL;
+                      final displayName = nameFromDoc ?? user?.displayName ?? 'Usuário';
+                      final displayEmail = emailFromDoc ?? user?.email ?? '';
+
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: avatarDiameter,
+                            height: avatarDiameter,
+                            child: UserAvatar(
+                              imageUrl: effectiveUrl,
+                              imageBytes: imageBytes,
+                              radius: avatarRadius,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Name and email to the right
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  displayName,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  displayEmail,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white.withOpacity(0.8),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                }),
               ),
             ),
-          ),
-          
+            );
+          }),
+
           // Menu items
           Expanded(
             child: ListView(

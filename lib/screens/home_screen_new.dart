@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
@@ -11,6 +13,7 @@ import '../widgets/mood_check_widget.dart';
 import '../widgets/reflective_questions_widget.dart';
 import '../widgets/compatible_users_widget.dart';
 import '../screens/main_navigation.dart';
+import '../widgets/user_avatar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -176,14 +179,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           
           IconButton(
             onPressed: _showProfileMenu,
-            icon: CircleAvatar(
+            icon: UserAvatar(
               radius: 16,
-              backgroundColor: AppColors.primary,
-              child: Icon(
-                Icons.person,
-                color: Colors.white,
-                size: 20,
-              ),
             ),
           ),
         ],
@@ -478,7 +475,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final age = user['age'] as int?;
     final city = user['city'] as String?;
     final bio = user['bio'] as String?;
-    final profileImage = user['profileImageUrl'] as String?;
+  final profileImage = user['profileImageUrl'] as String?;
+  final profileImageBase64 = user['profileImageBase64'] as String?;
+  final Uint8List? profileImageBytes = (profileImageBase64 != null && profileImageBase64.isNotEmpty) ? base64Decode(profileImageBase64) : null;
     final goal = user['goal'] as String?;
     
     // Parse tags
@@ -515,13 +514,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   // Profile image and compatibility
                   Stack(
                     children: [
-                      CircleAvatar(
+                      UserAvatar(
+                        imageUrl: profileImage,
+                        imageBytes: profileImageBytes,
                         radius: 60,
-                        backgroundColor: AppColors.gray200,
-                        backgroundImage: profileImage != null ? NetworkImage(profileImage) : null,
-                        child: profileImage == null
-                            ? const Icon(Icons.person, size: 60, color: AppColors.gray500)
-                            : null,
                       ),
                       Positioned(
                         bottom: 0,

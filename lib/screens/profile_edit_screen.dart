@@ -1,4 +1,7 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:image/image.dart' as imgpkg;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +11,7 @@ import 'package:provider/provider.dart';
 
 import '../services/firebase_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/user_avatar.dart';
 
 class AppColorsProfile {
   static const Color whiteBack = Color(0xFFF9FAFA);
@@ -133,8 +137,21 @@ class _ProfileEditScreen extends State<ProfileEditScreen> {
 
     try {
       String? uploadedUrl;
+      String? base64Image;
       if (_imageFile != null) {
-        uploadedUrl = await firebaseService.uploadProfilePicture(_imageFile!, user.uid);
+        try {
+          // Resize/compress image to try to fit under the Firestore-friendly limit
+          final resized = await _resizeImageIfNeeded(_imageFile!, 700000);
+          final bytes = resized;
+          uploadedUrl = await firebaseService.uploadUserProfileImage(user.uid, bytes);
+
+          // If Storage upload failed, fallback to saving Base64 in Firestore (free tier)
+          if ((uploadedUrl == null || uploadedUrl.isEmpty) && bytes.isNotEmpty) {
+            base64Image = base64Encode(bytes);
+          }
+        } catch (e) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao enviar imagem: $e')));
+        }
       }
 
       final updates = <String, dynamic>{};
@@ -145,7 +162,15 @@ class _ProfileEditScreen extends State<ProfileEditScreen> {
       if (instagramController.text.trim().isNotEmpty) updates['instagram'] = instagramController.text.trim();
       if (twitterController.text.trim().isNotEmpty) updates['twitter'] = twitterController.text.trim();
       if (selectedDate != null) updates['birthdate'] = selectedDate!.millisecondsSinceEpoch;
-      if (uploadedUrl != null && uploadedUrl.isNotEmpty) updates['profileImageUrl'] = uploadedUrl;
+      if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
+        updates['profileImageUrl'] = uploadedUrl;
+        // Clear any previous base64 stored image
+        updates.remove('profileImageBase64');
+      } else if (base64Image != null && base64Image.isNotEmpty) {
+        updates['profileImageBase64'] = base64Image;
+        // Mark that image is stored in Firestore
+        updates['profileImageStoredIn'] = 'firestore_base64';
+      }
 
       if (updates.isNotEmpty) {
         await firebaseService.updateUserProfile(user.uid, updates);
@@ -160,6 +185,63 @@ class _ProfileEditScreen extends State<ProfileEditScreen> {
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao salvar perfil: $e')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // Resize image file to try to get under maxBytes; returns JPEG bytes
+  Future<Uint8List> _resizeImageIfNeeded(File file, int maxBytes) async {
+    final original = await file.readAsBytes();
+    if (original.lengthInBytes <= maxBytes) return original;
+
+    // Decode
+    final img = imgpkg.decodeImage(original);
+    if (img == null) return original;
+
+    // Iteratively reduce size by scaling down and lowering quality
+    int quality = 85;
+    int width = img.width;
+    int height = img.height;
+    Uint8List encoded = Uint8List.fromList(imgpkg.encodeJpg(img, quality: quality));
+
+    while (encoded.lengthInBytes > maxBytes && (width > 100 || height > 100)) {
+      width = (width * 0.8).floor();
+      height = (height * 0.8).floor();
+      final resized = imgpkg.copyResize(img, width: width, height: height);
+      encoded = Uint8List.fromList(imgpkg.encodeJpg(resized, quality: quality));
+      if (quality > 40 && encoded.lengthInBytes > maxBytes) {
+        quality -= 10;
+        encoded = Uint8List.fromList(imgpkg.encodeJpg(resized, quality: quality));
+      }
+      // safety to avoid infinite loop
+      if (quality <= 30 && (width <= 100 || height <= 100)) break;
+    }
+
+    return encoded;
+  }
+
+  Future<void> _debugTestUpload() async {
+    final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final url = await firebaseService.testUploadBytes();
+      if (mounted) {
+        if (url != null && url.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('testUploadBytes OK: $url')));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('testUploadBytes falhou - veja logs')));
+        }
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro no testUploadBytes: $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -186,6 +268,13 @@ class _ProfileEditScreen extends State<ProfileEditScreen> {
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColorsProfile.whiteBack),
         ),
         actions: [
+          // Debug: quick test upload button (temporary)
+          IconButton(
+            tooltip: 'Test Upload',
+            onPressed: _isLoading ? null : _debugTestUpload,
+            icon: const Icon(Icons.cloud_upload),
+            color: AppColorsProfile.whiteBack,
+          ),
           IconButton(onPressed: _isLoading ? null : _saveProfile, icon: const Icon(Icons.done), color: AppColorsProfile.whiteBack)
         ],
         centerTitle: true,
@@ -203,17 +292,23 @@ class _ProfileEditScreen extends State<ProfileEditScreen> {
                 children: [
                   GestureDetector(
                     onTap: _pickImage,
-                    child: CircleAvatar(
-                      radius: 60,
-                      backgroundColor: Colors.grey.shade300,
-                      backgroundImage: _imageFile != null
-                          ? FileImage(_imageFile!) as ImageProvider
-                          : (_existingImageUrl != null && _existingImageUrl!.isNotEmpty)
-                              ? NetworkImage(_existingImageUrl!)
-                              : null,
-                      child: (_imageFile == null && (_existingImageUrl == null || _existingImageUrl!.isEmpty))
-                          ? const Icon(Icons.add_a_photo, size: 30, color: Colors.white)
-                          : null,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        UserAvatar(
+                          imageUrl: _imageFile == null ? _existingImageUrl : null,
+                          radius: 60,
+                          // no fallback asset here; show default icon when no image
+                          useAuthPhoto: false,
+                        ),
+                        if (_imageFile != null)
+                          CircleAvatar(
+                            radius: 60,
+                            backgroundImage: FileImage(_imageFile!),
+                          ),
+                        if (_imageFile == null && (_existingImageUrl == null || _existingImageUrl!.isEmpty))
+                          const Icon(Icons.add_a_photo, size: 30, color: Colors.white),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 8),

@@ -3,6 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:image/image.dart' as imgpkg;
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import '../utils/app_colors.dart';
@@ -725,22 +728,35 @@ class _LoginScreenState extends State<LoginScreen> {
             }
           }
           
-          // Upload profile picture last
+          // Upload profile picture last — try byte upload + Base64 fallback (same behavior as profile edit)
           if (_profileImage != null) {
             try {
-              print('� Uploading profile picture...');
-              final imageUrl = await firebaseService.uploadProfilePicture(
-                _profileImage!, 
-                userId,
-              );
-              if (imageUrl.isNotEmpty) {
+              // Resize/compress to fit Firestore-friendly limit
+              final resized = await _resizeImageIfNeeded(_profileImage!, 700000);
+              final bytes = resized;
+
+              String? imageUrl;
+              try {
+                imageUrl = await firebaseService.uploadUserProfileImage(userId, bytes);
+              } catch (e) {
+                print('⚠️ uploadUserProfileImage failed: $e');
+                imageUrl = null;
+              }
+
+              if (imageUrl != null && imageUrl.isNotEmpty) {
+                await firebaseService.addProfileFields(userId, {'profileImageUrl': imageUrl});
+                print('✅ Profile picture uploaded via bytes');
+              } else if (bytes.isNotEmpty) {
+                // Fallback to base64 in Firestore
+                final base64 = base64Encode(bytes);
                 await firebaseService.addProfileFields(userId, {
-                  'profileImageUrl': imageUrl
+                  'profileImageBase64': base64,
+                  'profileImageStoredIn': 'firestore_base64'
                 });
-                print('✅ Profile picture uploaded');
+                print('✅ Profile picture saved as base64 in Firestore');
               }
             } catch (imageError) {
-              print('⚠️ Profile picture upload failed: $imageError');
+              print('⚠️ Profile picture processing failed: $imageError');
               // Continue anyway
             }
           }
@@ -817,6 +833,39 @@ class _LoginScreenState extends State<LoginScreen> {
         backgroundColor: AppColors.error,
       ),
     );
+  }
+
+  // Resize image file to try to get under maxBytes; returns JPEG bytes
+  Future<Uint8List> _resizeImageIfNeeded(File file, int maxBytes) async {
+    try {
+      final original = await file.readAsBytes();
+      if (original.lengthInBytes <= maxBytes) return original;
+
+      final img = imgpkg.decodeImage(original);
+      if (img == null) return original;
+
+      int quality = 85;
+      int width = img.width;
+      int height = img.height;
+      Uint8List encoded = Uint8List.fromList(imgpkg.encodeJpg(img, quality: quality));
+
+      while (encoded.lengthInBytes > maxBytes && (width > 100 || height > 100)) {
+        width = (width * 0.8).floor();
+        height = (height * 0.8).floor();
+        final resized = imgpkg.copyResize(img, width: width, height: height);
+        encoded = Uint8List.fromList(imgpkg.encodeJpg(resized, quality: quality));
+        if (quality > 40 && encoded.lengthInBytes > maxBytes) {
+          quality -= 10;
+          encoded = Uint8List.fromList(imgpkg.encodeJpg(resized, quality: quality));
+        }
+        if (quality <= 30 && (width <= 100 || height <= 100)) break;
+      }
+
+      return encoded;
+    } catch (e) {
+      print('⚠️ Error resizing image: $e');
+      return Uint8List(0);
+    }
   }
 
   void _showSuccessSnackBar(String message) {

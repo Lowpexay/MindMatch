@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../services/auth_service.dart';
+import '../services/firebase_service.dart';
 
 class AppColorsProfile {
   static const Color whiteBack = Color(0xFFF9FAFA);
@@ -13,316 +17,168 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthService>(context);
+    final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+    final user = auth.currentUser;
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          //botoes lado esquerdo
           icon: const Icon(Icons.arrow_back_ios),
-          color: Color(0xFFF9FAFA),
-          tooltip: "Voltar",
+          color: AppColorsProfile.whiteBack,
+          tooltip: 'Voltar',
           onPressed: () {
             context.go('/home');
           },
         ),
-        title: Text(
-          "Perfil",
-          style: TextStyle(
-              color: AppColorsProfile.whiteBack, fontWeight: FontWeight.bold),
-        ),
+        title: Text('Perfil', style: TextStyle(color: AppColorsProfile.whiteBack, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-            icon: Icon(Icons.edit),
+            icon: const Icon(Icons.edit),
             color: AppColorsProfile.whiteBack,
-            onPressed: () {
-              context.push('/profileEdit');
-            },
+            onPressed: () => context.push('/profileEdit'),
           )
         ],
         centerTitle: true,
         backgroundColor: AppColorsProfile.purpleBack,
       ),
-      body: SingleChildScrollView(
-        //Tela perfil
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: MediaQuery.of(context).size.width,
-              height: MediaQuery.of(context).size.height * 0.3,
-              decoration: BoxDecoration(
-                  color: AppColorsProfile.purpleBack,
-                  borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(12),
-                      bottomRight: Radius.circular(12))),
-              child: FractionallySizedBox(
-                //Faz o redimencionamento do container em relação ao container pai
-                widthFactor: 0.8,
-                heightFactor: 0.8,
-                alignment: Alignment.center,
-                child: Container(
+      body: user == null
+          ? const Center(child: Text('Usuário não autenticado'))
+          : StreamBuilder(
+              stream: firebaseService.getUserProfileStream(user.uid),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) return Center(child: Text('Erro: ${snapshot.error}'));
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                final data = (snapshot.data as dynamic).data() as Map<String, dynamic>? ?? {};
+
+                final name = data['name'] ?? user.displayName ?? '';
+                final email = data['email'] ?? user.email ?? '';
+                final city = data['city'] ?? '';
+                final bio = data['bio'] ?? '';
+                final tagsString = data['tags_string'] ?? '';
+                final goal = data['goal'] ?? '';
+                final profileImageUrl = data['profileImageUrl'] ?? '';
+
+                return SingleChildScrollView(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      //Foto Avatar
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundImage:
-                            AssetImage("assets/images/luma_chat_avatar.png"),
-                      ),
-                      //Nome
-                      Text(
-                        'Gustavo Teodoro Gabilan',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            color: AppColorsProfile.whiteBack),
-                      ),
-                      //Idade
-                      Text(
-                        '20 Anos',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.normal,
-                            color: AppColorsProfile.whiteBack),
-                      ),
-                      //Localizacao
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.location_on,
-                            color: AppColorsProfile.whiteBack,
-                            size: 15,
+                      Container(
+                        width: MediaQuery.of(context).size.width,
+                        height: MediaQuery.of(context).size.height * 0.3,
+                        decoration: const BoxDecoration(
+                          color: AppColorsProfile.purpleBack,
+                          borderRadius: BorderRadius.only(bottomLeft: Radius.circular(12), bottomRight: Radius.circular(12)),
+                        ),
+                        child: FractionallySizedBox(
+                          widthFactor: 0.8,
+                          heightFactor: 0.8,
+                          alignment: Alignment.center,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius: 50,
+                                backgroundImage: profileImageUrl != null && profileImageUrl.isNotEmpty ? NetworkImage(profileImageUrl) : const AssetImage('assets/images/luma_chat_avatar.png') as ImageProvider,
+                              ),
+                              Text(name, textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColorsProfile.whiteBack)),
+                              Text(data['birthdate'] != null ? '${_ageFromBirthdate(data['birthdate'])} Anos' : '', style: const TextStyle(fontSize: 20, color: AppColorsProfile.whiteBack)),
+                              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                const Icon(Icons.location_on, color: AppColorsProfile.whiteBack, size: 15),
+                                const SizedBox(width: 6),
+                                Text(city, style: const TextStyle(fontSize: 15, color: AppColorsProfile.whiteBack)),
+                              ])
+                            ],
                           ),
-                          Text(
-                            "São Paulo",
-                            style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.normal,
-                                color: AppColorsProfile.whiteBack),
+                        ),
+                      ),
+                      Container(
+                        width: MediaQuery.of(context).size.width,
+                        padding: const EdgeInsets.all(30),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          DadoPerfil(dado: email, label: 'E-mail:', icon: Icons.email_outlined),
+                          const SizedBox(height: 25),
+                          DadoPerfil(dado: bio, label: 'Bio:', icon: Icons.chat_outlined),
+                          const SizedBox(height: 25),
+                          DadoPerfil(dado: data['instagram'] ?? '', label: 'Instagram:', icon: Icons.camera_alt_outlined),
+                          const SizedBox(height: 25),
+                          DadoPerfil(dado: data['twitter'] ?? '', label: 'Twitter:', icon: Icons.wifi_tethering_outlined),
+                          const SizedBox(height: 25),
+                          const Text('Interesses', style: TextStyle(color: AppColorsProfile.purpleBack, fontWeight: FontWeight.bold, fontSize: 16)),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: (tagsString as String).isNotEmpty
+                                ? (tagsString as String).split(',').map((t) => InteressesLabel(dado: t)).toList()
+                                : [],
+                          ),
+                          const SizedBox(height: 25),
+                          const Text('Objetivo', style: TextStyle(color: AppColorsProfile.purpleBack, fontWeight: FontWeight.bold, fontSize: 16)),
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.all(12),
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: AppColorsProfile.whiteBack,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColorsProfile.lightGreyFont),
+                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 6, offset: const Offset(0, 2))],
+                            ),
+                            child: Row(children: [const Text('🤝', style: TextStyle(color: AppColorsProfile.blackFont, fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(width: 8), Text(goal ?? '')]),
                           )
-                        ],
+                        ]),
                       )
                     ],
                   ),
-                ),
-              ),
+                );
+              },
             ),
-            //Quandrado de Baixo
-            SingleChildScrollView(
-              child: Container(
-                width: MediaQuery.of(context).size.width,
-                padding: EdgeInsets.all(30),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    //Classes para dados de texto
-                    DadoPerfil(
-                      dado: 'gustavogabilan77@gmail.com',
-                      label: 'E-mail:',
-                      icon: Icons.email_outlined,
-                    ),
-                    SizedBox(height: 25),
-                    DadoPerfil(
-                      dado: 'awdffwdawdawsdawd',
-                      label: 'Bio:',
-                      icon: Icons.chat_outlined,
-                    ),
-                    SizedBox(height: 25),
-                    DadoPerfil(
-                      dado: '@gustavo_gabi_ig',
-                      label: 'Instagram:',
-                      icon: Icons.camera_alt_outlined,
-                    ),
-                    SizedBox(height: 25),
-                    DadoPerfil(
-                      dado: '@gustavo_gabi_tt',
-                      label: 'Twitter:',
-                      icon: Icons.wifi_tethering_outlined,
-                    ),
-                    SizedBox(height: 25),
-                    //Dados de Interesse
-                    Column(
-                      spacing: 5,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        //Label
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.star_outline,
-                              color: AppColorsProfile.purpleBack,
-                            ),
-                            Text(
-                              'Interesses',
-                              style: TextStyle(
-                                  color: AppColorsProfile.purpleBack,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16),
-                            )
-                          ],
-                        ),
-                        //Interesses
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: [
-                            InteressesLabel(
-                              dado: "tecnologia",
-                            ),
-                            InteressesLabel(
-                              dado: "saúde mental",
-                            ),
-                            InteressesLabel(
-                              dado: "esportes",
-                            )
-                          ],
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 25),
-                    Column(
-                      spacing: 5,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        //Label
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.rocket_launch_outlined,
-                              color: AppColorsProfile.purpleBack,
-                            ),
-                            Text(
-                              'Interesses',
-                              style: TextStyle(
-                                  color: AppColorsProfile.purpleBack,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16),
-                            )
-                          ],
-                        ),
-                        //Interesses
-                        Container(
-                            width: double.infinity,
-                            alignment: Alignment.centerLeft,
-                            padding: EdgeInsets.all(12),
-                            height: 50,
-                            decoration: BoxDecoration(
-                                color: AppColorsProfile.whiteBack,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                    color: AppColorsProfile.lightGreyFont),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 6,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ]),
-                            child: Row(
-                              spacing: 12,
-                              children: [
-                                Text(
-                                  '🤝',
-                                  style: TextStyle(
-                                      color: AppColorsProfile.blackFont,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  'Fazer Novas Amizades',
-                                  style: TextStyle(
-                                      color: AppColorsProfile.blackFont,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold),
-                                )
-                              ],
-                            ))
-                      ],
-                    )
-                  ],
-                ),
-              ),
-            )
-          ],
-        ),
-      ),
     );
+  }
+
+  static int _ageFromBirthdate(dynamic birthdate) {
+    try {
+      if (birthdate is int) {
+        final dt = DateTime.fromMillisecondsSinceEpoch(birthdate);
+        final diff = DateTime.now().difference(dt);
+        return (diff.inDays / 365).floor();
+      }
+    } catch (_) {}
+    return 0;
   }
 }
 
-//Widget dos Dados
 class DadoPerfil extends StatelessWidget {
   final IconData icon;
   final String label;
   final String dado;
 
-  // ignore: use_super_parameters
-  const DadoPerfil({
-    Key? key,
-    required this.icon,
-    required this.label,
-    required this.dado,
-  }) : super(key: key);
+  const DadoPerfil({Key? key, required this.icon, required this.label, required this.dado}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      spacing: 3,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              icon,
-              color: AppColorsProfile.purpleBack,
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                  color: AppColorsProfile.purpleBack,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16),
-            )
-          ],
-        ),
-        Text(
-          dado,
-          style: TextStyle(
-              color: AppColorsProfile.blackFont,
-              fontWeight: FontWeight.bold,
-              fontSize: 18),
-        )
-      ],
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [Icon(icon, color: AppColorsProfile.purpleBack), const SizedBox(width: 8), Text(label, style: const TextStyle(color: AppColorsProfile.purpleBack, fontWeight: FontWeight.bold, fontSize: 16))]),
+      const SizedBox(height: 8),
+      Text(dado, style: const TextStyle(color: AppColorsProfile.blackFont, fontWeight: FontWeight.bold, fontSize: 18))
+    ]);
   }
 }
 
 class InteressesLabel extends StatelessWidget {
   final String dado;
 
-  // ignore: use_super_parameters
-  const InteressesLabel({
-    Key? key,
-    required this.dado,
-  }) : super(key: key);
+  const InteressesLabel({Key? key, required this.dado}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColorsProfile.lightGreyFont),
-        ),
-        child: Text("#$dado",
-            style: TextStyle(
-              color: AppColorsProfile.blackFont,
-              fontWeight: FontWeight.w600,
-            )));
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColorsProfile.lightGreyFont)),
+      child: Text('#$dado', style: const TextStyle(color: AppColorsProfile.blackFont, fontWeight: FontWeight.w600)),
+    );
   }
 }

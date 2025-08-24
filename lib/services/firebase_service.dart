@@ -1,4 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:typed_data';
+import 'dart:async';
+import 'dart:convert';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:io';
@@ -18,6 +21,20 @@ class FirebaseService {
   static const String messagesCollection = 'messages';
   static const String conversationsCollection = 'conversations';
 
+    /// Faz upload da imagem de perfil do usuário para o Firebase Storage e retorna a URL pública.
+    Future<String?> uploadUserProfileImage(String userId, Uint8List imageBytes) async {
+      try {
+        final ref = _storage.ref().child('users/$userId/profile.jpg');
+    // Provide explicit metadata to avoid null-metadata issues on some Android plugin versions
+    final metadata = SettableMetadata(contentType: 'image/jpeg');
+    await ref.putData(imageBytes, metadata);
+        final url = await ref.getDownloadURL();
+        return url;
+      } catch (e) {
+        print('Erro ao fazer upload da imagem: $e');
+        return null;
+      }
+    }
   // ULTRA SIMPLE TEST - Just write to Firestore without any validation
   Future<bool> simpleFirestoreTest() async {
     try {
@@ -356,18 +373,213 @@ class FirebaseService {
 
   // File Upload
   Future<String> uploadFile(File file, String path) async {
+    final ref = _storage.ref().child(path);
+    final fileSize = await file.length();
+    // Diagnostic info to help debug 404 / session termination issues
     try {
-      final ref = _storage.ref().child(path);
-      final uploadTask = await ref.putFile(file);
-      return await uploadTask.ref.getDownloadURL();
+      final bucketFromOptions = _storage.app.options.storageBucket;
+      print('🔎 FirebaseStorage configured bucket (from FirebaseOptions): $bucketFromOptions');
     } catch (e) {
-      print('Error uploading file: $e');
-      throw e;
+      print('🔎 Could not read storage bucket from FirebaseOptions: $e');
+    }
+    try {
+      print('🔎 Storage reference fullPath: ${ref.fullPath}');
+    } catch (e) {
+      print('🔎 Could not read ref.fullPath: $e');
+    }
+    print('⬆️ Starting upload to [$path] size=${fileSize} bytes');
+
+    const int maxAttempts = 2; // initial try + 1 retry
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        // Provide explicit metadata to avoid a null Pigeon metadata object in the Android plugin
+        String contentType = 'application/octet-stream';
+        final lower = file.path.toLowerCase();
+        if (lower.endsWith('.png')) {
+          contentType = 'image/png';
+        } else if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+          contentType = 'image/jpeg';
+        } else if (lower.endsWith('.webp')) {
+          contentType = 'image/webp';
+        }
+        final metadata = SettableMetadata(contentType: contentType);
+
+        // On first attempt use putFile (streaming, efficient). On retry use putData as a fallback
+        final bool usePutData = attempt > 1;
+        if (usePutData) {
+          print('⬆️ Attempting upload via putData fallback for $path (attempt $attempt)');
+        }
+        final UploadTask uploadTask = usePutData
+            ? ref.putData(await file.readAsBytes(), metadata)
+            : ref.putFile(file, metadata);
+
+        // Log progress
+        StreamSubscription? sub;
+        try {
+          sub = uploadTask.snapshotEvents.listen((snapshot) {
+            final total = snapshot.totalBytes == 0 ? fileSize : snapshot.totalBytes;
+            final progress = total > 0 ? (snapshot.bytesTransferred / total) * 100.0 : 0.0;
+            print('⬆️ Upload progress [$path] (attempt $attempt/$maxAttempts): ${progress.toStringAsFixed(1)}% state=${snapshot.state} transferred=${snapshot.bytesTransferred}/$total');
+          }, onError: (err) {
+            print('⚠️ Upload snapshot stream error for $path (attempt $attempt): $err');
+          });
+
+          // Wait for completion
+          final snapshot = await uploadTask.whenComplete(() {});
+          await sub.cancel();
+
+          final url = await snapshot.ref.getDownloadURL();
+          print('✅ Upload finished for [$path] (attempt $attempt), url=$url');
+          return url;
+        } catch (e, st) {
+          print('⚠️ Upload encountered an error while waiting for completion (attempt $attempt): $e\n$st');
+
+          // If the task shows success despite the channel error, try to read the URL directly
+          try {
+              if (uploadTask.snapshot.state == TaskState.success) {
+                final url = await ref.getDownloadURL();
+                print('✅ Upload completed (stream failed) for [$path] (attempt $attempt), url=$url');
+                final s = sub;
+                if (s != null) await s.cancel();
+                return url;
+              }
+          } catch (e2, st2) {
+            print('⚠️ Failed to recover URL after stream error (attempt $attempt): $e2\n$st2');
+          }
+
+          final s2 = sub;
+          if (s2 != null) await s2.cancel();
+          // if not last attempt, retry after a short delay
+          if (attempt < maxAttempts) {
+            print('↩️ Retrying upload to $path (next attempt ${attempt + 1}/$maxAttempts)');
+            await Future.delayed(Duration(milliseconds: 500 * attempt));
+            continue;
+          }
+          rethrow;
+        }
+      } catch (e, st) {
+        print('❌ Error uploading file to $path (attempt $attempt): $e\n$st');
+        // If this is a Firebase Storage exception, try to extract more details
+        try {
+          if (e is FirebaseException) {
+            print('🔔 FirebaseException code=${e.code} message=${e.message}');
+          }
+        } catch (_) {}
+        if (attempt < maxAttempts) {
+          print('↩️ Retrying upload to $path (next attempt ${attempt + 1}/$maxAttempts)');
+          await Future.delayed(Duration(milliseconds: 500 * attempt));
+          continue;
+        }
+        rethrow;
+      }
+    }
+
+    // After SDK attempts failed, try a non-resumable REST upload as a last resort.
+    try {
+      String contentType = 'application/octet-stream';
+      final lower = file.path.toLowerCase();
+      if (lower.endsWith('.png')) {
+        contentType = 'image/png';
+      } else if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+        contentType = 'image/jpeg';
+      } else if (lower.endsWith('.webp')) {
+        contentType = 'image/webp';
+      }
+
+      print('🔁 Trying REST fallback upload for $path with contentType=$contentType');
+      final restSuccess = await _uploadViaSimpleRest(file, path, contentType);
+      if (restSuccess) {
+        try {
+          final url = await _storage.ref().child(path).getDownloadURL();
+          print('✅ REST fallback upload finished, url=$url');
+          return url;
+        } catch (e, st) {
+          print('⚠️ Could not get download URL after REST upload: $e\n$st');
+        }
+      }
+    } catch (e, st) {
+      print('⚠️ REST fallback attempt failed: $e\n$st');
+    }
+
+    throw Exception('Failed to upload file to $path after $maxAttempts attempts');
+  }
+
+  // Non-resumable REST fallback using Firebase Storage JSON API (uploadType=media)
+  Future<bool> _uploadViaSimpleRest(File file, String path, String contentType) async {
+    try {
+      final bucket = _storage.app.options.storageBucket;
+      if (bucket == null || bucket.isEmpty) {
+        print('⚠️ _uploadViaSimpleRest: storageBucket is not configured');
+        return false;
+      }
+
+      final idToken = await _auth.currentUser?.getIdToken();
+      if (idToken == null) {
+        print('⚠️ _uploadViaSimpleRest: user is not authenticated (no idToken)');
+        return false;
+      }
+
+      final uri = Uri.parse('https://firebasestorage.googleapis.com/v0/b/$bucket/o?uploadType=media&name=${Uri.encodeComponent(path)}');
+      print('🔁 Attempting non-resumable REST upload to $uri');
+
+      final bytes = await file.readAsBytes();
+      final httpClient = HttpClient();
+      final request = await httpClient.postUrl(uri);
+      request.headers.set('Authorization', 'Bearer $idToken');
+      request.headers.set('Content-Type', contentType);
+      request.add(bytes);
+      final response = await request.close().timeout(Duration(seconds: 30));
+      final body = await utf8.decodeStream(response);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        print('✅ REST upload succeeded: ${response.statusCode} body=$body');
+        return true;
+      } else {
+        print('❌ REST upload failed: status=${response.statusCode} body=$body');
+        return false;
+      }
+    } catch (e, st) {
+      print('❌ _uploadViaSimpleRest error: $e\n$st');
+      return false;
     }
   }
 
   Future<String> uploadProfilePicture(File file, String userId) async {
     return uploadFile(file, 'profile_pictures/$userId/${DateTime.now().millisecondsSinceEpoch}');
+  }
+
+  // Diagnostic helper: upload a small byte array to Storage to isolate upload/session issues
+  Future<String?> testUploadBytes() async {
+    final path = 'debug_uploads/test_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final ref = _storage.ref().child(path);
+    print('🔧 Running testUploadBytes to path: $path');
+    try {
+      print('🔎 FirebaseStorage configured bucket (from FirebaseOptions): ${_storage.app.options.storageBucket}');
+    } catch (e) {
+      print('🔎 Could not read storage bucket from FirebaseOptions: $e');
+    }
+    try {
+      print('🔎 Storage reference fullPath: ${ref.fullPath}');
+    } catch (e) {
+      print('🔎 Could not read ref.fullPath: $e');
+    }
+
+    // Small test payload
+    final bytes = Uint8List.fromList(List<int>.generate(1024, (i) => i % 256));
+    final metadata = SettableMetadata(contentType: 'image/jpeg');
+
+    try {
+      final task = ref.putData(bytes, metadata);
+      final snapshot = await task.whenComplete(() {});
+      final url = await snapshot.ref.getDownloadURL();
+      print('✅ testUploadBytes succeeded: url=$url');
+      return url;
+    } catch (e, st) {
+      print('❌ testUploadBytes failed: $e\n$st');
+      try {
+        if (e is FirebaseException) print('🔔 FirebaseException code=${e.code} message=${e.message}');
+      } catch (_) {}
+      return null;
+    }
   }
 
   // Search Users

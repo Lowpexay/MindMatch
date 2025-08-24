@@ -207,14 +207,47 @@ class AuthService extends ChangeNotifier {
     String? displayName,
     String? photoURL,
   }) async {
+    // Update fields individually and handle a known Pigeon casting issue
+    // Some firebase_auth native channel calls can throw a cast error like:
+    // "type 'List<Object?>' is not a subtype of type 'PigeonUserInfo' in type cast"
+    // In that case we log a warning and continue (the user often still exists and profile may be set server-side).
     try {
-      await currentUser?.updateDisplayName(displayName);
-      await currentUser?.updatePhotoURL(photoURL);
-      await currentUser?.reload();
+      if (displayName != null) {
+        try {
+          await currentUser?.updateDisplayName(displayName);
+        } catch (e) {
+          debugPrint('Warning updating displayName: $e');
+          if (e.toString().contains('PigeonUserInfo') || e.toString().contains('List<Object?>')) {
+            // swallow known plugin/platform casting bug
+          } else {
+            rethrow;
+          }
+        }
+      }
+
+      if (photoURL != null) {
+        try {
+          await currentUser?.updatePhotoURL(photoURL);
+        } catch (e) {
+          debugPrint('Warning updating photoURL: $e');
+          if (e.toString().contains('PigeonUserInfo') || e.toString().contains('List<Object?>')) {
+            // swallow known plugin/platform casting bug
+          } else {
+            rethrow;
+          }
+        }
+      }
+
+      try {
+        await currentUser?.reload();
+      } catch (e) {
+        debugPrint('Warning reloading user after update: $e');
+      }
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error updating profile: $e');
-      throw e;
+      // Don't rethrow to avoid breaking higher-level flows (signup/login). Caller will see logs.
     }
   }
 }

@@ -481,7 +481,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
             // Opções do menu
             _buildMenuOption(
               icon: Icons.edit,
-              title: 'Editar Perfil',
+              title: 'Ver Perfil',
               subtitle: 'Alterar informações pessoais',
               onTap: () {
                 Navigator.pop(context);

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:typed_data';
+import 'dart:convert';
+// restored: no extra imports
 import '../utils/app_colors.dart';
 import '../widgets/global_drawer.dart';
 import '../widgets/checkup_heart_widget.dart';
+import '../widgets/user_avatar.dart';
 import '../providers/conversations_provider.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
@@ -40,6 +44,8 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
   int _currentIndex = 0;
   bool _notificationServiceInitialized = false;
   String _userName = ''; // Nome do usuário
+  Uint8List? _headerImageBytes;
+  // kept minimal state
   PageController _pageController = PageController();
   late AnimationController _animationController;
 
@@ -60,7 +66,30 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeGlobalNotifications();
       _loadUserName();
+      _loadHeaderImage();
     });
+  }
+
+  Future<void> _loadHeaderImage() async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+      final userId = authService.currentUser?.uid;
+      if (userId != null) {
+        final userProfile = await firebaseService.getUserProfile(userId);
+        final base64 = userProfile?['profileImageBase64'] as String?;
+        if (base64 != null && base64.isNotEmpty) {
+          try {
+            final bytes = base64Decode(base64);
+            setState(() {
+              _headerImageBytes = bytes;
+            });
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      print('❌ Error loading header image: $e');
+    }
   }
 
   @override
@@ -382,14 +411,10 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
           margin: const EdgeInsets.only(right: 16),
           child: GestureDetector(
             onTap: _showUserMenu,
-            child: CircleAvatar(
+            child: UserAvatar(
+              imageBytes: _headerImageBytes,
               radius: 20,
-              backgroundColor: AppColors.primary,
-              child: const Icon(
-                Icons.person,
-                color: Colors.white,
-                size: 20,
-              ),
+              useAuthPhoto: true,
             ),
           ),
         ),

@@ -31,9 +31,7 @@ class CheckupHeartWidget extends StatelessWidget {
               children: [
                 Icon(
                   Icons.favorite,
-                  color: streakService.todayCompleted 
-                    ? Colors.red 
-                    : Colors.grey.shade400,
+                  color: streakService.todayCompleted ? Colors.red : Colors.grey.shade400,
                   size: 24,
                 ),
                 const SizedBox(width: 6),

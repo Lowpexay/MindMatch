@@ -8,6 +8,9 @@ import '../providers/conversations_provider.dart';
 import '../models/conversation_models.dart';
 import '../utils/app_colors.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+import '../widgets/user_avatar.dart';
 
 class UserChatScreen extends StatefulWidget {
   final ChatUser otherUser;
@@ -33,6 +36,7 @@ class _UserChatScreenState extends State<UserChatScreen> {
   FirebaseService? _firebaseService;
   AuthService? _authService;
   GlobalNotificationService? _globalNotificationService;
+  Uint8List? _myImageBytes;
 
   @override
   void initState() {
@@ -56,6 +60,29 @@ class _UserChatScreenState extends State<UserChatScreen> {
     print('🔥 FirebaseService: ${_firebaseService != null ? "✅ Available" : "❌ NULL"}');
     print('🔐 AuthService: ${_authService != null ? "✅ Available" : "❌ NULL"}');
     print('👥 Current user: ${_authService?.currentUser?.uid ?? "❌ NULL"}');
+    // Try to load current user's profile image (base64 fallback)
+    _loadMyProfileImage();
+  }
+
+  Future<void> _loadMyProfileImage() async {
+    try {
+      final uid = _authService?.currentUser?.uid;
+      if (uid == null) return;
+      final profile = await _firebaseService?.getUserProfile(uid);
+      final base64 = profile?['profileImageBase64'] as String?;
+      if (base64 != null && base64.isNotEmpty) {
+        try {
+          final bytes = base64Decode(base64);
+          setState(() {
+            _myImageBytes = bytes;
+          });
+        } catch (_) {
+          // ignore
+        }
+      }
+    } catch (e) {
+      print('❌ Error loading my profile image: $e');
+    }
   }
 
   @override
@@ -565,14 +592,10 @@ class _UserChatScreenState extends State<UserChatScreen> {
           
           if (isMe) ...[
             const SizedBox(width: 8),
-            CircleAvatar(
+            UserAvatar(
+              imageBytes: _myImageBytes,
               radius: 16,
-              backgroundColor: AppColors.primary.withOpacity(0.2),
-              child: Icon(
-                Icons.person,
-                size: 16,
-                color: AppColors.primary,
-              ),
+              useAuthPhoto: true,
             ),
           ],
         ],

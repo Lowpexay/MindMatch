@@ -19,6 +19,34 @@ class FirebaseService {
 
   FirebaseService({this.forcePutDataOnAndroid = true});
 
+  // Helper to wrap Firestore streams and prevent unhandled exceptions
+  // If the underlying stream emits an error (e.g., missing composite index),
+  // log it and convert it into an empty stream so the UI doesn't crash.
+  Stream<T> _guardedStream<T>(Stream<T> source, String tag) {
+    // Use async* to yield events and catch errors
+    final controller = StreamController<T>.broadcast();
+
+    source.listen((event) {
+      try {
+        controller.add(event);
+      } catch (e) {
+        print('⚠️ Error while forwarding event for $tag: $e');
+      }
+    }, onError: (err, stack) {
+      // Cloud Firestore may throw FAILED_PRECONDITION when a composite index is missing.
+      print('❌ Firestore stream error for $tag: $err');
+      // Do not close the controller so consumers can keep working with previous/empty state.
+      // Optionally we could emit a special empty value, but for QuerySnapshot/DocumentSnapshot
+      // consumers generally expect the stream to remain open.
+    }, onDone: () {
+      try {
+        controller.close();
+      } catch (e) {}
+    }, cancelOnError: false);
+
+    return controller.stream;
+  }
+
   // Collections
   static const String usersCollection = 'users';
   static const String chatsCollection = 'chats';
@@ -639,24 +667,33 @@ class FirebaseService {
 
   // Real-time data streams
   Stream<DocumentSnapshot> getUserProfileStream(String userId) {
-    return _firestore.collection(usersCollection).doc(userId).snapshots();
+    return _guardedStream<DocumentSnapshot>(
+      _firestore.collection(usersCollection).doc(userId).snapshots(),
+      'userProfile:$userId',
+    );
   }
 
   Stream<QuerySnapshot> getChatsStream(String userId) {
-    return _firestore
-        .collection(chatsCollection)
-        .where('participants', arrayContains: userId)
-        .orderBy('lastMessageAt', descending: true)
-        .snapshots();
+    return _guardedStream<QuerySnapshot>(
+      _firestore
+          .collection(chatsCollection)
+          .where('participants', arrayContains: userId)
+          .orderBy('lastMessageAt', descending: true)
+          .snapshots(),
+      'chats:$userId',
+    );
   }
 
   Stream<QuerySnapshot> getMessagesStream(String chatId) {
-    return _firestore
-        .collection(chatsCollection)
-        .doc(chatId)
-        .collection(messagesCollection)
-        .orderBy('timestamp', descending: true)
-        .snapshots();
+    return _guardedStream<QuerySnapshot>(
+      _firestore
+          .collection(chatsCollection)
+          .doc(chatId)
+          .collection(messagesCollection)
+          .orderBy('timestamp', descending: true)
+          .snapshots(),
+      'messages:$chatId',
+    );
   }
 
   // Chat functionality
@@ -832,19 +869,38 @@ class FirebaseService {
 
       print('🔍 Getting user responses from ${startOfDay.toIso8601String()} to ${endOfDay.toIso8601String()}');
 
-      final query = await _firestore
-          .collection('question_responses')
-          .where('userId', isEqualTo: userId)
-          .where('answeredAt', isGreaterThanOrEqualTo: startOfDay.millisecondsSinceEpoch)
-          .where('answeredAt', isLessThan: endOfDay.millisecondsSinceEpoch)
-          .get();
+      try {
+        final query = await _firestore
+            .collection('question_responses')
+            .where('userId', isEqualTo: userId)
+            .where('answeredAt', isGreaterThanOrEqualTo: startOfDay.millisecondsSinceEpoch)
+            .where('answeredAt', isLessThan: endOfDay.millisecondsSinceEpoch)
+            .get();
 
-      final responses = query.docs
-          .map((doc) => QuestionResponse.fromMap(doc.data()))
-          .toList();
-      
-      print('📊 Found ${responses.length} responses for today');
-      return responses;
+        final responses = query.docs
+            .map((doc) => QuestionResponse.fromMap(doc.data()))
+            .toList();
+        print('📊 Found ${responses.length} responses for today (via composite query)');
+        return responses;
+      } catch (e) {
+        // Firestore may require a composite index for this compound query.
+        print('⚠️ Composite query failed (maybe missing index): $e');
+        print('⚠️ Falling back to single-field query + client-side filter');
+
+        // Fallback: query only by userId and filter locally by answeredAt range
+        final fallbackQuery = await _firestore
+            .collection('question_responses')
+            .where('userId', isEqualTo: userId)
+            .get();
+
+    final responses = fallbackQuery.docs
+      .map((doc) => QuestionResponse.fromMap(doc.data()))
+      .where((r) => !r.answeredAt.isBefore(startOfDay) && r.answeredAt.isBefore(endOfDay))
+      .toList();
+
+        print('📊 Found ${responses.length} responses for today (via fallback)');
+        return responses;
+      }
     } catch (e) {
       print('❌ Error getting today user responses: $e');
       return [];
@@ -948,6 +1004,18 @@ class FirebaseService {
           userData['compatibility'] = compatibility;
           compatibleUsers.add(userData);
           print('✅ Added compatible user: ${userData['name']} (${compatibility.toInt()}%)');
+          // Persist lightweight compatibility snapshot to reduce need for re-calculation
+          try {
+            final docId = _compatibilityDocId(userId, userDoc.id);
+            await _firestore.collection('compatibilities').doc(docId).set({
+              'userA': userId,
+              'userB': userDoc.id,
+              'compatibility': compatibility,
+              'updatedAt': DateTime.now().millisecondsSinceEpoch,
+            });
+          } catch (e) {
+            print('⚠️ Error saving compatibility snapshot: $e');
+          }
         }
       }
 
@@ -961,6 +1029,70 @@ class FirebaseService {
     } catch (e) {
       print('❌ Error getting compatible users: $e');
       return [];
+    }
+  }
+
+  // Helper to create deterministic doc id for a pair of users (order-independent)
+  String _compatibilityDocId(String a, String b) {
+    final parts = [a, b]..sort();
+    return '${parts[0]}_${parts[1]}';
+  }
+
+  /// Delete questions created before [cutoff] (millisecondsSinceEpoch)
+  Future<void> deleteQuestionsBefore(int cutoffMillis) async {
+    try {
+      const int pageSize = 400; // keep below 500 write limit
+      while (true) {
+        final query = await _firestore
+            .collection('questions')
+            .where('createdAt', isLessThan: cutoffMillis)
+            .orderBy('createdAt')
+            .limit(pageSize)
+            .get();
+
+        if (query.docs.isEmpty) break;
+
+        final batch = _firestore.batch();
+        for (var doc in query.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+        print('🧹 Deleted ${query.docs.length} old questions batch before $cutoffMillis');
+
+        // Small pause to avoid overwhelming Firestore
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+    } catch (e) {
+      print('❌ Error deleting old questions: $e');
+    }
+  }
+
+  /// Delete question responses answered before [cutoff] (millisecondsSinceEpoch)
+  Future<void> deleteResponsesBefore(int cutoffMillis) async {
+    try {
+      const int pageSize = 400; // keep below 500 write limit
+      while (true) {
+        final query = await _firestore
+            .collection('question_responses')
+            .where('answeredAt', isLessThan: cutoffMillis)
+            .orderBy('answeredAt')
+            .limit(pageSize)
+            .get();
+
+        if (query.docs.isEmpty) break;
+
+        final batch = _firestore.batch();
+        for (var doc in query.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+        print('🧹 Deleted ${query.docs.length} old question responses batch before $cutoffMillis');
+
+        // Small pause to avoid overwhelming Firestore
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+    } catch (e) {
+      print('❌ Error deleting old question responses: $e');
     }
   }
 
@@ -1198,6 +1330,8 @@ class FirebaseService {
           onMessage(message);
         }
       }
+    }, onError: (err) {
+      print('❌ listenToMessages stream error for $conversationId: $err');
     });
   }
 
@@ -1353,12 +1487,12 @@ class FirebaseService {
   void listenToUserConversations(String userId, Function(List<Conversation>) onConversationsUpdate) {
     try {
       print('👂 Setting up real-time listener for conversations');
-      _firestore
-          .collection(conversationsCollection)
-          .where('participants', arrayContains: userId)
-          .orderBy('updatedAt', descending: true)
-          .snapshots()
-          .listen((snapshot) async {
+    _firestore
+      .collection(conversationsCollection)
+      .where('participants', arrayContains: userId)
+      .orderBy('updatedAt', descending: true)
+      .snapshots()
+      .listen((snapshot) async {
         
         print('🔄 Conversations snapshot received: ${snapshot.docs.length} conversations');
         final conversations = <Conversation>[];
@@ -1427,6 +1561,8 @@ class FirebaseService {
 
         print('✅ Processed ${conversations.length} conversations successfully');
         onConversationsUpdate(conversations);
+      }, onError: (err) {
+        print('❌ listenToUserConversations stream error for $userId: $err');
       });
     } catch (e) {
       print('❌ Error setting up conversations listener: $e');
@@ -1623,12 +1759,13 @@ class FirebaseService {
 
   // Escutar mudanças no histórico de conversas em tempo real
   Stream<List<ConversationHistory>> listenToConversationHistory(String userId) {
-    return _firestore
-        .collection(conversationsCollection)
-        .where('participants', arrayContains: userId)
-        .orderBy('updatedAt', descending: true)
-        .snapshots()
-        .asyncMap((snapshot) async {
+    return _guardedStream<List<ConversationHistory>>(
+      _firestore
+          .collection(conversationsCollection)
+          .where('participants', arrayContains: userId)
+          .orderBy('updatedAt', descending: true)
+          .snapshots()
+          .asyncMap((snapshot) async {
       final conversations = <ConversationHistory>[];
       
       for (var doc in snapshot.docs) {
@@ -1663,7 +1800,9 @@ class FirebaseService {
         }
       }
       
-      return conversations;
-    });
+  return conversations;
+      }),
+      'conversationHistory:$userId',
+    );
   }
 }

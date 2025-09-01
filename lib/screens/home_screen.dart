@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
+import '../services/gemini_service.dart';
 import '../services/checkup_streak_service.dart';
 import '../models/mood_data.dart';
 import '../models/question_models.dart';
@@ -112,7 +113,84 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadDailyQuestions() async {
     try {
       // Carregar apenas perguntas criadas hoje
-      var questions = await _firebaseService?.getTodayQuestions() ?? [];
+  var questions = await _firebaseService?.getTodayQuestions() ?? [];
+      // Ensure we have exactly 10 questions for today. If Firestore has fewer,
+      // request only the missing count from Gemini and supplement with local fallback.
+      const int targetCount = 10;
+      if (questions.length < targetCount) {
+        final gemini = GeminiService();
+        final List<ReflectiveQuestion> newlyCreated = [];
+        final now = DateTime.now();
+        final startOfDay = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+
+        final missing = targetCount - questions.length;
+        try {
+          final generated = await gemini.generateDailyQuestions(
+            count: missing,
+            userMood: _todayMood,
+          ).timeout(const Duration(seconds: 8));
+          print('ℹ️ Gemini returned ${generated.length} generated questions (requested $missing)');
+
+          // Remove duplicates by text compared to existing questions
+          final existingTexts = questions.map((q) => q.question.trim()).toSet();
+          for (var g in generated) {
+            if (existingTexts.contains(g.question.trim())) continue;
+            // create deterministic id for new question
+            final id = '${now.millisecondsSinceEpoch}_${questions.length + newlyCreated.length}';
+            final q = ReflectiveQuestion(
+              id: id,
+              question: g.question,
+              type: g.type,
+              category: g.category ?? 'general',
+              createdAt: now,
+            );
+            newlyCreated.add(q);
+            questions.add(q);
+            if (questions.length >= targetCount) break;
+          }
+        } catch (e) {
+          print('⚠️ Gemini generation timed out or failed: $e');
+        }
+
+        // If still missing, supplement with local fallback items (avoiding duplicates)
+        if (questions.length < targetCount) {
+          final fallback = _localFallbackQuestions();
+          final existingTexts = questions.map((q) => q.question.trim()).toSet();
+          for (var fb in fallback) {
+            if (questions.length >= targetCount) break;
+            if (existingTexts.contains(fb.question.trim())) continue;
+            final id = '${now.millisecondsSinceEpoch}_${questions.length + newlyCreated.length}';
+            final q = ReflectiveQuestion(
+              id: id,
+              question: fb.question,
+              type: fb.type,
+              category: fb.category,
+              createdAt: now,
+            );
+            newlyCreated.add(q);
+            questions.add(q);
+          }
+          print('ℹ️ Supplemented with fallback, total questions now: ${questions.length}');
+        }
+
+        // If we created any new questions, delete previous-day data and save only the new items
+        if (newlyCreated.isNotEmpty) {
+          try {
+            await _firebaseService?.deleteQuestionsBefore(startOfDay);
+            await _firebaseService?.deleteResponsesBefore(startOfDay);
+          } catch (e) {
+            print('⚠️ Error cleaning previous questions/responses: $e');
+          }
+
+          for (var q in newlyCreated) {
+            try {
+              await _firebaseService?.saveQuestion(q);
+            } catch (e) {
+              print('⚠️ Error saving generated question: $e');
+            }
+          }
+        }
+      }
       
       // Carregar apenas respostas do usuário para hoje
       final userId = _authService?.currentUser?.uid;
@@ -122,17 +200,71 @@ class _HomeScreenState extends State<HomeScreen> {
         for (var response in responses) {
           answersMap[response.questionId] = response.answer;
         }
-        
+        // Safety: Guarantee we have exactly targetCount questions in memory
+        const int targetCount = 10;
+        if (questions.length < targetCount) {
+          print('⚠️ After generation/supplement we still have only ${questions.length} questions, filling from local fallback');
+          final fallback = _localFallbackQuestions();
+          final existingTexts = questions.map((q) => q.question.trim()).toSet();
+          final now = DateTime.now();
+          while (questions.length < targetCount) {
+            final candidate = fallback[questions.length % fallback.length];
+            if (existingTexts.contains(candidate.question.trim())) {
+              // Try next
+              bool found = false;
+              for (var fb in fallback) {
+                if (!existingTexts.contains(fb.question.trim())) {
+                  final id = '${now.millisecondsSinceEpoch}_${questions.length}';
+                  questions.add(ReflectiveQuestion(id: id, question: fb.question, type: fb.type, category: fb.category, createdAt: now));
+                  existingTexts.add(fb.question.trim());
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) break; // no unique fallback left
+            } else {
+              final id = '${now.millisecondsSinceEpoch}_${questions.length}';
+              questions.add(ReflectiveQuestion(id: id, question: candidate.question, type: candidate.type, category: candidate.category, createdAt: now));
+              existingTexts.add(candidate.question.trim());
+            }
+          }
+          print('✅ After final fill we have ${questions.length} questions');
+        }
+
         setState(() {
           _dailyQuestions = questions;
           _questionAnswers = answersMap;
         });
-        
+
         print('📱 Loaded ${questions.length} questions and ${responses.length} responses for today');
       }
     } catch (e) {
       print('❌ Error loading daily questions: $e');
     }
+  }
+
+  List<ReflectiveQuestion> _localFallbackQuestions() {
+    final now = DateTime.now();
+    final base = [
+      'Você prefere viajar sozinho ou acompanhado?',
+      'Você acha importante perdoar alguém que te magoou?',
+      'Você costuma seguir sua intuição nas decisões importantes?',
+      'Você acredita que pequenos hábitos mudam grandes resultados?',
+      'Você gosta mais de planejar ou improvisar?',
+      'Você se sente energizado ao passar tempo com outras pessoas?',
+      'Você costuma definir metas semanais para si mesmo?',
+      'Você acha que ouvir é mais importante que falar?',
+      'Você acredita que tecnologia melhora sua qualidade de vida?',
+      'Você teria coragem de mudar de carreira agora?'
+    ];
+
+    return List.generate(10, (i) => ReflectiveQuestion(
+      id: '${now.millisecondsSinceEpoch}_${i}',
+      question: base[i],
+      type: QuestionType.personal,
+      category: 'general',
+      createdAt: now,
+    ));
   }
 
   Future<void> _loadCompatibleUsers(String userId) async {

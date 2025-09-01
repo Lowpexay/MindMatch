@@ -40,16 +40,17 @@ class GeminiService {
         final text = data['candidates'][0]['content']['parts'][0]['text'];
         
         print('✅ Gemini response: $text');
-        
-        return _parseQuestionsFromResponse(text);
+  final parsed = _parseQuestionsFromResponse(text);
+  print('✅ Parsed ${parsed.length} questions from Gemini response');
+  return parsed;
       } else {
         print('❌ Gemini API error: ${response.statusCode}');
         print('❌ Response body: ${response.body}');
-        return _getFallbackQuestions();
+        return _getFallbackQuestions(count: count);
       }
     } catch (e) {
       print('❌ Error generating questions: $e');
-      return _getFallbackQuestions();
+      return _getFallbackQuestions(count: count);
     }
   }
 
@@ -163,7 +164,7 @@ Gere as $count perguntas agora:
     }
   }
 
-  List<ReflectiveQuestion> _getFallbackQuestions() {
+  List<ReflectiveQuestion> _getFallbackQuestions({int count = 5}) {
     final now = DateTime.now();
     final baseQuestions = [
       ReflectiveQuestion(
@@ -238,9 +239,9 @@ Gere as $count perguntas agora:
       ),
     ];
     
-    // Retorna 5 questões aleatórias diferentes a cada chamada
-    baseQuestions.shuffle();
-    return baseQuestions.take(5).toList();
+  // Retorna `count` questões aleatórias diferentes a cada chamada
+  baseQuestions.shuffle();
+  return baseQuestions.take(count).toList();
   }
 
   Future<String> generateEmotionalSupport(MoodData moodData) async {

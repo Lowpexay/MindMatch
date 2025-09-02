@@ -9,7 +9,8 @@ import '../services/auth_service.dart';
 import '../widgets/user_avatar.dart';
 import '../utils/app_colors.dart';
 import '../screens/quick_eventlog_test.dart';
-import '../screens/security_reports_screen.dart';
+import '../screens/eventlog_report_screen.dart';
+import '../screens/emotional_reports_screen.dart';
 
 class GlobalDrawer extends StatelessWidget {
   const GlobalDrawer({super.key});
@@ -195,6 +196,17 @@ class GlobalDrawer extends StatelessWidget {
                   onTap: () {
                     Navigator.pop(context);
                     _showReports(context);
+                  },
+                ),
+                
+                _buildMenuItem(
+                  context,
+                  icon: Icons.dashboard,
+                  title: 'Relatórios EventLog',
+                  subtitle: 'Painel ManageEngine',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openEventLogReports(context);
                   },
                 ),
                 
@@ -396,7 +408,7 @@ class GlobalDrawer extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const SecurityReportsScreen(),
+        builder: (context) => const EmotionalReportsScreen(),
       ),
     );
   }
@@ -478,11 +490,20 @@ class GlobalDrawer extends StatelessWidget {
     );
   }
 
+  void _openEventLogReports(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const EventLogReportScreen(),
+      ),
+    );
+  }
+
   void _testEventLog(BuildContext context) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const QuickEventLogTest(),
+        builder: (context) => QuickEventLogTestScreen(),
       ),
     );
   }

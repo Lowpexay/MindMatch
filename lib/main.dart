@@ -10,6 +10,7 @@ import 'services/firebase_service.dart';
 import 'services/notification_service.dart';
 import 'services/global_notification_service.dart';
 import 'services/checkup_streak_service.dart';
+import 'services/achievement_service.dart';
 import 'providers/conversations_provider.dart';
 import 'screens/profile_edit_screen.dart';
 import 'screens/profile_screen.dart';
@@ -48,6 +49,7 @@ class MindMatchApp extends StatelessWidget {
         Provider(create: (_) => FirebaseService()),
         Provider(create: (_) => GlobalNotificationService()),
         ChangeNotifierProvider(create: (_) => CheckupStreakService()),
+        ChangeNotifierProvider(create: (_) => AchievementService()),
         ChangeNotifierProxyProvider2<AuthService, FirebaseService, ConversationsProvider>(
           create: (context) => ConversationsProvider(
             Provider.of<FirebaseService>(context, listen: false),

@@ -2,24 +2,29 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/checkup_streak.dart';
+import '../models/daily_checkup.dart';
 
 class CheckupStreakService extends ChangeNotifier {
   static const String _streakKey = 'checkup_streak_data';
   static const String _lastCheckupKey = 'last_checkup_date';
   static const String _currentStreakKey = 'current_streak_count';
+  static const String _dailyCheckupKey = 'daily_checkup_data';
   
   List<CheckupStreak> _streakHistory = [];
+  List<DailyCheckup> _dailyCheckups = [];
   int _currentStreak = 0;
   DateTime? _lastCheckupDate;
   bool _todayCompleted = false;
 
   List<CheckupStreak> get streakHistory => _streakHistory;
+  List<DailyCheckup> get dailyCheckups => _dailyCheckups;
   int get currentStreak => _currentStreak;
   DateTime? get lastCheckupDate => _lastCheckupDate;
   bool get todayCompleted => _todayCompleted;
 
   CheckupStreakService() {
     _loadStreakData();
+    _loadDailyCheckups();
   }
 
   /// Carregar dados salvos
@@ -226,5 +231,86 @@ class CheckupStreakService extends ChangeNotifier {
     await _saveStreakData();
     notifyListeners();
     print('🔄 Streak resetado');
+  }
+
+  // Métodos para DailyCheckup
+
+  /// Carregar dados de checkups diários
+  Future<void> _loadDailyCheckups() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dailyJson = prefs.getString(_dailyCheckupKey);
+      
+      if (dailyJson != null) {
+        final List<dynamic> dailyList = jsonDecode(dailyJson);
+        _dailyCheckups = dailyList.map((item) => DailyCheckup.fromJson(item)).toList();
+      }
+    } catch (e) {
+      print('❌ Erro ao carregar checkups diários: $e');
+    }
+  }
+
+  /// Salvar dados de checkups diários
+  Future<void> _saveDailyCheckups() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dailyJson = jsonEncode(_dailyCheckups.map((e) => e.toJson()).toList());
+      await prefs.setString(_dailyCheckupKey, dailyJson);
+    } catch (e) {
+      print('❌ Erro ao salvar checkups diários: $e');
+    }
+  }
+
+  /// Atualizar ou criar checkup do dia
+  Future<void> updateTodayCheckup(DailyCheckup checkup) async {
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    
+    // Remover checkup existente do dia
+    _dailyCheckups.removeWhere((c) => _isSameDay(c.date, todayDate));
+    
+    // Adicionar o novo
+    _dailyCheckups.add(checkup.copyWith(date: todayDate));
+    
+    // Ordenar por data
+    _dailyCheckups.sort((a, b) => b.date.compareTo(a.date));
+    
+    await _saveDailyCheckups();
+    notifyListeners();
+  }
+
+  /// Obter checkup de hoje
+  DailyCheckup? getTodayCheckup() {
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    
+    try {
+      return _dailyCheckups.firstWhere((c) => _isSameDay(c.date, todayDate));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Obter checkups dos últimos N dias
+  List<DailyCheckup> getRecentCheckups({int days = 7}) {
+    final now = DateTime.now();
+    final cutoffDate = now.subtract(Duration(days: days));
+    
+    return _dailyCheckups
+        .where((c) => c.date.isAfter(cutoffDate))
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  /// Calcular média de humor dos últimos 7 dias
+  double getAverageMood({int days = 7}) {
+    final recentCheckups = getRecentCheckups(days: days)
+        .where((c) => c.moodScore > 0)
+        .toList();
+    
+    if (recentCheckups.isEmpty) return 3.0;
+    
+    final sum = recentCheckups.map((c) => c.moodScore).reduce((a, b) => a + b);
+    return sum / recentCheckups.length;
   }
 }

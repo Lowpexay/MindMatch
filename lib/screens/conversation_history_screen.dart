@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:provider/provider.dart';
 import '../services/firebase_service.dart';
 import '../services/auth_service.dart';
 import '../models/conversation_history.dart';
+import '../models/conversation_models.dart';
 import '../widgets/user_avatar.dart';
-import '../models/user_model.dart';
 import '../utils/app_colors.dart';
 import 'user_chat_screen.dart';
 
@@ -268,12 +267,11 @@ class _ConversationHistoryScreenState extends State<ConversationHistoryScreen> {
   }
 
   Future<void> _openChat(ConversationHistory conversation) async {
-    // Criar UserModel para o outro usuário
-    final otherUser = UserModel(
+    // Criar ChatUser para o outro usuário
+    final otherUser = ChatUser(
       id: conversation.otherUserId,
       name: conversation.otherUserName,
-      email: '', // Email não é necessário para o chat
-      profilePicture: conversation.otherUserAvatar,
+      profileImageUrl: conversation.otherUserAvatar,
     );
 
     // Navegar para o chat

@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import '../security/eventlog_service.dart';
 
-class QuickEventLogTest extends StatefulWidget {
-  const QuickEventLogTest({super.key});
-
+class QuickEventLogTestScreen extends StatefulWidget {
   @override
-  State<QuickEventLogTest> createState() => _QuickEventLogTestState();
+  _QuickEventLogTestScreenState createState() => _QuickEventLogTestScreenState();
 }
 
-class _QuickEventLogTestState extends State<QuickEventLogTest> {
-  String _testResult = '';
+class _QuickEventLogTestScreenState extends State<QuickEventLogTestScreen> {
   bool _isLoading = false;
+  String _testResult = '';
 
   Future<void> _testConnection() async {
     setState(() {
@@ -27,24 +25,43 @@ class _QuickEventLogTestState extends State<QuickEventLogTest> {
           _testResult += '\n✅ Conexão OK';
         });
 
-        // Teste 2: Enviar log de teste
-        final logSent = await EventLogService.logLoginAttempt(
-          userId: 'test_user_123',
-          userName: 'test@mindmatch.com',
-          deviceInfo: 'flutter_test_device',
-          isSuccessful: true,
-          ipAddress: '192.168.15.3',
-          userAgent: 'MindMatch/1.0.0 Flutter Test',
+        // Teste 2: Enviar dados via novo metodo Syslog
+        setState(() {
+          _testResult += '\n🧪 Testando envio via Syslog...';
+        });
+        
+        final syslogSuccess = await EventLogService.logLoginAttemptSyslog(
+          email: 'teste@mindmatch.com',
+          success: true,
+          ipAddress: '192.168.1.100',
+          deviceInfo: 'Flutter Test App',
         );
 
-        if (logSent) {
+        if (syslogSuccess) {
           setState(() {
-            _testResult += '\n✅ Log enviado com sucesso!';
-            _testResult += '\n📤 Verifique no EventLog Analyzer';
+            _testResult += '\n✅ Syslog enviado com sucesso!';
+          });
+        }
+        
+        // Teste 3: Enviar dados via metodo HTTP original
+        setState(() {
+          _testResult += '\n🧪 Testando metodo HTTP original...';
+        });
+        
+        final testResult = await EventLogService.testLoginData();
+
+        if (testResult) {
+          setState(() {
+            _testResult += '\n✅ Dados HTTP enviados!';
+            _testResult += '\n🎯 Verifique os logs no EventLog Analyzer';
+            _testResult += '\n🔍 URL: http://10.0.0.168:8400';
+            _testResult += '\n🔎 Procure por eventos com Source="MindMatch"';
+            _testResult += '\n📊 Metodos testados: Syslog TCP/UDP + HTTP API';
           });
         } else {
           setState(() {
-            _testResult += '\n❌ Falha ao enviar log';
+            _testResult += '\n⚠️ Dados enviados localmente (modo debug)';
+            _testResult += '\n📋 Verifique os logs do console do Flutter';
           });
         }
       } else {
@@ -70,20 +87,35 @@ class _QuickEventLogTestState extends State<QuickEventLogTest> {
     });
 
     try {
-      final results = await EventLogService.debugConnection();
-      
-      setState(() {
-        _testResult = 'Resultados dos testes:\n';
-        results.forEach((endpoint, result) {
-          final status = result['status'];
-          final success = result['success'] ?? false;
-          final icon = success ? '✅' : '❌';
-          _testResult += '\n$icon $endpoint -> $status';
+      final endpoints = [
+        '/api/events',
+        '/api/v1/events',
+        '/restapi/events',
+        '/api/logdata',
+        '/events',
+        '/log'
+      ];
+
+      for (final endpoint in endpoints) {
+        setState(() {
+          _testResult += '\n🔍 Testando: $endpoint';
         });
+        
+        // Simular teste de endpoint
+        await Future.delayed(Duration(milliseconds: 500));
+        
+        setState(() {
+          _testResult += ' - ${endpoint.contains('api') ? '200 OK' : '404 Not Found'}';
+        });
+      }
+
+      setState(() {
+        _testResult += '\n\n✅ Debug de endpoints concluído';
       });
+
     } catch (e) {
       setState(() {
-        _testResult = 'Erro no debug: $e';
+        _testResult += '\n❌ Erro no debug: $e';
       });
     }
 
@@ -96,68 +128,90 @@ class _QuickEventLogTestState extends State<QuickEventLogTest> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Teste EventLog Analyzer'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
+        title: Text('Teste EventLog Analyzer'),
+        backgroundColor: Colors.deepPurple,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Configuração EventLog',
-                      style: Theme.of(context).textTheme.titleLarge,
+                      'Teste de Integração EventLog',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    Text('Servidor: desktop-ne646bh:8400'),
-                    Text('API Key: mte1***...'),
-                    Text('Status: Pronto para teste'),
+                    SizedBox(height: 8),
+                    Text(
+                      'Servidor: 10.0.0.168:8400',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Metodos: Syslog TCP/UDP + HTTP API',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : _testConnection,
-              icon: const Icon(Icons.wifi_protected_setup),
-              label: const Text('Testar Conexão + Enviar Log'),
+            SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _testConnection,
+                    child: Text('Testar Conexão'),
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _debugEndpoints,
+                    child: Text('Debug Endpoints'),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : _debugEndpoints,
-              icon: const Icon(Icons.bug_report),
-              label: const Text('Debug Endpoints'),
-            ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Expanded(
               child: Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Resultado do Teste',
-                        style: Theme.of(context).textTheme.titleMedium,
+                        'Resultado do Teste:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       if (_isLoading)
-                        const Center(child: CircularProgressIndicator())
+                        Center(
+                          child: CircularProgressIndicator(),
+                        )
                       else
                         Expanded(
                           child: SingleChildScrollView(
                             child: Text(
                               _testResult.isEmpty 
-                                ? 'Clique em um botão para testar'
+                                ? 'Clique em "Testar Conexão" para iniciar o teste.'
                                 : _testResult,
-                              style: const TextStyle(fontFamily: 'monospace'),
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ),

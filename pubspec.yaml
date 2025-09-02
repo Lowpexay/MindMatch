@@ -30,6 +30,7 @@ dependencies:
   # HTTP & API
   http: ^1.1.2
   dio: ^5.3.4
+  url_launcher: ^6.2.2
   
   # Storage
   shared_preferences: ^2.2.2
@@ -41,6 +42,7 @@ dependencies:
   flutter_chip_tags: ^2.0.2
   cached_network_image: ^3.3.0
   flutter_local_notifications: ^17.2.4
+  fl_chart: ^0.68.0
   
   # Audio
   audioplayers: ^5.0.0

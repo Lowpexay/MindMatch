@@ -467,14 +467,10 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
             // Header do perfil
             Row(
               children: [
-                CircleAvatar(
+                UserAvatar(
+                  imageBytes: _headerImageBytes,
                   radius: 24,
-                  backgroundColor: AppColors.primary,
-                  child: const Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: 24,
-                  ),
+                  useAuthPhoto: true,
                 ),
                 const SizedBox(width: 16),
                 Expanded(

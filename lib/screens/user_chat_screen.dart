@@ -290,15 +290,12 @@ class _UserChatScreenState extends State<UserChatScreen> {
           children: [
             Stack(
               children: [
-                CircleAvatar(
+                UserAvatar(
+                  imageUrl: widget.otherUser.profileImageUrl,
+                  imageBytes: widget.otherUser.profileImageBase64 != null && widget.otherUser.profileImageBase64!.isNotEmpty
+                      ? base64Decode(widget.otherUser.profileImageBase64!)
+                      : null,
                   radius: 20,
-                  backgroundColor: AppColors.gray200,
-                  backgroundImage: widget.otherUser.profileImageUrl != null
-                      ? NetworkImage(widget.otherUser.profileImageUrl!)
-                      : null,
-                  child: widget.otherUser.profileImageUrl == null
-                      ? const Icon(Icons.person, size: 20, color: AppColors.gray500)
-                      : null,
                 ),
                 if (widget.otherUser.isOnline)
                   Positioned(
@@ -430,15 +427,12 @@ class _UserChatScreenState extends State<UserChatScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircleAvatar(
+            UserAvatar(
+              imageUrl: widget.otherUser.profileImageUrl,
+              imageBytes: widget.otherUser.profileImageBase64 != null && widget.otherUser.profileImageBase64!.isNotEmpty
+                  ? base64Decode(widget.otherUser.profileImageBase64!)
+                  : null,
               radius: 40,
-              backgroundColor: AppColors.gray200,
-              backgroundImage: widget.otherUser.profileImageUrl != null
-                  ? NetworkImage(widget.otherUser.profileImageUrl!)
-                  : null,
-              child: widget.otherUser.profileImageUrl == null
-                  ? const Icon(Icons.person, size: 40, color: AppColors.gray500)
-                  : null,
             ),
             const SizedBox(height: 16),
             Text(
@@ -512,15 +506,12 @@ class _UserChatScreenState extends State<UserChatScreen> {
         mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
           if (!isMe) ...[
-            CircleAvatar(
+            UserAvatar(
+              imageUrl: widget.otherUser.profileImageUrl,
+              imageBytes: widget.otherUser.profileImageBase64 != null && widget.otherUser.profileImageBase64!.isNotEmpty
+                  ? base64Decode(widget.otherUser.profileImageBase64!)
+                  : null,
               radius: 16,
-              backgroundColor: AppColors.gray200,
-              backgroundImage: widget.otherUser.profileImageUrl != null
-                  ? NetworkImage(widget.otherUser.profileImageUrl!)
-                  : null,
-              child: widget.otherUser.profileImageUrl == null
-                  ? const Icon(Icons.person, size: 16, color: AppColors.gray500)
-                  : null,
             ),
             const SizedBox(width: 8),
           ],

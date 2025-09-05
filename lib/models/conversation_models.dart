@@ -59,6 +59,7 @@ class ChatUser {
   final String id;
   final String name;
   final String? profileImageUrl;
+  final String? profileImageBase64;
   final bool isOnline;
   final DateTime? lastSeen;
 
@@ -66,6 +67,7 @@ class ChatUser {
     required this.id,
     required this.name,
     this.profileImageUrl,
+    this.profileImageBase64,
     this.isOnline = false,
     this.lastSeen,
   });
@@ -75,6 +77,7 @@ class ChatUser {
       id: data['id'] ?? '',
       name: data['name'] ?? 'Usuário',
       profileImageUrl: data['profileImageUrl'],
+      profileImageBase64: data['profileImageBase64'],
       isOnline: data['isOnline'] ?? false,
       lastSeen: data['lastSeen'] != null 
           ? DateTime.fromMillisecondsSinceEpoch(data['lastSeen'])
@@ -87,6 +90,7 @@ class ChatUser {
       'id': id,
       'name': name,
       'profileImageUrl': profileImageUrl,
+      'profileImageBase64': profileImageBase64,
       'isOnline': isOnline,
       'lastSeen': lastSeen?.millisecondsSinceEpoch,
     };

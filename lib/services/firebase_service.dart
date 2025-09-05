@@ -1002,6 +1002,12 @@ class FirebaseService {
           final userData = userDoc.data();
           userData['id'] = userDoc.id;
           userData['compatibility'] = compatibility;
+          
+          // Debug: verificar se as imagens estão sendo carregadas
+          print('📸 User ${userData['name']} image data:');
+          print('   - profileImageUrl: ${userData['profileImageUrl']}');
+          print('   - profileImageBase64: ${userData['profileImageBase64'] != null ? 'Present (${userData['profileImageBase64'].toString().length} chars)' : 'null'}');
+          
           compatibleUsers.add(userData);
           print('✅ Added compatible user: ${userData['name']} (${compatibility.toInt()}%)');
           // Persist lightweight compatibility snapshot to reduce need for re-calculation
@@ -1538,6 +1544,7 @@ class FirebaseService {
                     id: otherUserId,
                     name: otherUserData['name'] ?? 'Usuário',
                     profileImageUrl: otherUserData['profileImageUrl'],
+                    profileImageBase64: otherUserData['profileImageBase64'],
                     isOnline: otherUserData['isOnline'] ?? false,
                     lastSeen: otherUserData['lastSeen'] != null
                         ? DateTime.fromMillisecondsSinceEpoch(otherUserData['lastSeen'])

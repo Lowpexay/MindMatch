@@ -272,6 +272,7 @@ class _ConversationHistoryScreenState extends State<ConversationHistoryScreen> {
       id: conversation.otherUserId,
       name: conversation.otherUserName,
       profileImageUrl: conversation.otherUserAvatar,
+      profileImageBase64: conversation.otherUserAvatarBase64,
     );
 
     // Navegar para o chat

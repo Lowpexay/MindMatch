@@ -195,11 +195,16 @@ class AchievementService extends ChangeNotifier {
   }
 
   Future<List<Achievement>> updateStats(String statKey, int value) async {
-    _userStats[statKey] = (_userStats[statKey] ?? 0) + value;
+    final oldValue = _userStats[statKey] ?? 0;
+    _userStats[statKey] = oldValue + value;
+    final newValue = _userStats[statKey];
+    
+    print('🏆 DEBUG: updateStats - $statKey: $oldValue + $value = $newValue');
     
     final newAchievements = await _checkForNewAchievements();
     await _saveAchievementData();
     
+    print('🏆 DEBUG: updateStats returning ${newAchievements.length} new achievements');
     return newAchievements;
   }
 
@@ -291,6 +296,7 @@ class AchievementService extends ChangeNotifier {
 
   // Métodos para incrementar estatísticas específicas
   Future<List<Achievement>> onCheckupCompleted(int streak, int hour) async {
+    print('🏆 DEBUG: onCheckupCompleted called with streak: $streak, hour: $hour');
     final newAchievements = <Achievement>[];
     
     newAchievements.addAll(await updateStats('checkups_completed', 1));
@@ -305,6 +311,7 @@ class AchievementService extends ChangeNotifier {
       newAchievements.addAll(await updateStats('early_checkups', 1));
     }
     
+    print('🏆 DEBUG: onCheckupCompleted returning ${newAchievements.length} achievements');
     return newAchievements.toSet().toList(); // Remove duplicatas
   }
 

@@ -152,7 +152,25 @@ class CompatibleUsersWidget extends StatelessWidget {
   final name = user['name'] ?? 'Usuário';
   final profileImage = user['profileImageUrl'] as String?;
   final profileImageBase64 = user['profileImageBase64'] as String?;
-  final Uint8List? imageBytes = (profileImageBase64 != null && profileImageBase64.isNotEmpty) ? base64Decode(profileImageBase64) : null;
+  
+  // Decodificar base64 com tratamento de erro
+  Uint8List? imageBytes;
+  if (profileImageBase64 != null && profileImageBase64.isNotEmpty) {
+    try {
+      imageBytes = base64Decode(profileImageBase64);
+      print('✅ Decoded podium base64 image for $name: ${imageBytes.length} bytes');
+    } catch (e) {
+      print('❌ Error decoding podium base64 for $name: $e');
+      imageBytes = null;
+    }
+  } else {
+    print('ℹ️ No base64 image for podium user $name');
+  }
+  
+  print('🏆 Building podium user $position for $name:');
+  print('   - profileImageUrl: $profileImage');
+  print('   - profileImageBase64: ${profileImageBase64 != null ? '${profileImageBase64.length} chars' : 'null'}');
+  print('   - imageBytes: ${imageBytes != null ? '${imageBytes.length} bytes' : 'null'}');
     
     return GestureDetector(
       onTap: () => onUserTapped(user),
@@ -251,7 +269,25 @@ class CompatibleUsersWidget extends StatelessWidget {
   final bio = user['bio'] as String?;
   final profileImage = user['profileImageUrl'] as String?;
   final profileImageBase64 = user['profileImageBase64'] as String?;
-  final Uint8List? imageBytes = (profileImageBase64 != null && profileImageBase64.isNotEmpty) ? base64Decode(profileImageBase64) : null;
+  
+  // Decodificar base64 com tratamento de erro
+  Uint8List? imageBytes;
+  if (profileImageBase64 != null && profileImageBase64.isNotEmpty) {
+    try {
+      imageBytes = base64Decode(profileImageBase64);
+      print('✅ Decoded base64 image for $name: ${imageBytes.length} bytes');
+    } catch (e) {
+      print('❌ Error decoding base64 for $name: $e');
+      imageBytes = null;
+    }
+  } else {
+    print('ℹ️ No base64 image for $name');
+  }
+  
+  print('🎭 Building user card for $name:');
+  print('   - profileImageUrl: $profileImage');
+  print('   - profileImageBase64: ${profileImageBase64 != null ? '${profileImageBase64.length} chars' : 'null'}');
+  print('   - imageBytes: ${imageBytes != null ? '${imageBytes.length} bytes' : 'null'}');
     
     // Parse tags
     final tags = <String>[];

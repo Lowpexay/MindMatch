@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:convert';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import '../providers/conversations_provider.dart';
 import '../utils/app_colors.dart';
 import '../models/conversation_models.dart';
+import '../widgets/user_avatar.dart';
 import 'user_chat_screen.dart';
 import '../utils/scaffold_utils.dart';
 
@@ -179,15 +181,12 @@ class ConversationsScreenState extends State<ConversationsScreen> {
         contentPadding: const EdgeInsets.all(16),
         leading: Stack(
           children: [
-            CircleAvatar(
+            UserAvatar(
+              imageUrl: otherUser.profileImageUrl,
+              imageBytes: otherUser.profileImageBase64 != null && otherUser.profileImageBase64!.isNotEmpty
+                  ? base64Decode(otherUser.profileImageBase64!)
+                  : null,
               radius: 28,
-              backgroundColor: AppColors.gray200,
-              backgroundImage: otherUser.profileImageUrl != null 
-                  ? NetworkImage(otherUser.profileImageUrl!) 
-                  : null,
-              child: otherUser.profileImageUrl == null
-                  ? const Icon(Icons.person, size: 28, color: AppColors.gray500)
-                  : null,
             ),
             if (otherUser.isOnline)
               Positioned(

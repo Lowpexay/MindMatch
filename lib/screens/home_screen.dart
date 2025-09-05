@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:convert';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import '../services/gemini_service.dart';
 import '../services/checkup_streak_service.dart';
+import '../services/achievement_service.dart';
 import '../models/mood_data.dart';
 import '../models/question_models.dart';
 import '../models/conversation_models.dart';
@@ -12,6 +14,7 @@ import '../utils/app_colors.dart';
 import '../widgets/mood_check_widget.dart';
 import '../widgets/reflective_questions_widget.dart';
 import '../widgets/compatible_users_widget.dart';
+import '../widgets/user_avatar.dart';
 import '../screens/user_chat_screen.dart';
 import '../screens/ai_chat_screen.dart';
 import '../screens/main_navigation.dart';
@@ -114,8 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       // Carregar apenas perguntas criadas hoje
   var questions = await _firebaseService?.getTodayQuestions() ?? [];
-      // Ensure we have exactly 10 questions for today. If Firestore has fewer,
-      // request only the missing count from Gemini and supplement with local fallback.
+
       const int targetCount = 10;
       if (questions.length < targetCount) {
         final gemini = GeminiService();
@@ -1076,12 +1078,45 @@ class _HomeScreenState extends State<HomeScreen> {
       final streakService = Provider.of<CheckupStreakService>(context, listen: false);
       await streakService.completeCheckup();
       
+      // ✨ CONQUISTAS: Registrar checkup completo
+      print('🏆 DEBUG: Iniciando registro de conquistas...');
+      final achievementService = Provider.of<AchievementService>(context, listen: false);
+      final currentStreak = streakService.currentStreak;
+      final currentHour = DateTime.now().hour;
+      print('🏆 DEBUG: Chamando onCheckupCompleted com streak: $currentStreak, hour: $currentHour');
+      final newAchievements = await achievementService.onCheckupCompleted(currentStreak, currentHour);
+      
+      // ✨ CONQUISTAS: Verificar humor feliz (felicidade >= 4)
+      if (updatedMood.happiness >= 4) {
+        print('🏆 DEBUG: Humor feliz detectado (${updatedMood.happiness}), chamando onHappyMood');
+        final moodAchievements = await achievementService.onHappyMood();
+        newAchievements.addAll(moodAchievements);
+      }
+      
+      // ✨ CONQUISTAS: Verificar variedade de humor (diferentes níveis)
+      final moodVarietyAchievements = await achievementService.onDifferentMood();
+      newAchievements.addAll(moodVarietyAchievements);
+      
+      // Mostrar conquistas desbloqueadas
+      print('🏆 DEBUG: Total de conquistas desbloqueadas: ${newAchievements.length}');
+      if (newAchievements.isNotEmpty) {
+        for (final achievement in newAchievements) {
+          print('🏆 DEBUG: Mostrando conquista: ${achievement.title}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('🏆 ${achievement.title} desbloqueada! ${achievement.icon}'),
+              backgroundColor: Colors.amber,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        print('🏆 DEBUG: Nenhuma conquista desbloqueada');
+      }
+      
       setState(() {
         _todayMood = updatedMood;
       });
-
-      // Removido: geração automática de apoio emocional
-      // As mensagens da Luma agora só aparecem quando o usuário vai para a aba dela
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1118,6 +1153,23 @@ class _HomeScreenState extends State<HomeScreen> {
         _questionAnswers[response.questionId] = response.answer;
       });
 
+      // ✨ CONQUISTAS: Registrar nova seção visitada (responder pergunta)
+      final achievementService = Provider.of<AchievementService>(context, listen: false);
+      final newAchievements = await achievementService.onSectionVisited();
+      
+      // Mostrar conquistas desbloqueadas
+      if (newAchievements.isNotEmpty) {
+        for (final achievement in newAchievements) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('🏆 ${achievement.title} desbloqueada! ${achievement.icon}'),
+              backgroundColor: Colors.amber,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+
       // Recarregar usuários compatíveis
       _loadCompatibleUsers(userId);
 
@@ -1153,6 +1205,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final city = user['city'] as String?;
     final bio = user['bio'] as String?;
     final profileImage = user['profileImageUrl'] as String?;
+    final profileImageBase64 = user['profileImageBase64'] as String?;
     final goal = user['goal'] as String?;
     
     // Parse tags
@@ -1189,13 +1242,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   // Profile image and compatibility
                   Stack(
                     children: [
-                      CircleAvatar(
-                        radius: 60,
-                        backgroundColor: AppColors.gray200,
-                        backgroundImage: profileImage != null ? NetworkImage(profileImage) : null,
-                        child: profileImage == null
-                            ? const Icon(Icons.person, size: 60, color: AppColors.gray500)
+                      UserAvatar(
+                        imageUrl: profileImage,
+                        imageBytes: profileImageBase64 != null && profileImageBase64.isNotEmpty
+                            ? base64Decode(profileImageBase64)
                             : null,
+                        radius: 60,
                       ),
                       Positioned(
                         bottom: 0,
@@ -1400,7 +1452,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           id: user['id'] ?? '',
                           name: name,
                           profileImageUrl: profileImage,
-                          isOnline: false, // Podemos implementar status online depois
+                          profileImageBase64: user['profileImageBase64'] as String?,
+                          isOnline: false,
                         );
                         
                         // Navegar para o chat

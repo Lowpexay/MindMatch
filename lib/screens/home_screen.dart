@@ -7,13 +7,16 @@ import '../services/firebase_service.dart';
 import '../services/gemini_service.dart';
 import '../services/checkup_streak_service.dart';
 import '../services/achievement_service.dart';
+import '../services/course_service.dart';
 import '../models/mood_data.dart';
 import '../models/question_models.dart';
 import '../models/conversation_models.dart';
+import '../models/course_models.dart';
 import '../utils/app_colors.dart';
 import '../widgets/mood_check_widget.dart';
 import '../widgets/reflective_questions_widget.dart';
 import '../widgets/compatible_users_widget.dart';
+import '../widgets/courses_widget.dart';
 import '../widgets/user_avatar.dart';
 import '../screens/user_chat_screen.dart';
 import '../screens/ai_chat_screen.dart';
@@ -35,11 +38,13 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _compatibleUsers = [];
   Map<String, bool> _questionAnswers = {};
   String _userName = ''; // Nome do usuário
+  List<Course> _courses = []; // Lista de cursos
   // Removido: _supportMessage - mensagens da Luma agora só aparecem na aba dela
   
   // Services
   FirebaseService? _firebaseService;
   AuthService? _authService;
+  CourseService? _courseService;
 
   @override
   void initState() {
@@ -56,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.didChangeDependencies();
     _firebaseService = Provider.of<FirebaseService>(context);
     _authService = Provider.of<AuthService>(context);
+    _courseService = Provider.of<CourseService>(context);
   }
 
   Future<void> _loadInitialData() async {
@@ -73,6 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadTodayMood(userId),
         _loadDailyQuestions(),
         _loadCompatibleUsers(userId),
+        _loadSampleCourses(),
       ]);
 
     } catch (e) {
@@ -288,6 +295,93 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _loadSampleCourses() async {
+    try {
+      // Cursos completos com conteúdo real
+      setState(() {
+        _courses = [
+          Course(
+            id: 'respiracao',
+            title: 'Técnicas de Respiração para Ansiedade',
+            description: 'Aprenda técnicas científicas de respiração para controlar a ansiedade e o estresse no dia a dia',
+            imageUrl: 'https://img.youtube.com/vi/YRPh_GaiL8s/maxresdefault.jpg',
+            category: 'Ansiedade',
+            level: CourseLevel.beginner,
+            duration: 240, // 4 horas
+            lessonsCount: 5,
+            exercisesCount: 3,
+            tags: ['respiração', 'ansiedade', 'relaxamento', 'meditação'],
+            createdAt: DateTime.now().subtract(const Duration(days: 10)),
+            isPopular: true,
+            isFree: true,
+          ),
+          Course(
+            id: 'mindfulness',
+            title: 'Mindfulness e Meditação Diária',
+            description: 'Desenvolva a prática da atenção plena com exercícios guiados e técnicas comprovadas cientificamente',
+            imageUrl: 'https://img.youtube.com/vi/ZToicYcHIOU/maxresdefault.jpg',
+            category: 'Mindfulness',
+            level: CourseLevel.beginner,
+            duration: 300, // 5 horas
+            lessonsCount: 5,
+            exercisesCount: 2,
+            tags: ['mindfulness', 'meditação', 'atenção plena', 'foco'],
+            createdAt: DateTime.now().subtract(const Duration(days: 15)),
+            isPopular: true,
+            isFree: true,
+          ),
+          Course(
+            id: 'emocoes',
+            title: 'Inteligência Emocional na Prática',
+            description: 'Aprenda a identificar, compreender e gerenciar suas emoções de forma saudável e produtiva',
+            imageUrl: 'https://img.youtube.com/vi/R1vskiVDwl4/maxresdefault.jpg',
+            category: 'Autoconhecimento',
+            level: CourseLevel.intermediate,
+            duration: 360, // 6 horas
+            lessonsCount: 5,
+            exercisesCount: 1,
+            tags: ['emoções', 'autoconhecimento', 'inteligência emocional', 'relacionamentos'],
+            createdAt: DateTime.now().subtract(const Duration(days: 8)),
+            isPopular: false,
+            isFree: true,
+          ),
+          Course(
+            id: 'autoestima',
+            title: 'Construindo Autoestima Saudável',
+            description: 'Desenvolva uma autoestima equilibrada através de exercícios práticos e mudança de perspectiva',
+            imageUrl: 'https://img.youtube.com/vi/f-m2YcdMdFw/maxresdefault.jpg',
+            category: 'Autoestima',
+            level: CourseLevel.beginner,
+            duration: 240, // 4 horas
+            lessonsCount: 5,
+            exercisesCount: 2,
+            tags: ['autoestima', 'autoconfiança', 'autocuidado', 'desenvolvimento pessoal'],
+            createdAt: DateTime.now().subtract(const Duration(days: 5)),
+            isPopular: true,
+            isFree: true,
+          ),
+          Course(
+            id: 'estresse',
+            title: 'Gestão de Estresse no Trabalho',
+            description: 'Estratégias práticas para lidar com pressão, deadlines e demandas do ambiente profissional',
+            imageUrl: 'https://img.youtube.com/vi/hnpQrMqDoqE/maxresdefault.jpg',
+            category: 'Estresse',
+            level: CourseLevel.intermediate,
+            duration: 270, // 4.5 horas
+            lessonsCount: 5,
+            exercisesCount: 2,
+            tags: ['estresse', 'trabalho', 'produtividade', 'equilíbrio'],
+            createdAt: DateTime.now().subtract(const Duration(days: 12)),
+            isPopular: false,
+            isFree: true,
+          ),
+        ];
+      });
+    } catch (e) {
+      print('❌ Error loading courses: $e');
+    }
+  }
+
   // Verifica se todas as perguntas do dia foram respondidas
   bool _areAllQuestionsAnswered() {
     if (_dailyQuestions.isEmpty) return false;
@@ -371,6 +465,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       compatibleUsers: _compatibleUsers,
                       onUserTapped: _showUserProfile,
                     ),
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Courses Section
+                  _buildSectionCard(
+                    icon: Icons.school,
+                    title: 'Cursos de Bem-Estar Mental',
+                    subtitle: 'Aprenda técnicas para melhorar sua saúde mental',
+                    child: CoursesWidget(courses: _courses),
                   ),
                   
                   const SizedBox(height: 32), // Espaço no final

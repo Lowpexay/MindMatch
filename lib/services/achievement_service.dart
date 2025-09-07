@@ -1,16 +1,18 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/achievement.dart';
 
 class AchievementService extends ChangeNotifier {
-  static const String _achievementsKey = 'user_achievements';
-  static const String _unlockedAchievementsKey = 'unlocked_achievements';
-  static const String _statsKey = 'user_stats';
+  static const String _achievementsKeyPrefix = 'user_achievements_';
+  static const String _unlockedAchievementsKeyPrefix = 'unlocked_achievements_';
+  static const String _statsKeyPrefix = 'user_stats_';
 
   List<Achievement> _allAchievements = [];
   List<Achievement> _unlockedAchievements = [];
   Map<String, int> _userStats = {};
+  String? _currentUserId;
 
   List<Achievement> get allAchievements => _allAchievements;
   List<Achievement> get unlockedAchievements => _unlockedAchievements;
@@ -24,8 +26,19 @@ class AchievementService extends ChangeNotifier {
 
   AchievementService() {
     _initializeAchievements();
-    _loadAchievementData();
+    _checkCurrentUser();
   }
+
+  Future<void> _checkCurrentUser() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && _currentUserId != user.uid) {
+      _currentUserId = user.uid;
+      await _loadAchievementData();
+    }
+  }
+
+  String get _unlockedAchievementsKey => '${_unlockedAchievementsKeyPrefix}${_currentUserId ?? 'anonymous'}';
+  String get _statsKey => '${_statsKeyPrefix}${_currentUserId ?? 'anonymous'}';
 
   void _initializeAchievements() {
     _allAchievements = [
@@ -139,6 +152,64 @@ class AchievementService extends ChangeNotifier {
         icon: '⚔️',
         requiredCount: 2,
         category: 'special',
+      ),
+      
+      // Conquistas de Cursos
+      Achievement(
+        id: 'first_lesson',
+        title: 'Estudante Iniciante',
+        description: 'Complete sua primeira aula',
+        icon: '📚',
+        requiredCount: 1,
+        category: 'course',
+      ),
+      Achievement(
+        id: 'lesson_streak_5',
+        title: 'Dedicado aos Estudos',
+        description: 'Complete 5 aulas',
+        icon: '🎓',
+        requiredCount: 5,
+        category: 'course',
+      ),
+      Achievement(
+        id: 'lesson_streak_20',
+        title: 'Expert em Aprendizado',
+        description: 'Complete 20 aulas',
+        icon: '🏆',
+        requiredCount: 20,
+        category: 'course',
+      ),
+      Achievement(
+        id: 'first_course',
+        title: 'Curso Concluído',
+        description: 'Complete seu primeiro curso',
+        icon: '🌟',
+        requiredCount: 1,
+        category: 'course',
+      ),
+      Achievement(
+        id: 'course_master',
+        title: 'Mestre dos Cursos',
+        description: 'Complete 5 cursos',
+        icon: '👨‍🎓',
+        requiredCount: 5,
+        category: 'course',
+      ),
+      Achievement(
+        id: 'exercise_starter',
+        title: 'Praticante',
+        description: 'Complete 10 exercícios',
+        icon: '💪',
+        requiredCount: 10,
+        category: 'course',
+      ),
+      Achievement(
+        id: 'exercise_master',
+        title: 'Mestre dos Exercícios',
+        description: 'Complete 50 exercícios',
+        icon: '🥇',
+        requiredCount: 50,
+        category: 'course',
       ),
     ];
   }
@@ -329,5 +400,23 @@ class AchievementService extends ChangeNotifier {
 
   Future<List<Achievement>> onDifferentMood() async {
     return await updateStats('different_moods', 1);
+  }
+
+  // Course-related achievement methods
+  Future<List<Achievement>> onLessonCompleted() async {
+    return await updateStats('lessons_completed', 1);
+  }
+
+  Future<List<Achievement>> onCourseCompleted() async {
+    return await updateStats('courses_completed', 1);
+  }
+
+  Future<List<Achievement>> onExerciseCompleted() async {
+    return await updateStats('exercises_completed', 1);
+  }
+
+  /// Método para atualizar usuário (chamar quando usuário logar/deslogar)
+  Future<void> updateUser() async {
+    await _checkCurrentUser();
   }
 }

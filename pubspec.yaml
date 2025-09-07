@@ -44,8 +44,9 @@ dependencies:
   flutter_local_notifications: ^17.2.4
   fl_chart: ^0.68.0
   
-  # Audio
+  # Audio & Video
   audioplayers: ^5.0.0
+  youtube_player_flutter: ^9.0.1
   intl: ^0.20.2
 
 dev_dependencies:

@@ -1,20 +1,22 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/checkup_streak.dart';
 import '../models/daily_checkup.dart';
 
 class CheckupStreakService extends ChangeNotifier {
-  static const String _streakKey = 'checkup_streak_data';
-  static const String _lastCheckupKey = 'last_checkup_date';
-  static const String _currentStreakKey = 'current_streak_count';
-  static const String _dailyCheckupKey = 'daily_checkup_data';
+  static const String _streakKeyPrefix = 'checkup_streak_data_';
+  static const String _lastCheckupKeyPrefix = 'last_checkup_date_';
+  static const String _currentStreakKeyPrefix = 'current_streak_count_';
+  static const String _dailyCheckupKeyPrefix = 'daily_checkup_data_';
   
   List<CheckupStreak> _streakHistory = [];
   List<DailyCheckup> _dailyCheckups = [];
   int _currentStreak = 0;
   DateTime? _lastCheckupDate;
   bool _todayCompleted = false;
+  String? _currentUserId;
 
   List<CheckupStreak> get streakHistory => _streakHistory;
   List<DailyCheckup> get dailyCheckups => _dailyCheckups;
@@ -23,9 +25,22 @@ class CheckupStreakService extends ChangeNotifier {
   bool get todayCompleted => _todayCompleted;
 
   CheckupStreakService() {
-    _loadStreakData();
-    _loadDailyCheckups();
+    _checkCurrentUser();
   }
+
+  Future<void> _checkCurrentUser() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && _currentUserId != user.uid) {
+      _currentUserId = user.uid;
+      await _loadStreakData();
+      await _loadDailyCheckups();
+    }
+  }
+
+  String get _streakKey => '${_streakKeyPrefix}${_currentUserId ?? 'anonymous'}';
+  String get _lastCheckupKey => '${_lastCheckupKeyPrefix}${_currentUserId ?? 'anonymous'}';
+  String get _currentStreakKey => '${_currentStreakKeyPrefix}${_currentUserId ?? 'anonymous'}';
+  String get _dailyCheckupKey => '${_dailyCheckupKeyPrefix}${_currentUserId ?? 'anonymous'}';
 
   /// Carregar dados salvos
   Future<void> _loadStreakData() async {
@@ -312,5 +327,10 @@ class CheckupStreakService extends ChangeNotifier {
     
     final sum = recentCheckups.map((c) => c.moodScore).reduce((a, b) => a + b);
     return sum / recentCheckups.length;
+  }
+
+  /// Método para atualizar usuário (chamar quando usuário logar/deslogar)
+  Future<void> updateUser() async {
+    await _checkCurrentUser();
   }
 }

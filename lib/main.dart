@@ -12,6 +12,8 @@ import 'services/global_notification_service.dart';
 import 'services/checkup_streak_service.dart';
 import 'services/achievement_service.dart';
 import 'services/course_service.dart';
+import 'services/course_progress_service.dart';
+import 'services/daily_checkup_history_service.dart';
 import 'providers/conversations_provider.dart';
 import 'screens/profile_edit_screen.dart';
 import 'screens/profile_screen.dart';
@@ -51,6 +53,14 @@ class MindMatchApp extends StatelessWidget {
         Provider(create: (_) => GlobalNotificationService()),
         ChangeNotifierProvider(create: (_) => CheckupStreakService()),
         ChangeNotifierProvider(create: (_) => AchievementService()),
+        ChangeNotifierProvider(create: (_) => DailyCheckupHistoryService()),
+        ChangeNotifierProxyProvider<AchievementService, CourseProgressService>(
+          create: (context) => CourseProgressService(
+            Provider.of<AchievementService>(context, listen: false),
+          ),
+          update: (context, achievementService, previous) =>
+              previous ?? CourseProgressService(achievementService),
+        ),
         ChangeNotifierProxyProvider<AchievementService, CourseService>(
           create: (context) => CourseService(
             Provider.of<AchievementService>(context, listen: false),

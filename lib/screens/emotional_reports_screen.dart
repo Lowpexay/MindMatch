@@ -3,8 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/checkup_streak_service.dart';
 import '../services/achievement_service.dart';
+import '../services/course_progress_service.dart';
 import '../services/luma_ai_service.dart';
-import '../models/checkup_streak.dart';
 import '../models/achievement.dart';
 import '../models/daily_checkup.dart';
 import '../utils/app_colors.dart';
@@ -24,6 +24,30 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _registerReportView();
+  }
+
+  Future<void> _registerReportView() async {
+    try {
+      // ✨ CONQUISTAS: Registrar visualização de relatório
+      final achievementService = Provider.of<AchievementService>(context, listen: false);
+      final newAchievements = await achievementService.onReportViewed();
+      
+      // Mostrar conquistas desbloqueadas
+      if (newAchievements.isNotEmpty) {
+        for (final achievement in newAchievements) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('🏆 ${achievement.title} desbloqueada! ${achievement.icon}'),
+              backgroundColor: Colors.amber,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ Erro ao registrar visualização de relatório: $e');
+    }
   }
 
   @override
@@ -70,14 +94,16 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
   }
 
   Widget _buildOverviewTab() {
-    return Consumer<CheckupStreakService>(
-      builder: (context, streakService, child) {
+    return Consumer2<CheckupStreakService, CourseProgressService>(
+      builder: (context, streakService, courseProgressService, child) {
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildStatsCards(streakService),
+              const SizedBox(height: 24),
+              _buildCourseProgressSection(courseProgressService),
               const SizedBox(height: 24),
               _buildMotivationalMessage(streakService),
               const SizedBox(height: 24),
@@ -247,7 +273,7 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
       const FlSpot(2, 3.5),
       const FlSpot(3, 4.5),
       const FlSpot(4, 4),
-      const FlSpot(5, 5),
+      const FlSpot(5, 3.8),
       const FlSpot(6, 4.2),
     ];
   }
@@ -1066,5 +1092,179 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
     } else {
       return '${date.day}/${date.month}/${date.year}';
     }
+  }
+
+  Widget _buildCourseProgressSection(CourseProgressService courseProgressService) {
+    final totalLessons = courseProgressService.totalCompletedLessons;
+    final totalExercises = courseProgressService.totalCompletedExercises;
+    
+    // Dados fictícios dos cursos para calcular cursos completados
+    final courseData = {
+      'respiracao': {'lessons': 3, 'exercises': 1},
+      'mindfulness': {'lessons': 2, 'exercises': 1},
+      'emocoes': {'lessons': 1, 'exercises': 0},
+    };
+    
+    final completedCourses = courseProgressService.getTotalCompletedCourses(courseData);
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.school,
+                  color: Colors.blue,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Text(
+                  'Progresso dos Cursos',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: _buildCourseStatItem(
+                  'Lições Completadas',
+                  totalLessons.toString(),
+                  Icons.play_circle_outline,
+                  Colors.green,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildCourseStatItem(
+                  'Exercícios Feitos',
+                  totalExercises.toString(),
+                  Icons.quiz_outlined,
+                  Colors.orange,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildCourseStatItem(
+                  'Cursos Concluídos',
+                  completedCourses.toString(),
+                  Icons.emoji_events,
+                  Colors.amber,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildCourseStatItem(
+                  'Total de Cursos',
+                  courseData.length.toString(),
+                  Icons.library_books,
+                  Colors.purple,
+                ),
+              ),
+            ],
+          ),
+          if (totalLessons > 0 || totalExercises > 0) ...[
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.trending_up,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      completedCourses > 0 
+                        ? 'Parabéns! Você já concluiu $completedCourses curso${completedCourses > 1 ? 's' : ''}!'
+                        : 'Continue aprendendo! Você está fazendo progresso nos cursos.',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCourseStatItem(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            color: color,
+            size: 28,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
   }
 }

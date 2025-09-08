@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/checkup_streak_service.dart';
+import '../services/daily_checkup_history_service.dart';
 import '../models/checkup_streak.dart';
+import '../models/daily_checkup.dart';
 import '../utils/app_colors.dart';
 
 class CheckupCalendarScreen extends StatefulWidget {
@@ -29,8 +31,11 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
       ),
-      body: Consumer<CheckupStreakService>(
-        builder: (context, streakService, child) {
+      body: Consumer2<CheckupStreakService, DailyCheckupHistoryService>(
+        builder: (context, streakService, historyService, child) {
+          final monthCheckups = historyService.getCheckupsForMonth(_selectedMonth);
+          final last7DaysStats = historyService.getLast7DaysStats();
+          
           return Column(
             children: [
               // Header com estatísticas
@@ -50,10 +55,34 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         _buildStatCard(
+                          'Humor Médio',
+                          '${last7DaysStats['averageMood']?.toStringAsFixed(1) ?? '3.0'}',
+                          Icons.sentiment_satisfied,
+                          Colors.blue,
+                        ),
+                        _buildStatCard(
+                          'Energia Média',
+                          '${last7DaysStats['averageEnergy']?.toStringAsFixed(1) ?? '3.0'}',
+                          Icons.battery_charging_full,
+                          Colors.green,
+                        ),
+                        _buildStatCard(
+                          'Checkups',
+                          '${last7DaysStats['checkupsCompleted']?.toInt() ?? 0}',
+                          Icons.calendar_today,
+                          Colors.orange,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildStatCard(
                           'Streak Atual',
                           '${streakService.currentStreak}',
                           Icons.local_fire_department,
-                          Colors.orange,
+                          Colors.red,
                         ),
                         _buildStatCard(
                           'Melhor Streak',
@@ -63,9 +92,9 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
                         ),
                         _buildStatCard(
                           'Total',
-                          '${streakService.totalCheckupDays}',
-                          Icons.calendar_today,
-                          Colors.green,
+                          '${historyService.totalCheckupsCompleted}',
+                          Icons.history,
+                          Colors.purple,
                         ),
                       ],
                     ),

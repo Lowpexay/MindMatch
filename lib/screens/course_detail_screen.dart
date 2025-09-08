@@ -6,6 +6,7 @@ import '../models/course_exercise.dart';
 import '../models/question.dart';
 import '../utils/app_colors.dart';
 import '../services/achievement_service.dart';
+import '../services/course_progress_service.dart';
 
 class CourseDetailScreen extends StatefulWidget {
   final Course course;
@@ -24,8 +25,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   List<CourseExercise> _exercises = [];
   bool _isLoading = true;
   int _selectedTab = 0;
-  Set<String> _completedLessons = {};
-  Set<String> _completedExercises = {};
 
   @override
   void initState() {
@@ -49,10 +48,14 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Future<void> _checkCourseCompletion() async {
-    final totalItems = _lessons.length + _exercises.length;
-    final completedItems = _completedLessons.length + _completedExercises.length;
+    final progressService = Provider.of<CourseProgressService>(context, listen: false);
+    final isCourseCompleted = progressService.isCourseCompleted(
+      widget.course.id, 
+      _lessons.length, 
+      _exercises.length
+    );
     
-    if (totalItems > 0 && completedItems == totalItems) {
+    if (isCourseCompleted) {
       await _onCourseCompleted();
       _showCompletionCelebration();
     }
@@ -326,19 +329,23 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Widget _buildProgressBar() {
-    final totalItems = _lessons.length + _exercises.length;
-    final completedItems = _completedLessons.length + _completedExercises.length;
-    final progress = totalItems > 0 ? completedItems / totalItems : 0.0;
-    
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.gray50,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Consumer<CourseProgressService>(
+      builder: (context, progressService, child) {
+        final totalItems = _lessons.length + _exercises.length;
+        final completedLessons = progressService.getCompletedLessons(widget.course.id).length;
+        final completedExercises = progressService.getCompletedExercises(widget.course.id).length;
+        final completedItems = completedLessons + completedExercises;
+        final progress = totalItems > 0 ? completedItems / totalItems : 0.0;
+        
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.gray50,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -378,6 +385,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           ),
         ],
       ),
+    );
+      },
     );
   }
 
@@ -460,8 +469,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
             itemCount: _lessons.length,
             itemBuilder: (context, index) {
               final lesson = _lessons[index];
-              final isCompleted = _completedLessons.contains(lesson.id);
-              return _buildLessonCard(lesson, index + 1, isCompleted);
+              return Consumer<CourseProgressService>(
+                builder: (context, progressService, child) {
+                  final isCompleted = progressService.isLessonCompleted(widget.course.id, lesson.id);
+                  return _buildLessonCard(lesson, index + 1, isCompleted);
+                },
+              );
             },
           ),
         ],
@@ -493,9 +506,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 lesson: lesson,
                 course: widget.course,
                 onLessonCompleted: () async {
-                  setState(() {
-                    _completedLessons.add(lesson.id);
-                  });
+                  // Salvar progresso no serviço
+                  final progressService = Provider.of<CourseProgressService>(context, listen: false);
+                  await progressService.completeLesson(widget.course.id, lesson.id);
                   
                   // ✨ CONQUISTAS: Registrar conclusão de lição
                   try {
@@ -644,8 +657,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
             itemCount: _exercises.length,
             itemBuilder: (context, index) {
               final exercise = _exercises[index];
-              final isCompleted = _completedExercises.contains(exercise.id);
-              return _buildExerciseCard(exercise, index + 1, isCompleted);
+              return Consumer<CourseProgressService>(
+                builder: (context, progressService, child) {
+                  final isCompleted = progressService.isExerciseCompleted(widget.course.id, exercise.id);
+                  return _buildExerciseCard(exercise, index + 1, isCompleted);
+                },
+              );
             },
           ),
         ],
@@ -860,9 +877,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           child: QuizWidget(
             exercise: exercise,
             onExerciseCompleted: () async {
-              setState(() {
-                _completedExercises.add(exercise.id);
-              });
+              // Salvar progresso no serviço
+              final progressService = Provider.of<CourseProgressService>(context, listen: false);
+              await progressService.completeExercise(widget.course.id, exercise.id);
               
               // ✨ CONQUISTAS: Registrar conclusão de exercício
               try {

@@ -236,14 +236,6 @@ class PrivacyHelper {
 - `test_unique_events.dart` - Teste de eventos únicos e identificação
 - `test_verification_final.dart` - Verificação final da integração
 
-### 📊 **Guias de Integração Disponíveis**
-- `EVENTLOG_INTEGRATION_GUIDE.md` - Guia completo de integração
-- `EVENTLOG_CONFIG.md` - Configurações detalhadas
-- `EVENTLOG_ACCESS_GUIDE.md` - Guia de acesso e permissões
-- `DEBUG_GUIDE.md` - Guia de debugging para EventLog
-- `INTEGRATION_SUMMARY.md` - Resumo da integração
-- `SOLUTION_SUMMARY.md` - Resumo da solução implementada
-
 ### 📊 **Logs e Monitoramento**
 - Firebase Analytics integrado
 - Debug prints para desenvolvimento

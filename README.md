@@ -1,12 +1,16 @@
-# 🧠 MindMatch - Emotional Wellness & ### 🌟 Visão
-Criar um espaço seguro onde as pessoas pos### 🤖 **Chat com IA Avançado**
-- Chat por texto tradicional com histórico
-- **🆕 Chat por voz com síntese de fala**
-- **🆕 Modo visual da Luma com avatar animado**
-- **🆕 Controles de voz intuitivos (toque para parar/continuar)**
-- Contexto baseado no humor atual
-- Suporte emocional personalizado
-- **🆕 Configuração persistente de modo (texto/voz)**e conectar com base em compatibilidade emocional e intelectual, promovendo relacionamentos mais profundos e significativos.
+# 🧠 MindMatch - Emotional Wellness & Connection App
+
+<div align="center">
+  
+  **Um aplicativo Flutter para bem-estar emocional e conexões humanas significativas**
+  
+  [![Flutter](https://img.shields.io/badge/Flutter-3.8+-blue.svg)](https://flutter.dev/)
+  [![Firebase](https://img.shields.io/badge/Firebase-Integrated-orange.svg)](https://firebase.google.com/)
+  
+</div>
+
+### 🌟 Visão
+Criar um espaço seguro onde as pessoas possam cuidar de sua saúde mental e se conectar com base em compatibilidade emocional e intelectual, promovendo relacionamentos mais profundos e significativos.
 
 ### 💡 Inspiração
 Baseado nos princípios da **Society 5.0** (Sociedade 5.0), integrando tecnologia avançada com necessidades humanas fundamentais.
@@ -14,6 +18,33 @@ Baseado nos princípios da **Society 5.0** (Sociedade 5.0), integrando tecnologi
 ---
 
 ## 🆕 Últimas Atualizações
+
+### 🎯 **11/09/2025 - Sistema de Cursos Aprimorado e Dados Reais**
+
+**� Sistema de Cursos Inteligente:**
+- ✅ **Marcação Visual de Conclusão**: Cursos concluídos mostram ícone ✅ verde antes de entrar
+- ✅ **Barra de Progresso**: Cursos iniciados mostram porcentagem de conclusão
+- ✅ **Status Dinâmico**: "Concluído", "X% concluído" ou informações de aulas/exercícios
+- ✅ **Progresso Persistente**: Todo progresso salvo por usuário entre sessões
+- ✅ **Dados Específicos por Usuário**: Isolamento completo de dados usando Firebase Auth
+
+**� Sistema de Conquistas Conectado:**
+- ✅ **Conquistas Automáticas**: Desbloqueio automático ao completar lições, exercícios e cursos
+- ✅ **Integração em Tempo Real**: CourseProgressService dispara conquistas automaticamente
+- ✅ **Notificações de Conquista**: Feedback visual quando conquistas são desbloqueadas
+- ✅ **Dependency Injection**: AchievementService integrado ao progresso dos cursos
+
+**� Histórico de Checkups com Dados Reais:**
+- ✅ **DailyCheckupHistoryService**: Novo serviço para histórico completo de checkups
+- ✅ **Dados Reais nos Gráficos**: Humor dos últimos 7 dias baseado em checkups reais
+- ✅ **Estatísticas Automáticas**: Cálculo de humor, energia e estresse médios
+- ✅ **Relatórios Atualizados**: Progresso mensal com dados reais do usuário
+
+**🔄 Arquitetura de Dados Aprimorada:**
+- ✅ **Isolamento por Usuário**: Todos os dados específicos usando Firebase Auth user.uid
+- ✅ **SharedPreferences Seguro**: Chaves únicas por usuário para persistência local
+- ✅ **Sincronização Automática**: Dados carregados automaticamente no login
+- ✅ **Provider Pattern**: Estado global gerenciado com Consumer widgets
 
 ### 🎯 **17/08/2025 - Chat por Voz com Luma**
 
@@ -24,30 +55,14 @@ Baseado nos princípios da **Society 5.0** (Sociedade 5.0), integrando tecnologi
 - ✅ **Controles Intuitivos**: Toque para parar/continuar a fala
 - ✅ **Configuração Persistente**: O app lembra sua preferência de modo
 
-**🎨 Melhorias na Interface:**
-- ✅ **Material Widget Fix**: Corrigidos erros de "No Material widget found"
-- ✅ **Botão Atualizado**: Mudado para "Falar com a Luma" no modo voz
-- ✅ **Navegação Melhorada**: Sistema de navegação por abas otimizado
-- ✅ **Widget da Luma**: Novo componente visual com animações para modo voz
-
-**🔊 Sistema de TTS:**
-- ✅ **ElevenLabs Integration**: Integração completa com API de Text-to-Speech
-- ✅ **Voz Rachel**: Configurada voz feminina natural e estável
-- ✅ **Controle de Estado**: Sistema robusto para gerenciar estado da fala
-- ✅ **Fallback System**: Sistema de fallback para garantir funcionamento
-
-**⚙️ Arquitetura Técnica:**
-- ✅ **Serviços Modulares**: ElevenLabsService independente e reutilizável
-- ✅ **Adaptador de Preferências**: Sistema para gerenciar configurações do usuário
-- ✅ **Estados Visuais**: Animações e indicadores visuais para modo voz
-- ✅ **Cleanup de Código**: Removido código de teste experimentalction App
-
-<div align="center">
-  
-  **Um aplicativo Flutter para bem-estar emocional e conexões humanas significativas**
-  
-  [![Flutter](https://img.shields.io/badge/Flutter-3.8+-blue.svg)](https://flutter.dev/)
-  [![Firebase](https://img.shields.io/badge/Firebase-Integrated-orange.svg)](https://firebase.google.com/)
+**🤖 Chat com IA Avançado:**
+- Chat por texto tradicional com histórico
+- **🆕 Chat por voz com síntese de fala**
+- **🆕 Modo visual da Luma com avatar animado**
+- **🆕 Controles de voz intuitivos (toque para parar/continuar)**
+- Contexto baseado no humor atual
+- Suporte emocional personalizado
+- **🆕 Configuração persistente de modo (texto/voz)**
   [![AI](https://img.shields.io/badge/AI-Google%20Gemini-green.svg)](https://ai.google.dev/)
   [![TTS](https://img.shields.io/badge/TTS-ElevenLabs-purple.svg)](https://elevenlabs.io/)
   [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
@@ -633,7 +648,7 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 **Gustavo Teodoro**
 **Felipe Kindermann**
 **Kauã Granata**
-
+**Marcelo Furnaletto**
 </div>
 
 ---

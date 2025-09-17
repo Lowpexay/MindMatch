@@ -1,12 +1,249 @@
-# 🧠 MindMatch - Emotional Wellness & ### 🌟 Visão
-Criar um espaço seguro onde as pessoas pos### 🤖 **Chat com IA Avançado**
-- Chat por texto tradicional com histórico
-- **🆕 Chat por voz com síntese de fala**
-- **🆕 Modo visual da Luma com avatar animado**
-- **🆕 Controles de voz intuitivos (toque para parar/continuar)**
-- Contexto baseado no humor atual
-- Suporte emocional personalizado
-- **🆕 Configuração persistente de modo (texto/voz)**e conectar com base em compatibilidade emocional e intelectual, promovendo relacionamentos mais profundos e significativos.
+# 🧠 MindMatch - Emotional Wellness & Connection App
+
+<div align="center">
+  
+  **Um aplicativo Flutter para bem-estar emocional e conexões humanas significativas**
+  
+  [![Flutter](https://img.shields.io/badge/Flutter-3.8+-blue.svg)](https://flutter.dev/)
+  [![Firebase](https://img.shields.io/badge/Firebase-Integrated-orange.svg)](https://firebase.google.com/)
+  [![ManageEngine](https://img.shields.io/badge/ManageEngine-EventLog-red.svg)](https://www.manageengine.com/)
+  [![Syslog](https://img.shields.io/badge/Syslog-RFC3164-green.svg)](https://tools.ietf.org/html/rfc3164)
+  [![CEF](https://img.shields.io/badge/CEF-Format-purple.svg)](https://www.microfocus.com/documentation/arcsight/arcsight-smartconnectors-8.3/pdfdoc/cef-implementation-standard/cef-implementation-standard.pdf)
+  
+</div>
+
+### 🌟 Visão
+Criar um espaço seguro onde as pessoas possam cuidar de sua saúde mental e se conectar com base em compatibilidade emocional e intelectual, promovendo relacionamentos mais profundos e significativ---
+
+## 📱 Geração de APK
+
+### 🔨 **Como Gerar APK**
+
+Para gerar o APK do aplicativo para distribuição/teste:
+
+```bash
+# 1. Primeiro, certifique-se de que está no diretório do projeto
+cd MindMatch
+
+# 2. Limpe o projeto (opcional, mas recomendado)
+flutter clean
+flutter pub get
+
+# 3. Para APK de debug (mais rápido)
+flutter build apk --debug
+
+# 4. Para APK de release (otimizado)
+flutter build apk --release
+
+# 5. Para APK split por arquitetura (menor tamanho)
+flutter build apk --split-per-abi
+
+# 6. Para bundle (recomendado para Play Store)
+flutter build appbundle --release
+```
+
+**📍 Localização dos arquivos gerados:**
+- APK Debug: `build/app/outputs/flutter-apk/app-debug.apk`
+- APK Release: `build/app/outputs/flutter-apk/app-release.apk`
+- App Bundle: `build/app/outputs/bundle/release/app-release.aab`
+
+### ⚙️ **Configurações de Build**
+
+**android/app/build.gradle** - Principais configurações:
+```gradle
+android {
+    compileSdk 34
+    defaultConfig {
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+}
+```
+
+**Assinatura de APK:**
+Para release em produção, configure keystore em `android/key.properties`
+
+---
+
+## 🛠️ Arquitetura Técnica Detalhada
+
+### 📊 **Gerenciamento de Estado**
+```dart
+// Provider Pattern para estado global
+MultiProvider(
+  providers: [
+    ChangeNotifierProvider(create: (_) => UserProvider()),
+    ChangeNotifierProvider(create: (_) => CourseProgressService()),
+    ChangeNotifierProvider(create: (_) => AchievementService()),
+    ChangeNotifierProvider(create: (_) => DailyCheckupHistoryService()),
+  ],
+  child: MyApp(),
+)
+```
+
+### 🔐 **Isolamento de Dados por Usuário**
+```dart
+// Exemplo de chave específica por usuário
+String getCourseProgressKey() {
+  final user = FirebaseAuth.instance.currentUser;
+  return 'course_progress_${user?.uid ?? 'anonymous'}';
+}
+```
+
+### 🏆 **Sistema de Conquistas Automático**
+```dart
+// Integração curso -> conquista
+void _checkAndTriggerAchievements(String courseId) {
+  if (isCourseCompletedById(courseId)) {
+    achievementService.unlockAchievement('course_completion');
+  }
+}
+```
+
+### 📱 **Estrutura de Widgets Reutilizáveis**
+- `courses_widget.dart` - Cards de curso com status visual
+- `achievement_card.dart` - Conquistas com animações
+- `mood_chart.dart` - Gráficos de humor com dados reais
+- `luma_voice_widget.dart` - Interface de chat por voz
+
+### 📡 **Sistema ManageEngine EventLog**
+
+**🔌 Configuração de Conexão:**
+```dart
+// Syslog Service para ManageEngine
+class SyslogService {
+  static const String EVENTLOG_HOST = 'your-manageengine-server.com';
+  static const int SYSLOG_PORT = 513;
+  static const String FACILITY = 'LOCAL0';
+  
+  static Future<void> sendEvent({
+    required String eventType,
+    required Map<String, dynamic> data,
+    String severity = 'INFO',
+  }) async {
+    final cefMessage = _formatToCEF(eventType, data);
+    await _sendSyslogMessage(cefMessage, severity);
+  }
+}
+```
+
+**📊 Formato CEF (Common Event Format):**
+```dart
+// Exemplo de evento formatado para ManageEngine
+String _formatToCEF(String eventType, Map<String, dynamic> data) {
+  return 'CEF:0|MindMatch|Flutter App|1.0|$eventType|$eventType|'
+         '${_getSeverityNumber(severity)}|'
+         'src=${data['userId']} '
+         'duser=${data['username']} '
+         'act=${data['action']} '
+         'outcome=${data['result']} '
+         'msg=${data['details']}';
+}
+```
+
+**🔍 Eventos Capturados:**
+```dart
+// Exemplos de eventos enviados para ManageEngine
+await SyslogService.sendEvent(
+  eventType: 'USER_LOGIN',
+  data: {
+    'userId': user.uid,
+    'username': user.email,
+    'action': 'authentication',
+    'result': 'success',
+    'details': 'User successfully logged in',
+    'timestamp': DateTime.now().toIso8601String(),
+  }
+);
+
+await SyslogService.sendEvent(
+  eventType: 'COURSE_COMPLETED',
+  data: {
+    'userId': user.uid,
+    'courseId': courseId,
+    'action': 'course_completion',
+    'result': 'success',
+    'details': 'Course $courseName completed',
+  }
+);
+
+await SyslogService.sendEvent(
+  eventType: 'DAILY_CHECKUP',
+  data: {
+    'userId': user.uid,
+    'mood': moodLevel,
+    'energy': energyLevel,
+    'stress': stressLevel,
+    'action': 'mood_tracking',
+    'result': 'recorded',
+  }
+);
+```
+
+**🛡️ Compliance e Privacidade:**
+```dart
+// Anonização de dados sensíveis
+class PrivacyHelper {
+  static String anonymizeUserId(String userId) {
+    return sha256.convert(utf8.encode(userId)).toString().substring(0, 16);
+  }
+  
+  static Map<String, dynamic> sanitizeEventData(Map<String, dynamic> data) {
+    final sanitized = Map<String, dynamic>.from(data);
+    
+    // Remove dados pessoais identificáveis
+    sanitized.remove('email');
+    sanitized.remove('name');
+    sanitized.remove('phone');
+    
+    // Anonimiza userId
+    if (sanitized.containsKey('userId')) {
+      sanitized['userId'] = anonymizeUserId(sanitized['userId']);
+    }
+    
+    return sanitized;
+  }
+}
+```
+
+**📈 Dashboards ManageEngine:**
+- **User Activity Dashboard**: Métricas de uso e engajamento
+- **Security Monitoring**: Eventos de login e segurança
+- **Application Performance**: Erros, crashes e performance
+- **Business Intelligence**: Padrões de uso de cursos e conquistas
+- **Health Metrics**: Agregados de humor e bem-estar (anonimizados)
+
+---
+
+## 🧪 Testes e Debugging
+
+### 🔍 **Scripts de Teste Disponíveis**
+- `test_api_direct.dart` - Testes de API
+- `test_auth_simulation.dart` - Simulação de autenticação
+- `test_final_working.dart` - Testes finais integrados
+- `test_real_app_simulation.dart` - Simulação completa do app
+- **🆕 `test_eventlog_connection.dart`** - Teste de conexão com ManageEngine
+- **🆕 `test_syslog_direct.dart`** - Teste direto do protocolo Syslog
+- **🆕 `test_cef_format.dart`** - Validação do formato CEF
+- **🆕 `test_port_513.dart`** - Teste específico da porta 513
+- **🆕 `test_eventlog_format.dart`** - Teste de formatação de eventos
+
+### 🔧 **Scripts de Configuração ManageEngine**
+- `eventlog_test.dart` - Teste completo de integração EventLog
+- `test_different_formats.dart` - Teste de diferentes formatos de log
+- `test_unique_events.dart` - Teste de eventos únicos e identificação
+- `test_verification_final.dart` - Verificação final da integração
+
+### 📊 **Logs e Monitoramento**
+- Firebase Analytics integrado
+- Debug prints para desenvolvimento
+- Error tracking com Firebase Crashlytics
+
+---
+
+## 🔄 Contribuição
 
 ### 💡 Inspiração
 Baseado nos princípios da **Society 5.0** (Sociedade 5.0), integrando tecnologia avançada com necessidades humanas fundamentais.
@@ -14,6 +251,64 @@ Baseado nos princípios da **Society 5.0** (Sociedade 5.0), integrando tecnologi
 ---
 
 ## 🆕 Últimas Atualizações
+
+### 🎯 **11/09/2025 - Sistema de Cursos Aprimorado e Dados Reais**
+
+**� Sistema de Cursos Inteligente:**
+- ✅ **Marcação Visual de Conclusão**: Cursos concluídos mostram ícone ✅ verde antes de entrar
+- ✅ **Barra de Progresso**: Cursos iniciados mostram porcentagem de conclusão
+- ✅ **Status Dinâmico**: "Concluído", "X% concluído" ou informações de aulas/exercícios
+- ✅ **Progresso Persistente**: Todo progresso salvo por usuário entre sessões
+- ✅ **Dados Específicos por Usuário**: Isolamento completo de dados usando Firebase Auth
+
+**� Sistema de Conquistas Conectado:**
+- ✅ **Conquistas Automáticas**: Desbloqueio automático ao completar lições, exercícios e cursos
+- ✅ **Integração em Tempo Real**: CourseProgressService dispara conquistas automaticamente
+- ✅ **Notificações de Conquista**: Feedback visual quando conquistas são desbloqueadas
+- ✅ **Dependency Injection**: AchievementService integrado ao progresso dos cursos
+
+**� Histórico de Checkups com Dados Reais:**
+- ✅ **DailyCheckupHistoryService**: Novo serviço para histórico completo de checkups
+- ✅ **Dados Reais nos Gráficos**: Humor dos últimos 7 dias baseado em checkups reais
+- ✅ **Estatísticas Automáticas**: Cálculo de humor, energia e estresse médios
+- ✅ **Relatórios Atualizados**: Progresso mensal com dados reais do usuário
+
+**🔄 Arquitetura de Dados Aprimorada:**
+- ✅ **Isolamento por Usuário**: Todos os dados específicos usando Firebase Auth user.uid
+- ✅ **SharedPreferences Seguro**: Chaves únicas por usuário para persistência local
+- ✅ **Sincronização Automática**: Dados carregados automaticamente no login
+- ✅ **Provider Pattern**: Estado global gerenciado com Consumer widgets
+
+### 🔧 **11/09/2025 - Integração ManageEngine EventLog**
+
+**📡 Sistema de Monitoramento de Eventos:**
+- ✅ **EventLog Integration**: Conexão direta com ManageEngine EventLog Analyzer
+- ✅ **Syslog Protocol**: Implementação completa do protocolo Syslog (RFC 3164)
+- ✅ **Port 513 Configuration**: Configuração para recebimento de logs via UDP
+- ✅ **CEF Format Support**: Suporte ao Common Event Format para estruturação de dados
+- ✅ **Real-time Logging**: Logs em tempo real de ações do usuário no aplicativo
+
+**🔍 Tipos de Eventos Monitorados:**
+- ✅ **Login/Logout**: Autenticação e sessões de usuário
+- ✅ **Checkup Daily**: Registros de humor e bem-estar diário
+- ✅ **Course Progress**: Progresso e conclusão de cursos
+- ✅ **Achievement Unlock**: Desbloqueio de conquistas
+- ✅ **Chat Interactions**: Interações com IA Luma (anônimo/agregado)
+- ✅ **App Usage**: Tempo de uso e navegação entre telas
+
+**⚙️ Configuração Técnica:**
+- ✅ **Syslog Service**: Serviço dedicado para envio de logs
+- ✅ **Event Formatting**: Formatação automática CEF para ManageEngine
+- ✅ **Error Handling**: Sistema robusto de fallback para falhas de conexão
+- ✅ **Privacy Compliance**: Logs anonimizados respeitando LGPD/GDPR
+- ✅ **Batch Processing**: Envio em lotes para otimização de rede
+
+**📊 Dashboards e Analytics:**
+- ✅ **ManageEngine Dashboard**: Dashboards customizados para métricas do app
+- ✅ **User Behavior Analytics**: Análise de padrões de uso (anonimizado)
+- ✅ **Performance Monitoring**: Monitoramento de performance e erros
+- ✅ **Security Events**: Logs de segurança e tentativas de acesso
+- ✅ **Business Intelligence**: Relatórios para tomada de decisão
 
 ### 🎯 **17/08/2025 - Chat por Voz com Luma**
 
@@ -24,11 +319,14 @@ Baseado nos princípios da **Society 5.0** (Sociedade 5.0), integrando tecnologi
 - ✅ **Controles Intuitivos**: Toque para parar/continuar a fala
 - ✅ **Configuração Persistente**: O app lembra sua preferência de modo
 
-**🎨 Melhorias na Interface:**
-- ✅ **Material Widget Fix**: Corrigidos erros de "No Material widget found"
-- ✅ **Botão Atualizado**: Mudado para "Falar com a Luma" no modo voz
-- ✅ **Navegação Melhorada**: Sistema de navegação por abas otimizado
-- ✅ **Widget da Luma**: Novo componente visual com animações para modo voz
+**🤖 Chat com IA Avançado:**
+- Chat por texto tradicional com histórico
+- **🆕 Chat por voz com síntese de fala**
+- **🆕 Modo visual da Luma com avatar animado**
+- **🆕 Controles de voz intuitivos (toque para parar/continuar)**
+- Contexto baseado no humor atual
+- Suporte emocional personalizado
+- **🆕 Configuração persistente de modo (texto/voz)**
 
 **🔊 Sistema de TTS:**
 - ✅ **ElevenLabs Integration**: Integração completa com API de Text-to-Speech
@@ -36,53 +334,21 @@ Baseado nos princípios da **Society 5.0** (Sociedade 5.0), integrando tecnologi
 - ✅ **Controle de Estado**: Sistema robusto para gerenciar estado da fala
 - ✅ **Fallback System**: Sistema de fallback para garantir funcionamento
 
+**🎨 Melhorias na Interface:**
+- ✅ **Material Widget Fix**: Corrigidos erros de "No Material widget found"
+- ✅ **Botão Atualizado**: Mudado para "Falar com a Luma" no modo voz
+- ✅ **Navegação Melhorada**: Sistema de navegação por abas otimizado
+- ✅ **Widget da Luma**: Novo componente visual com animações para modo voz
+
 **⚙️ Arquitetura Técnica:**
 - ✅ **Serviços Modulares**: ElevenLabsService independente e reutilizável
 - ✅ **Adaptador de Preferências**: Sistema para gerenciar configurações do usuário
 - ✅ **Estados Visuais**: Animações e indicadores visuais para modo voz
-- ✅ **Cleanup de Código**: Removido código de teste experimentalction App
-
-<div align="center">
-  
-  **Um aplicativo Flutter para bem-estar emocional e conexões humanas significativas**
-  
-  [![Flutter](https://img.shields.io/badge/Flutter-3.8+-blue.svg)](https://flutter.dev/)
-  [![Firebase](https://img.shields.io/badge/Firebase-Integrated-orange.svg)](https://firebase.google.com/)
-  [![AI](https://img.shields.io/badge/AI-Google%20Gemini-green.svg)](https://ai.google.dev/)
-  [![TTS](https://img.shields.io/badge/TTS-ElevenLabs-purple.svg)](https://elevenlabs.io/)
-  [![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
-
-  **✨ Atualizado em 17/08/2025 - Versão com Chat por Voz da Luma ✨**
-</div>
+- ✅ **Cleanup de Código**: Removido código de teste experimental
 
 ---
 
-## 📋 Índice
-
-- [Sobre o Projeto](#-sobre-o-projeto)
-- [🆕 Últimas Atualizações](#-últimas-atualizações)
-- [Características Principais](#-características-principais)
-- [Funcionalidades Implementadas](#-funcionalidades-implementadas)
-- [Arquitetura](#-arquitetura)
-- [Tecnologias Utilizadas](#-tecnologias-utilizadas)
-- [Configuração do Projeto](#-configuração-do-projeto)
-- [Estrutura do Projeto](#-estrutura-do-projeto)
-- [Funcionalidades Pendentes](#-funcionalidades-pendentes)
-- [Como Usar](#-como-usar)
-- [Contribuição](#-contribuição)
-- [Roadmap](#-roadmap)
-
----
-
-## 🎯 Sobre o Projeto
-
-MindMatch é uma plataforma inovadora que combina **bem-estar emocional** com **conexões humanas significativas**. O aplicativo utiliza inteligência artificial para análise emocional e algoritmos de compatibilidade para conectar pessoas com afinidades e valores similares.
-
-### 🌟 Visão
-Criar um espaço seguro onde as pessoas possam se conectar com base em compatibilidade emocional e intelectual, promovendo relacionamentos mais profundos e significativos.
-
-### � Inspiração
-Baseado nos princípios da **Society 5.0** (Sociedade 5.0), integrando tecnologia avançada com necessidades humanas fundamentais.
+## 🚀 Principais Funcionalidades
 - **Google Sign-In**: Autenticação social
 - **Sign in with Apple**: Autenticação Apple
 - **Image Picker**: Seleção de imagens
@@ -633,7 +899,7 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 **Gustavo Teodoro**
 **Felipe Kindermann**
 **Kauã Granata**
-
+**Marcelo Furlanetto**
 </div>
 
 ---
@@ -652,3 +918,4 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 [⬆ Voltar ao topo](#-mindmatch---emotional-wellness--connection-app)
 
 </div>
+

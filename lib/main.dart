@@ -25,6 +25,27 @@ import 'utils/app_colors.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Configure error handling for Pigeon errors
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    bool isPigeonError = details.exception.toString().contains('PigeonUserDetails') ||
+                        details.exception.toString().contains('channel-error') ||
+                        details.exception.toString().contains('List<Object?>');
+    
+    if (isPigeonError) {
+      print('🔧 Pigeon error caught and handled: ${details.exception}');
+      // Return a minimal widget instead of error screen for Pigeon errors
+      return Container(
+        color: Colors.white,
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    
+    // For other errors, show the default error widget
+    return ErrorWidget(details.exception);
+  };
+  
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -97,6 +118,26 @@ class MindMatchApp extends StatelessWidget {
 
 final GoRouter _router = GoRouter(
   initialLocation: '/',
+  errorBuilder: (context, state) {
+    // Handle routing errors gracefully
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error, size: 64, color: AppColors.error),
+            SizedBox(height: 16),
+            Text('Erro de navegação'),
+            SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: () => context.go('/'),
+              child: Text('Voltar ao início'),
+            ),
+          ],
+        ),
+      ),
+    );
+  },
   routes: [
     GoRoute(
       path: '/',

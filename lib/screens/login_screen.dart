@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -9,6 +8,7 @@ import 'package:image/image.dart' as imgpkg;
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import '../utils/app_colors.dart';
+import '../utils/safe_navigation.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/configuration_error_dialog.dart';
 import '../widgets/tag_selector.dart';
@@ -534,9 +534,27 @@ class _LoginScreenState extends State<LoginScreen> {
       final userCredential = await authService.signInWithGoogle();
       
       if (userCredential != null && mounted) {
-        context.go('/home');
+        await SafeNavigation.safeNavigate(context, '/home');
       }
     } catch (e) {
+      // Check if it's the known Pigeon error but user was authenticated
+      if (e.toString().contains('PigeonUserDetails') || 
+          e.toString().contains('List<Object?>') ||
+          e.toString().contains('channel-error')) {
+        
+        // Wait a moment and check if user is actually authenticated
+        await Future.delayed(Duration(milliseconds: 500));
+        final authService = Provider.of<AuthService>(context, listen: false);
+        
+        if (authService.currentUser != null) {
+          // User is authenticated despite the error, proceed to home
+          if (mounted) {
+            await SafeNavigation.safeNavigate(context, '/home');
+          }
+          return;
+        }
+      }
+      
       if (mounted) {
         if (e.toString().contains('configuração do Google Sign-In')) {
           ConfigurationErrorDialog.show(
@@ -554,7 +572,11 @@ class _LoginScreenState extends State<LoginScreen> {
             onRetry: _signInWithGoogle,
           );
         } else {
-          _showErrorSnackBar('Erro ao entrar com Google: $e');
+          // Only show error if user is not authenticated
+          final authService = Provider.of<AuthService>(context, listen: false);
+          if (authService.currentUser == null) {
+            _showErrorSnackBar('Erro ao entrar com Google: $e');
+          }
         }
       }
     } finally {
@@ -576,7 +598,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final userCredential = await authService.signInWithApple();
       
       if (userCredential != null && mounted) {
-        context.go('/home');
+        await SafeNavigation.safeNavigate(context, '/home');
       }
     } catch (e) {
       _showErrorSnackBar('Erro ao entrar com Apple: $e');
@@ -603,10 +625,32 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       
       if (mounted) {
-        context.go('/home');
+        await SafeNavigation.safeNavigate(context, '/home');
       }
     } catch (e) {
-      _showErrorSnackBar('Erro ao entrar: $e');
+      // Check if it's the known Pigeon error but user was authenticated
+      if (e.toString().contains('PigeonUserDetails') || 
+          e.toString().contains('List<Object?>') ||
+          e.toString().contains('channel-error')) {
+        
+        // Wait a moment and check if user is actually authenticated
+        await Future.delayed(Duration(milliseconds: 500));
+        final authService = Provider.of<AuthService>(context, listen: false);
+        
+        if (authService.currentUser != null) {
+          // User is authenticated despite the error, proceed to home
+          if (mounted) {
+            await SafeNavigation.safeNavigate(context, '/home');
+          }
+          return;
+        }
+      }
+      
+      // Only show error if user is not authenticated
+      final authService = Provider.of<AuthService>(context, listen: false);
+      if (authService.currentUser == null) {
+        _showErrorSnackBar('Erro ao entrar: $e');
+      }
     } finally {
       setState(() {
         _isLoading = false;
@@ -649,7 +693,8 @@ class _LoginScreenState extends State<LoginScreen> {
         
         // Check if it's the known Pigeon error but user was still created
         if (authError.toString().contains('PigeonUserDetails') || 
-            authError.toString().contains('List<Object?>')) {
+            authError.toString().contains('List<Object?>') ||
+            authError.toString().contains('channel-error')) {
           print('🔧 Pigeon error detected, checking if user was created anyway...');
           
           // Wait a moment and check if user exists
@@ -657,11 +702,18 @@ class _LoginScreenState extends State<LoginScreen> {
           if (authService.currentUser != null) {
             print('✅ User was created despite Pigeon error!');
             // User exists, continue with profile creation
+          } else {
+            print('❌ User was not created, this is a real error');
+            throw authError; // Re-throw if user wasn't actually created
           }
-        }
-        
-        if (authService.currentUser == null) {
-          throw authError; // Re-throw if user wasn't actually created
+        } else {
+          // For other types of errors, check if user was still created
+          await Future.delayed(Duration(milliseconds: 500));
+          if (authService.currentUser == null) {
+            throw authError; // Re-throw if user wasn't actually created
+          } else {
+            print('✅ User was created despite other error!');
+          }
         }
       }
       
@@ -771,7 +823,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Always navigate to home if user exists
         if (mounted) {
           _showSuccessSnackBar('Conta criada com sucesso!');
-          context.go('/home');
+          await SafeNavigation.safeNavigate(context, '/home');
         }
         
       } else {
@@ -782,18 +834,32 @@ class _LoginScreenState extends State<LoginScreen> {
       print('❌ Registration error: $e');
       print('❌ Error type: ${e.runtimeType}');
       
+      // Check for Pigeon errors first
+      bool isPigeonError = e.toString().contains('PigeonUserDetails') || 
+                          e.toString().contains('List<Object?>') ||
+                          e.toString().contains('channel-error');
+      
       // Final check - sometimes user gets created despite errors
+      await Future.delayed(Duration(milliseconds: 500));
       final auth = Provider.of<AuthService>(context, listen: false);
+      
       if (auth.currentUser != null) {
         print('✅ User exists despite error, proceeding to home');
         if (mounted) {
-          _showSuccessSnackBar('Conta criada! Complete seu perfil depois.');
-          context.go('/home');
+          if (isPigeonError) {
+            _showSuccessSnackBar('Conta criada com sucesso!');
+          } else {
+            _showSuccessSnackBar('Conta criada! Complete seu perfil depois.');
+          }
+          await SafeNavigation.safeNavigate(context, '/home');
         }
       } else {
-        // Show appropriate error message
+        // Show appropriate error message only if user wasn't created
         String errorMessage = 'Erro ao criar conta';
-        if (e.toString().contains('email-already-in-use')) {
+        
+        if (isPigeonError) {
+          errorMessage = 'Erro de comunicação. Tente novamente.';
+        } else if (e.toString().contains('email-already-in-use')) {
           errorMessage = 'Este e-mail já está em uso';
         } else if (e.toString().contains('weak-password')) {
           errorMessage = 'A senha é muito fraca';

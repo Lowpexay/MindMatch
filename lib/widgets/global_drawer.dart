@@ -8,9 +8,9 @@ import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import '../widgets/user_avatar.dart';
 import '../utils/app_colors.dart';
-import '../screens/quick_eventlog_test.dart';
-import '../screens/eventlog_report_screen.dart';
 import '../screens/emotional_reports_screen.dart';
+import '../screens/profile_screen.dart';
+import '../screens/main_navigation.dart';
 
 class GlobalDrawer extends StatelessWidget {
   const GlobalDrawer({super.key});
@@ -156,11 +156,11 @@ class GlobalDrawer extends StatelessWidget {
                 _buildMenuItem(
                   context,
                   icon: Icons.psychology,
-                  title: 'IA Assistente',
-                  subtitle: 'Apoio emocional',
+                  title: 'Chat Luma',
+                  subtitle: 'IA para apoio emocional',
                   onTap: () {
                     Navigator.pop(context);
-                    _navigateToAI(context);
+                    _navigateToLuma(context);
                   },
                 ),
                 
@@ -170,21 +170,10 @@ class GlobalDrawer extends StatelessWidget {
                   context,
                   icon: Icons.person,
                   title: 'Meu Perfil',
-                  subtitle: 'Editar informações',
+                  subtitle: 'Ver informações pessoais',
                   onTap: () {
                     Navigator.pop(context);
-                    _showProfile(context);
-                  },
-                ),
-                
-                _buildMenuItem(
-                  context,
-                  icon: Icons.mood,
-                  title: 'Histórico de Humor',
-                  subtitle: 'Ver evolução emocional',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showMoodHistory(context);
+                    _navigateToProfile(context);
                   },
                 ),
                 
@@ -196,17 +185,6 @@ class GlobalDrawer extends StatelessWidget {
                   onTap: () {
                     Navigator.pop(context);
                     _showReports(context);
-                  },
-                ),
-                
-                _buildMenuItem(
-                  context,
-                  icon: Icons.dashboard,
-                  title: 'Relatórios EventLog',
-                  subtitle: 'Painel ManageEngine',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _openEventLogReports(context);
                   },
                 ),
                 
@@ -242,17 +220,6 @@ class GlobalDrawer extends StatelessWidget {
                   onTap: () {
                     Navigator.pop(context);
                     _showAbout(context);
-                  },
-                ),
-                
-                _buildMenuItem(
-                  context,
-                  icon: Icons.network_check,
-                  title: 'Teste EventLog',
-                  subtitle: 'Testar conexão API',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _testEventLog(context);
                   },
                 ),
                 
@@ -327,79 +294,56 @@ class GlobalDrawer extends StatelessWidget {
   }
 
   void _navigateToHome(BuildContext context) {
-    // Implementar navegação para home se necessário
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Navegando para Início...'),
-        backgroundColor: AppColors.primary,
-      ),
-    );
+    // Navega para a aba Home (índice 0)
+    final state = MainNavigation.mainNavigationKey.currentState;
+    if (state != null) {
+      state.switchToTab(0);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Navegando para Início...'),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    }
   }
 
   void _navigateToConversations(BuildContext context) {
-    // Implementar navegação para conversas se necessário
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Navegando para Conversas...'),
-        backgroundColor: AppColors.primary,
-      ),
-    );
-  }
-
-  void _navigateToAI(BuildContext context) {
-    // Implementar navegação para IA se necessário
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Navegando para IA Assistente...'),
-        backgroundColor: AppColors.primary,
-      ),
-    );
-  }
-
-  void _showProfile(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Meu Perfil'),
-        content: const Text(
-          'Aqui você poderá editar suas informações pessoais, '
-          'foto do perfil, bio e configurar suas preferências '
-          'de compatibilidade.',
+    // Navega para a aba de Conversas (índice 1)
+    final state = MainNavigation.mainNavigationKey.currentState;
+    if (state != null) {
+      state.switchToTab(1);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Navegando para Conversas...'),
+          backgroundColor: AppColors.primary,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fechar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Editar Perfil'),
-          ),
-        ],
-      ),
-    );
+      );
+    }
   }
 
-  void _showMoodHistory(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Histórico de Humor'),
-        content: const Text(
-          'Visualize a evolução do seu bem-estar emocional '
-          'ao longo do tempo com gráficos e estatísticas '
-          'detalhadas.',
+  void _navigateToLuma(BuildContext context) {
+    // Navega para a aba da Luma (índice 2) 
+    final state = MainNavigation.mainNavigationKey.currentState;
+    if (state != null) {
+      state.switchToTab(2);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Navegando para Chat Luma...'),
+          backgroundColor: AppColors.primary,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fechar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Ver Histórico'),
-          ),
-        ],
+      );
+    }
+  }
+
+  void _navigateToProfile(BuildContext context) {
+    // Navega para a tela de perfil
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ProfileScreen(),
       ),
     );
   }
@@ -486,24 +430,6 @@ class GlobalDrawer extends StatelessWidget {
             child: const Text('Fechar'),
           ),
         ],
-      ),
-    );
-  }
-
-  void _openEventLogReports(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const EventLogReportScreen(),
-      ),
-    );
-  }
-
-  void _testEventLog(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => QuickEventLogTestScreen(),
       ),
     );
   }

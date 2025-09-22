@@ -101,18 +101,39 @@ class AiChatScreenState extends State<AiChatScreen> {
 
   Future<void> _loadUserName() async {
     try {
+      // Aguardar um momento para garantir que os providers estão disponíveis
+      await Future.delayed(const Duration(milliseconds: 100));
+      
       final userId = _authService?.currentUser?.uid;
-      if (userId != null) {
-        final userProfile = await _firebaseService?.getUserProfile(userId);
+      print('🔍 Carregando nome do usuário para ID: $userId');
+      
+      if (userId != null && _firebaseService != null) {
+        final userProfile = await _firebaseService!.getUserProfile(userId);
         setState(() {
-          _userName = userProfile?['name'] ?? _authService?.currentUser?.displayName ?? '';
+          _userName = userProfile?['name'] ?? 
+                     _authService?.currentUser?.displayName ?? 
+                     _authService?.currentUser?.email?.split('@')[0] ?? '';
         });
         print('👤 Nome do usuário carregado no chat: $_userName');
+      } else {
+        // Fallback para displayName ou email
+        setState(() {
+          _userName = _authService?.currentUser?.displayName ?? 
+                     _authService?.currentUser?.email?.split('@')[0] ?? '';
+        });
+        print('⚠️ Usando fallback para nome: $_userName');
+      }
+      
+      // Recriar mensagem de boas-vindas com o nome correto se já foi enviada
+      if (_messages.isNotEmpty && !_messages.first.isUser) {
+        _updateWelcomeMessage();
       }
     } catch (e) {
       print('❌ Error loading user name in chat: $e');
       setState(() {
-        _userName = _authService?.currentUser?.displayName ?? '';
+        _userName = _authService?.currentUser?.displayName ?? 
+                   _authService?.currentUser?.email?.split('@')[0] ?? 
+                   'Usuário';
       });
     }
   }
@@ -140,6 +161,8 @@ class AiChatScreenState extends State<AiChatScreen> {
       
       setState(() {});
       
+      // Aguardar um pouco para garantir que o nome do usuário seja carregado
+      await Future.delayed(const Duration(milliseconds: 500));
       _sendWelcomeMessage();
     } else {
       // Primeira vez - mostrar modal de configuração apenas se a tela estiver visível
@@ -215,9 +238,48 @@ class AiChatScreenState extends State<AiChatScreen> {
     super.dispose();
   }
 
+  void _updateWelcomeMessage() {
+    if (_messages.isNotEmpty && !_messages.first.isUser) {
+      // Recriar a mensagem de boas-vindas com o nome correto
+      final name = _userName.isNotEmpty ? _userName : 'você';
+      String welcomeMessage;
+      
+      if (widget.userMood?.needsSupport == true) {
+        welcomeMessage = "Olá $name, sou a Luma 💙 Percebo que hoje pode não estar sendo um dia fácil para você. "
+            "Quero que saiba que é completamente normal sentir-se assim às vezes, e você foi muito corajoso(a) "
+            "ao buscar apoio. Este é um espaço seguro onde seus sentimentos são válidos e importantes. "
+            "Estou aqui, presente com você. Como posso te acompanhar neste momento?";
+      } else {
+        // Personalizar mensagem baseada no modo de interação
+        if (_interactionMode == 'voice') {
+          welcomeMessage = "Olá $name! Sou a Luma ✨ É um prazer te encontrar aqui. Meu nome significa 'luz', "
+              "e estou aqui para iluminar sua jornada de bem-estar emocional com minha voz. "
+              "Este é um espaço acolhedor onde você pode se expressar livremente. Como você está se sentindo hoje?";
+        } else {
+          welcomeMessage = "Olá $name! Sou a Luma ✨ É um prazer te encontrar aqui. Meu nome significa 'luz', "
+              "e estou aqui para iluminar sua jornada de bem-estar emocional. Este é um espaço acolhedor "
+              "onde você pode se expressar livremente, refletir sobre seus sentimentos e descobrir "
+              "recursos internos que já possui. Como você está se sentindo hoje?";
+        }
+      }
+      
+      setState(() {
+        _messages[0] = ChatMessage(
+          text: welcomeMessage,
+          isUser: false,
+          timestamp: _messages[0].timestamp,
+        );
+      });
+      
+      print('🔄 Mensagem de boas-vindas atualizada com nome: $name');
+    }
+  }
+
   void _sendWelcomeMessage() {
     String welcomeMessage;
     final name = _userName.isNotEmpty ? _userName : 'você';
+    
+    print('📝 Criando mensagem de boas-vindas com nome: "$name" (_userName: "$_userName")');
     
     if (widget.userMood?.needsSupport == true) {
       welcomeMessage = "Olá $name, sou a Luma 💙 Percebo que hoje pode não estar sendo um dia fácil para você. "
@@ -556,23 +618,49 @@ class AiChatScreenState extends State<AiChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!message.isUser) ...[
-            // Avatar da IA
+            // Avatar da Luma
             Container(
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary,
-                    AppColors.primary.withOpacity(0.7),
-                  ],
-                ),
                 borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: const Icon(
-                Icons.auto_awesome,
-                color: Colors.white,
-                size: 20,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Image.asset(
+                  'assets/images/luma_chat_avatar.png',
+                  width: 36,
+                  height: 36,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback para o ícone antigo se a imagem não carregar
+                    return Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.primary,
+                            AppColors.primary.withOpacity(0.7),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
             const SizedBox(width: 12),

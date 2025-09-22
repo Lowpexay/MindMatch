@@ -210,7 +210,6 @@ class _SplashScreenState extends State<SplashScreen> {
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: Colors.white,
                 borderRadius: BorderRadius.circular(60),
                 boxShadow: [
                   BoxShadow(
@@ -220,10 +219,22 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.favorite,
-                size: 60,
-                color: AppColors.primary,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(60),
+                child: Image.asset(
+                  'assets/images/luma_chat_avatar.png',
+                  width: 120,
+                  height: 120,
+                  fit: BoxFit.contain, // Mudando para contain para preservar transparência
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback para o ícone antigo se a imagem não carregar
+                    return const Icon(
+                      Icons.favorite,
+                      size: 60,
+                      color: AppColors.primary,
+                    );
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 24),

@@ -2,15 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
-import '../services/firebase_service.dart';
-import '../services/global_notification_service.dart';
-import '../providers/conversations_provider.dart';
-import '../models/conversation_models.dart';
 import '../utils/app_colors.dart';
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 import '../widgets/user_avatar.dart';
+
+class ConversationPartner {
+  final String id;
+  final String name;
+  final Uint8List? imageBytes;
+
+  const ConversationPartner({
+    required this.id,
+    required this.name,
+    this.imageBytes,
+  });
+}
 
 class UserChatScreen extends StatefulWidget {
   final ConversationPartner otherUser;
@@ -30,10 +37,7 @@ class _UserChatScreenState extends State<UserChatScreen> {
   bool _isSending = false;
   String? _conversationId;
   
-  FirebaseService? _firebaseService;
   AuthService? _authService;
-  GlobalNotificationService? _globalNotificationService;
-  Uint8List? _myImageBytes;
 
   @override
   void initState() {
@@ -49,23 +53,7 @@ class _UserChatScreenState extends State<UserChatScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _firebaseService = Provider.of<FirebaseService>(context, listen: false);
     _authService = Provider.of<AuthService>(context, listen: false);
-    _globalNotificationService = Provider.of<GlobalNotificationService>(context, listen: false);
-    
-    // Load my image bytes
-    _loadMyImage();
-  }
-
-  Future<void> _loadMyImage() async {
-    if (_authService != null) {
-      final myImage = await _authService!.getUserImage();
-      if (myImage != null) {
-        setState(() {
-          _myImageBytes = myImage;
-        });
-      }
-    }
   }
 
   @override
@@ -225,18 +213,20 @@ class _UserChatScreenState extends State<UserChatScreen> {
 
   Future<void> _sendNotificationToOtherUser(String messageText) async {
     try {
-      if (_globalNotificationService != null) {
-        await _globalNotificationService!.sendNotificationToUser(
-          widget.otherUser.id,
-          'Nova mensagem',
-          messageText,
-          data: {
-            'type': 'chat_message',
-            'conversationId': _conversationId ?? '',
-            'senderId': _authService?.currentUser?.uid ?? '',
-          },
-        );
-      }
+      final senderName = _authService?.currentUser?.displayName ?? 'Usuário';
+      // Cria um documento de notificação no Firestore do outro usuário
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.otherUser.id)
+          .collection('notifications')
+          .add({
+        'type': 'message',
+        'conversationId': _conversationId ?? '',
+        'senderName': senderName,
+        'content': messageText,
+        'isRead': false,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
     } catch (e) {
       print('Error sending notification: $e');
     }
@@ -270,7 +260,6 @@ class _UserChatScreenState extends State<UserChatScreen> {
             UserAvatar(
               imageBytes: widget.otherUser.imageBytes,
               radius: 16,
-              defaultIcon: const Icon(Icons.person, size: 16, color: AppColors.gray500),
             ),
             const SizedBox(width: 8),
           ],
@@ -314,10 +303,8 @@ class _UserChatScreenState extends State<UserChatScreen> {
           ),
           if (isMe) ...[
             const SizedBox(width: 8),
-            UserAvatar(
-              imageBytes: _myImageBytes,
+            const UserAvatar(
               radius: 16,
-              defaultIcon: const Icon(Icons.person, size: 16, color: AppColors.gray500),
             ),
           ],
         ],
@@ -346,9 +333,6 @@ class _UserChatScreenState extends State<UserChatScreen> {
             UserAvatar(
               imageBytes: widget.otherUser.imageBytes,
               radius: 20,
-              defaultIcon: widget.otherUser.imageBytes == null
-                  ? const Icon(Icons.person, size: 20, color: AppColors.gray500)
-                  : null,
             ),
             const SizedBox(width: 12),
             Expanded(

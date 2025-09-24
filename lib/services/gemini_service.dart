@@ -1,12 +1,55 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import '../config/api_keys.dart';
 import '../models/question_models.dart';
 import '../models/mood_data.dart';
 
 class GeminiService {
-  static const String _apiKey = 'AIzaSyDAEcBUmI4KOoxNxkaaXxeqWe3UkJoPmj8';
   static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  final List<String> _keys = ApiKeys.geminiApiKeys;
+  int _keyIndex = 0;
+
+  String get _apiKey => _keys[_keyIndex];
+
+  void _advanceKey() {
+    if (_keys.isEmpty) return;
+    _keyIndex = (_keyIndex + 1) % _keys.length;
+  }
+
+  bool _shouldRotateOn(http.Response response) {
+    if (response.statusCode == 429 || response.statusCode == 401 || response.statusCode == 403) {
+      return true;
+    }
+    // Heuristic: check common quota/rate messages
+    final body = response.body.toLowerCase();
+    return body.contains('quota') || body.contains('rate') || body.contains('exceeded') || body.contains('limit');
+  }
+
+  Future<http.Response> _postWithRotation(Map<String, dynamic> body) async {
+    if (_keys.isEmpty) {
+      // Fall back to single attempt with empty key to surface meaningful error
+      final uri = Uri.parse('$_baseUrl?key=');
+      return http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
+    }
+
+    int tries = 0;
+    http.Response? last;
+    while (tries < _keys.length) {
+      final uri = Uri.parse('$_baseUrl?key=${_apiKey}');
+      final resp = await http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
+      if (resp.statusCode == 200) return resp;
+      last = resp;
+      if (_shouldRotateOn(resp)) {
+        _advanceKey();
+        tries++;
+        continue;
+      } else {
+        return resp;
+      }
+    }
+    return last!;
+  }
 
   Future<List<ReflectiveQuestion>> generateDailyQuestions({
     int count = 5,
@@ -18,12 +61,7 @@ class GeminiService {
       
       final prompt = _buildQuestionPrompt(count, userMood, userId);
       
-      final response = await http.post(
-        Uri.parse('$_baseUrl?key=$_apiKey'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
+      final response = await _postWithRotation({
           'contents': [{
             'parts': [{
               'text': prompt,
@@ -33,8 +71,7 @@ class GeminiService {
             'temperature': 0.8,
             'maxOutputTokens': 1000,
           },
-        }),
-      );
+        });
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -62,7 +99,6 @@ class GeminiService {
     required String mimeType,
   }) async {
     try {
-      final uri = Uri.parse('$_baseUrl?key=$_apiKey');
       final requestBody = {
         'contents': [
           {
@@ -81,8 +117,8 @@ class GeminiService {
           }
         ],
         'generationConfig': {
-          'temperature': 0.2,
-          'maxOutputTokens': 1024,
+          'temperature': 0.1,
+          'maxOutputTokens': 256,
         },
         'safetySettings': [
           {
@@ -104,11 +140,7 @@ class GeminiService {
         ],
       };
 
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(requestBody),
-      );
+      final response = await _postWithRotation(requestBody);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -334,12 +366,7 @@ Mantenha o tom acolhedor e positivo.
 Máximo 200 palavras.
 ''';
 
-      final response = await http.post(
-        Uri.parse('$_baseUrl?key=$_apiKey'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
+      final response = await _postWithRotation({
           'contents': [{
             'parts': [{
               'text': prompt,
@@ -349,8 +376,7 @@ Máximo 200 palavras.
             'temperature': 0.7,
             'maxOutputTokens': 300,
           },
-        }),
-      );
+        });
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -389,12 +415,7 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
       // Constrói o histórico usando o padrão LangChain
       final history = _buildChatHistory(userMessage, userMood, conversationContext, userName);
       
-      final response = await http.post(
-        Uri.parse('$_baseUrl?key=$_apiKey'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
+      final response = await _postWithRotation({
           'contents': history,
           'generationConfig': {
             'temperature': 0.8,
@@ -420,8 +441,7 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
               'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
             }
           ],
-        }),
-      );
+        });
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

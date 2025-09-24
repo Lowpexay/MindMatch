@@ -17,4 +17,15 @@ class ApiKeys {
     return elevenLabsApiKey != 'YOUR_ELEVENLABS_API_KEY_HERE' && 
            elevenLabsApiKey.isNotEmpty;
   }
+
+  // Gemini API Keys (suporta rotação)
+  // Adicione aqui suas chaves; serão usadas em fallback/rotação em caso de 429/403/401
+  static const List<String> geminiApiKeys = [
+    // Chave primária já usada atualmente no projeto (migrar para este array)
+    'AIzaSyDAEcBUmI4KOoxNxkaaXxeqWe3UkJoPmj8',
+    // Chave secundária fornecida pelo usuário para fallback
+    'AIzaSyCvtiI4SmV4UHtfPRTAnwZsv0fqQWNFNPs',
+  ];
+
+  static bool get isGeminiConfigured => geminiApiKeys.isNotEmpty && geminiApiKeys.first.isNotEmpty;
 }

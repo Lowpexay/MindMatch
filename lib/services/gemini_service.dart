@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../models/question_models.dart';
 import '../models/mood_data.dart';
@@ -51,6 +52,79 @@ class GeminiService {
     } catch (e) {
       print('❌ Error generating questions: $e');
       return _getFallbackQuestions(count: count);
+    }
+  }
+
+  /// Transcreve áudio usando o Gemini (pt-BR)
+  /// Suporta `mimeType` como 'audio/webm', 'audio/mpeg', 'audio/wav', etc.
+  Future<String> transcribeAudio({
+    required Uint8List audioBytes,
+    required String mimeType,
+  }) async {
+    try {
+      final uri = Uri.parse('$_baseUrl?key=$_apiKey');
+      final requestBody = {
+        'contents': [
+          {
+            'role': 'user',
+            'parts': [
+              {
+                'text': 'Transcreva integralmente em português do Brasil o áudio fornecido. Responda apenas com a transcrição, sem comentários.'
+              },
+              {
+                'inlineData': {
+                  'mimeType': mimeType,
+                  'data': base64Encode(audioBytes),
+                }
+              }
+            ]
+          }
+        ],
+        'generationConfig': {
+          'temperature': 0.2,
+          'maxOutputTokens': 1024,
+        },
+        'safetySettings': [
+          {
+            'category': 'HARM_CATEGORY_HARASSMENT',
+            'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+          },
+          {
+            'category': 'HARM_CATEGORY_HATE_SPEECH',
+            'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+          },
+          {
+            'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+            'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+          },
+          {
+            'category': 'HARM_CATEGORY_DANGEROUS_CONTENT',
+            'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+          }
+        ],
+      };
+
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final candidates = data['candidates'] as List?;
+        if (candidates != null && candidates.isNotEmpty) {
+          final text = candidates.first['content']?['parts']?[0]?['text']?.toString();
+          if (text != null && text.trim().isNotEmpty) {
+            return text.trim();
+          }
+        }
+        throw Exception('Resposta vazia do Gemini');
+      } else {
+        throw Exception('Erro do Gemini: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      rethrow;
     }
   }
 

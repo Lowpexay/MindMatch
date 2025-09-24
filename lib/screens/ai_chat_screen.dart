@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/gemini_service.dart';
 import '../services/elevenlabs_service.dart';
+import '../services/speech_recognition_service.dart';
 import '../services/preferences_service.dart';
 import '../services/firebase_service.dart';
 import '../services/auth_service.dart';
@@ -9,6 +10,7 @@ import '../models/mood_data.dart';
 import '../utils/app_colors.dart';
 import '../utils/scaffold_utils.dart';
 import '../widgets/luma_voice_widget.dart';
+import '../widgets/audio_record_button.dart';
 import 'dart:typed_data';
 import 'dart:convert';
 import '../widgets/user_avatar.dart';
@@ -42,6 +44,7 @@ class AiChatScreenState extends State<AiChatScreen> {
   
   // Configurações de voz simplificadas
   ElevenLabsService? _elevenLabsService;
+  SpeechRecognitionService? _speechService;
   String _interactionMode = 'text'; // 'text' ou 'voice'
   bool _hasConfigured = false;
   
@@ -49,6 +52,11 @@ class AiChatScreenState extends State<AiChatScreen> {
   bool _isVisualVoiceMode = false;
   String? _currentSpeechText;
   bool _isSpeakingNow = false;
+  
+  // Controles de áudio para o usuário
+  bool _isRecordingAudio = false;
+  String _partialSpeechText = '';
+  bool _speechRecognitionAvailable = false;
 
   @override
   void initState() {
@@ -62,6 +70,9 @@ class AiChatScreenState extends State<AiChatScreen> {
     } catch (e) {
       print('⚠️ ElevenLabs não disponível: $e');
     }
+    
+    // Inicializar Speech Recognition
+    _initializeSpeechRecognition();
     
     // NÃO inicializar automaticamente - aguardar o usuário acessar a tela
   }
@@ -230,11 +241,130 @@ class AiChatScreenState extends State<AiChatScreen> {
     ScaffoldUtils.showSuccessSnackBar('Modo de conversa por voz ativado 🗣️🦊');
   }
 
+  /// Inicializar serviço de reconhecimento de fala
+  Future<void> _initializeSpeechRecognition() async {
+    try {
+      _speechService = SpeechRecognitionService();
+      _speechRecognitionAvailable = await _speechService!.initialize();
+      
+      if (_speechRecognitionAvailable) {
+        print('✅ Reconhecimento de fala inicializado');
+        
+        // Configurar callbacks
+        _speechService!.onResult = (String text) {
+          _onSpeechRecognitionResult(text);
+        };
+        
+        _speechService!.onPartialResult = (String text) {
+          _onPartialSpeechResult(text);
+        };
+        
+        _speechService!.onError = (String error) {
+          _onSpeechRecognitionError(error);
+        };
+        
+        _speechService!.onListeningStart = () {
+          setState(() {
+            _isRecordingAudio = true;
+          });
+        };
+        
+        _speechService!.onListeningStop = () {
+          setState(() {
+            _isRecordingAudio = false;
+            _partialSpeechText = '';
+          });
+        };
+      } else {
+        print('❌ Reconhecimento de fala não está disponível');
+      }
+    } catch (e) {
+      print('❌ Erro ao inicializar reconhecimento de fala: $e');
+      _speechRecognitionAvailable = false;
+    }
+  }
+
+  /// Iniciar gravação de áudio
+  Future<void> _startAudioRecording() async {
+    if (!_speechRecognitionAvailable || _speechService == null) {
+      ScaffoldUtils.showErrorSnackBar('Reconhecimento de fala não disponível');
+      return;
+    }
+
+    if (_isRecordingAudio) return;
+
+    try {
+      final started = await _speechService!.startListening(
+        localeId: _speechService!.getDefaultLocale(),
+      );
+
+      if (!started) {
+        ScaffoldUtils.showErrorSnackBar('Não foi possível iniciar a gravação');
+      }
+    } catch (e) {
+      print('❌ Erro ao iniciar gravação: $e');
+      ScaffoldUtils.showErrorSnackBar('Erro ao iniciar gravação: $e');
+    }
+  }
+
+  /// Parar gravação de áudio
+  Future<void> _stopAudioRecording() async {
+    if (_speechService == null || !_isRecordingAudio) return;
+
+    try {
+      await _speechService!.stopListening();
+    } catch (e) {
+      print('❌ Erro ao parar gravação: $e');
+    }
+  }
+
+  /// Callback para resultado final do reconhecimento de fala
+  void _onSpeechRecognitionResult(String text) {
+    if (text.trim().isEmpty) return;
+
+    print('🎤 Texto reconhecido: $text');
+    
+    // Adicionar o texto reconhecido ao campo de mensagem
+    _messageController.text = text.trim();
+    
+    // Enviar automaticamente se estiver no modo de voz
+    if (_interactionMode == 'voice') {
+      _sendMessage();
+    }
+    
+    // Limpar texto parcial
+    setState(() {
+      _partialSpeechText = '';
+    });
+  }
+
+  /// Callback para resultado parcial do reconhecimento de fala
+  void _onPartialSpeechResult(String text) {
+    setState(() {
+      _partialSpeechText = text;
+    });
+  }
+
+  /// Callback para erros do reconhecimento de fala
+  void _onSpeechRecognitionError(String error) {
+    print('❌ Erro no reconhecimento de fala: $error');
+    ScaffoldUtils.showErrorSnackBar('Erro no reconhecimento: $error');
+    
+    setState(() {
+      _isRecordingAudio = false;
+      _partialSpeechText = '';
+    });
+  }
+
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
     _messageFocus.dispose();
+    
+    // Limpar recursos de áudio
+    _speechService?.dispose();
+    
     super.dispose();
   }
 
@@ -420,56 +550,73 @@ class AiChatScreenState extends State<AiChatScreen> {
                   ),
                 ],
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      focusNode: _messageFocus,
-                      decoration: InputDecoration(
-                        hintText: 'Digite sua mensagem para a Luma...',
-                        hintStyle: TextStyle(color: AppColors.textSecondary),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(25),
-                          borderSide: BorderSide(color: AppColors.gray300),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(25),
-                          borderSide: BorderSide(color: AppColors.gray300),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(25),
-                          borderSide: BorderSide(color: AppColors.primary),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
+                  // Botão de gravação de áudio (se disponível)
+                  if (_speechRecognitionAvailable)
+                    AudioRecordButton(
+                      isRecording: _isRecordingAudio,
+                      isEnabled: _speechRecognitionAvailable && !_isLoading,
+                      onStartRecording: _startAudioRecording,
+                      onStopRecording: _stopAudioRecording,
+                      partialText: _partialSpeechText.isNotEmpty ? _partialSpeechText : null,
+                    ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Input de texto
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _messageController,
+                          focusNode: _messageFocus,
+                          decoration: InputDecoration(
+                            hintText: 'Digite sua mensagem para a Luma...',
+                            hintStyle: TextStyle(color: AppColors.textSecondary),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(25),
+                              borderSide: BorderSide(color: AppColors.gray300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(25),
+                              borderSide: BorderSide(color: AppColors.gray300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(25),
+                              borderSide: BorderSide(color: AppColors.primary),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                          ),
+                          maxLines: null,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _sendMessage(),
                         ),
                       ),
-                      maxLines: null,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendMessage(),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      icon: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Icon(Icons.send, color: Colors.white),
-                      onPressed: _isLoading ? null : _sendMessage,
-                    ),
+                      const SizedBox(width: 12),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: _isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.send, color: Colors.white),
+                          onPressed: _isLoading ? null : _sendMessage,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -741,59 +888,146 @@ class AiChatScreenState extends State<AiChatScreen> {
         ],
       ),
       child: SafeArea(
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.gray50,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: AppColors.gray300,
-                    width: 1,
-                  ),
+            // Botão de gravação de áudio (se disponível e texto parcial)
+            if (_speechRecognitionAvailable && (_isRecordingAudio || _partialSpeechText.isNotEmpty))
+              Container(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (_partialSpeechText.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: AppColors.primary.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.mic,
+                              size: 16,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _partialSpeechText,
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
-                child: TextField(
-                  controller: _messageController,
-                  focusNode: _messageFocus,
-                  decoration: const InputDecoration(
-                    hintText: 'Digite sua mensagem...',
-                    hintStyle: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 15,
+              ),
+            
+            // Input principal
+            Row(
+              children: [
+                // Botão de áudio
+                if (_speechRecognitionAvailable)
+                  Container(
+                    width: 48,
+                    height: 48,
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: _isRecordingAudio 
+                        ? Colors.red.withOpacity(0.1)
+                        : AppColors.gray100,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: _isRecordingAudio 
+                          ? Colors.red
+                          : AppColors.gray300,
+                        width: 1,
+                      ),
                     ),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
+                    child: IconButton(
+                      onPressed: _speechRecognitionAvailable && !_isLoading
+                        ? (_isRecordingAudio 
+                            ? _stopAudioRecording 
+                            : _startAudioRecording)
+                        : null,
+                      icon: Icon(
+                        _isRecordingAudio ? Icons.stop : Icons.mic,
+                        color: _isRecordingAudio 
+                          ? Colors.red
+                          : (_speechRecognitionAvailable 
+                              ? AppColors.primary 
+                              : AppColors.gray400),
+                        size: 20,
+                      ),
                     ),
                   ),
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: AppColors.textPrimary,
+                
+                // Campo de texto
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.gray50,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: AppColors.gray300,
+                        width: 1,
+                      ),
+                    ),
+                    child: TextField(
+                      controller: _messageController,
+                      focusNode: _messageFocus,
+                      decoration: const InputDecoration(
+                        hintText: 'Digite sua mensagem...',
+                        hintStyle: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 15,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: AppColors.textPrimary,
+                      ),
+                      maxLines: null,
+                      textCapitalization: TextCapitalization.sentences,
+                      onSubmitted: (_) => _sendMessage(),
+                    ),
                   ),
-                  maxLines: null,
-                  textCapitalization: TextCapitalization.sentences,
-                  onSubmitted: (_) => _sendMessage(),
                 ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: IconButton(
-                onPressed: _isLoading ? null : _sendMessage,
-                icon: Icon(
-                  _isLoading ? Icons.hourglass_empty : Icons.send,
-                  color: Colors.white,
-                  size: 20,
+                const SizedBox(width: 12),
+                
+                // Botão de enviar
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: IconButton(
+                    onPressed: _isLoading ? null : _sendMessage,
+                    icon: Icon(
+                      _isLoading ? Icons.hourglass_empty : Icons.send,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
         ),
@@ -876,6 +1110,23 @@ class AiChatScreenState extends State<AiChatScreen> {
             
             const SizedBox(height: 12),
             
+            // Opção Texto com Áudio (se disponível)
+            if (_speechRecognitionAvailable)
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.gray300),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ListTile(
+                  leading: const Icon(Icons.mic_rounded, color: AppColors.primary),
+                  title: const Text('Chat com Áudio'),
+                  subtitle: const Text('Você pode falar ou escrever suas mensagens'),
+                  onTap: () => _finishSetup('text'),
+                ),
+              ),
+            
+            if (_speechRecognitionAvailable) const SizedBox(height: 12),
+            
             // Opção Voz
             Container(
               decoration: BoxDecoration(
@@ -884,8 +1135,8 @@ class AiChatScreenState extends State<AiChatScreen> {
               ),
               child: ListTile(
                 leading: const Icon(Icons.record_voice_over, color: AppColors.primary),
-                title: const Text('Chat por Voz'),
-                subtitle: const Text('Eu falarei minhas respostas para você'),
+                title: const Text('Chat por Voz Completo'),
+                subtitle: const Text('Conversaremos apenas por áudio'),
                 onTap: () => _finishSetup('voice'),
               ),
             ),

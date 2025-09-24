@@ -46,6 +46,7 @@ dependencies:
   
   # Audio & Video
   audioplayers: ^5.0.0
+  record: ^6.1.1
   youtube_player_flutter: ^9.0.1
   intl: ^0.20.2
 
@@ -69,7 +70,6 @@ flutter:
   
   assets:
     - assets/images/
-    - assets/icons/
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package

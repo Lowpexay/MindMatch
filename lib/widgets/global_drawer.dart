@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../widgets/user_avatar.dart';
 import '../utils/app_colors.dart';
 import '../screens/emotional_reports_screen.dart';
+import '../screens/eventlog_report_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/main_navigation.dart';
 
@@ -188,6 +189,17 @@ class GlobalDrawer extends StatelessWidget {
                   },
                 ),
                 
+                _buildMenuItem(
+                  context,
+                  icon: Icons.security,
+                  title: 'Relatório EventLog',
+                  subtitle: 'Logins e segurança',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showEventLogReports(context);
+                  },
+                ),
+                
                 const Divider(height: 32),
                 
                 _buildMenuItem(
@@ -353,6 +365,15 @@ class GlobalDrawer extends StatelessWidget {
       context,
       MaterialPageRoute(
         builder: (context) => const EmotionalReportsScreen(),
+      ),
+    );
+  }
+
+  void _showEventLogReports(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const EventLogReportScreen(),
       ),
     );
   }

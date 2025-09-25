@@ -48,7 +48,7 @@ class CheckupHeartWidget extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'dias',
+                      streakService.currentStreak == 1 ? 'dia' : 'dias',
                       style: TextStyle(
                         fontSize: 10,
                         color: AppColors.textSecondary,

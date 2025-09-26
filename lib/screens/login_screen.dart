@@ -73,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -121,28 +121,34 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 24),
               
               // Title
-              Text(
-                _isLogin ? 'Bem-vindo de volta!' : 'Criar conta',
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              Builder(builder: (context) {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                return Text(
+                  _isLogin ? 'Bem-vindo de volta!' : 'Criar conta',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                );
+              }),
               
               const SizedBox(height: 8),
               
-              Text(
-                _isLogin 
-                    ? 'Entre para continuar sua jornada no MindMatch'
-                    : 'Junte-se à nossa comunidade de conexões significativas',
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: AppColors.textSecondary,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              Builder(builder: (context) {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                return Text(
+                  _isLogin
+                      ? 'Entre para continuar sua jornada no MindMatch'
+                      : 'Junte-se à nossa comunidade de conexões significativas',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isDark ? Colors.white70 : AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                );
+              }),
               
               const SizedBox(height: 40),
               
@@ -154,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
               // Divider
               Row(
                 children: [
-                  const Expanded(child: Divider()),
+                  Expanded(child: Divider(color: Theme.of(context).brightness == Brightness.dark ? Colors.white12 : null)),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
@@ -165,7 +171,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  const Expanded(child: Divider()),
+                  Expanded(child: Divider(color: Theme.of(context).brightness == Brightness.dark ? Colors.white12 : null)),
                 ],
               ),
               
@@ -180,10 +186,13 @@ class _LoginScreenState extends State<LoginScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    _isLogin ? 'Não tem uma conta? ' : 'Já tem uma conta? ',
-                    style: const TextStyle(color: AppColors.textSecondary),
-                  ),
+                  Builder(builder: (context) {
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+                    return Text(
+                      _isLogin ? 'Não tem uma conta? ' : 'Já tem uma conta? ',
+                      style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
+                    );
+                  }),
                   TextButton(
                     onPressed: () {
                       setState(() {
@@ -236,7 +245,7 @@ class _LoginScreenState extends State<LoginScreen> {
             icon: const Icon(Icons.apple, size: 24),
             label: Text(_isLogin ? 'Entrar com Apple' : 'Cadastrar com Apple'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
+              backgroundColor: AppColors.darkSurface,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(

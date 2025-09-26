@@ -277,14 +277,16 @@ class _UserChatScreenState extends State<UserChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: AppColors.gray50,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+  backgroundColor: isDark ? AppColors.darkSurface : scheme.surface,
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : AppColors.textPrimary),
         ),
         title: Row(
           children: [
@@ -307,7 +309,7 @@ class _UserChatScreenState extends State<UserChatScreen> {
                       decoration: BoxDecoration(
                         color: Colors.green,
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.white, width: 1.5),
+                        border: Border.all(color: isDark ? AppColors.darkSurface : Colors.white, width: 1.5),
                       ),
                     ),
                   ),
@@ -320,34 +322,29 @@ class _UserChatScreenState extends State<UserChatScreen> {
                 children: [
                   Text(
                     widget.otherUser.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
-                    widget.otherUser.isOnline 
-                        ? 'Online'
-                        : _getLastSeenText(),
+                    widget.otherUser.isOnline ? 'Online' : _getLastSeenText(),
                     style: TextStyle(
                       fontSize: 12,
-                      color: widget.otherUser.isOnline 
-                          ? Colors.green 
-                          : AppColors.textSecondary,
+                      color: widget.otherUser.isOnline ? Colors.greenAccent : (isDark ? Colors.white70 : AppColors.textSecondary),
                     ),
                   ),
                 ],
               ),
             ),
+            IconButton(
+              onPressed: _showChatOptions,
+              icon: Icon(Icons.more_vert, color: isDark ? Colors.white : AppColors.textPrimary),
+            ),
           ],
         ),
-        actions: [
-          IconButton(
-            onPressed: _showChatOptions,
-            icon: const Icon(Icons.more_vert, color: AppColors.textPrimary),
-          ),
-        ],
       ),
       body: _isLoading
           ? _buildLoadingState()
@@ -402,17 +399,18 @@ class _UserChatScreenState extends State<UserChatScreen> {
   }
 
   Widget _buildLoadingState() {
-    return const Center(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
           Text(
             'Carregando conversa...',
             style: TextStyle(
               fontSize: 16,
-              color: AppColors.textSecondary,
+              color: isDark ? Colors.white70 : AppColors.textSecondary,
             ),
           ),
         ],
@@ -421,6 +419,7 @@ class _UserChatScreenState extends State<UserChatScreen> {
   }
 
   Widget _buildEmptyState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -437,10 +436,10 @@ class _UserChatScreenState extends State<UserChatScreen> {
             const SizedBox(height: 16),
             Text(
               'Conversa com ${widget.otherUser.name}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
@@ -448,7 +447,7 @@ class _UserChatScreenState extends State<UserChatScreen> {
               'Vocês ainda não conversaram. Que tal enviar a primeira mensagem?',
               style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary,
+                color: isDark ? Colors.white70 : AppColors.textSecondary,
                 height: 1.5,
               ),
               textAlign: TextAlign.center,
@@ -460,6 +459,7 @@ class _UserChatScreenState extends State<UserChatScreen> {
   }
 
   Widget _buildDateHeader(DateTime date) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final now = DateTime.now();
     final difference = now.difference(date);
     
@@ -479,19 +479,19 @@ class _UserChatScreenState extends State<UserChatScreen> {
       margin: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
         children: [
-          Expanded(child: Divider(color: AppColors.gray300)),
+          Expanded(child: Divider(color: isDark ? Colors.white12 : AppColors.gray300)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
               dateText,
               style: TextStyle(
                 fontSize: 12,
-                color: AppColors.textSecondary,
+                color: isDark ? Colors.white70 : AppColors.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
             ),
           ),
-          Expanded(child: Divider(color: AppColors.gray300)),
+          Expanded(child: Divider(color: isDark ? Colors.white12 : AppColors.gray300)),
         ],
       ),
     );
@@ -499,6 +499,7 @@ class _UserChatScreenState extends State<UserChatScreen> {
 
   Widget _buildMessageBubble(ChatMessage message) {
     final isMe = message.senderId == _authService?.currentUser?.uid;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -523,14 +524,16 @@ class _UserChatScreenState extends State<UserChatScreen> {
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: isMe ? AppColors.primary : Colors.white,
+                color: isMe
+                    ? AppColors.primary
+                    : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
                 borderRadius: BorderRadius.circular(18).copyWith(
                   bottomLeft: isMe ? const Radius.circular(18) : const Radius.circular(4),
                   bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(18),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withOpacity(isDark ? 0.4 : 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -544,7 +547,9 @@ class _UserChatScreenState extends State<UserChatScreen> {
                     style: TextStyle(
                       fontSize: 15,
                       height: 1.4,
-                      color: isMe ? Colors.white : AppColors.textPrimary,
+                      color: isMe
+                          ? Colors.white
+                          : (isDark ? Colors.white : AppColors.textPrimary),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -557,7 +562,7 @@ class _UserChatScreenState extends State<UserChatScreen> {
                           fontSize: 11,
                           color: isMe
                               ? Colors.white.withOpacity(0.7)
-                              : AppColors.textSecondary,
+                              : (isDark ? Colors.white70 : AppColors.textSecondary),
                         ),
                       ),
                       if (isMe) ...[
@@ -595,13 +600,14 @@ class _UserChatScreenState extends State<UserChatScreen> {
   }
 
   Widget _buildMessageInput() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+  color: isDark ? AppColors.darkSurface : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),
@@ -613,20 +619,20 @@ class _UserChatScreenState extends State<UserChatScreen> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.gray50,
+                  color: isDark ? const Color(0xFF121212) : AppColors.gray50,
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: AppColors.gray300,
+                    color: isDark ? Colors.white12 : AppColors.gray300,
                     width: 1,
                   ),
                 ),
                 child: TextField(
                   controller: _messageController,
                   focusNode: _messageFocus,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Digite uma mensagem...',
                     hintStyle: TextStyle(
-                      color: AppColors.textSecondary,
+                      color: isDark ? Colors.white54 : AppColors.textSecondary,
                       fontSize: 15,
                     ),
                     border: InputBorder.none,
@@ -635,9 +641,9 @@ class _UserChatScreenState extends State<UserChatScreen> {
                       vertical: 12,
                     ),
                   ),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
-                    color: AppColors.textPrimary,
+                    color: isDark ? Colors.white : AppColors.textPrimary,
                   ),
                   maxLines: null,
                   textCapitalization: TextCapitalization.sentences,
@@ -712,47 +718,51 @@ class _UserChatScreenState extends State<UserChatScreen> {
   void _showChatOptions() {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Opções da Conversa',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+  backgroundColor: Theme.of(context).brightness == Brightness.dark ? AppColors.darkSurface : null,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Opções da Conversa',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(Icons.person, color: AppColors.primary),
-              title: const Text('Ver perfil'),
-              onTap: () {
-                Navigator.pop(context);
-                _showUserProfile();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text('Limpar conversa'),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmClearChat();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.block, color: Colors.red),
-              title: const Text('Bloquear usuário'),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmBlockUser();
-              },
-            ),
-          ],
-        ),
-      ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: const Icon(Icons.person, color: AppColors.primary),
+                title: Text('Ver perfil', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showUserProfile();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: Text('Limpar conversa', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmClearChat();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.block, color: Colors.red),
+                title: Text('Bloquear usuário', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmBlockUser();
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -769,54 +779,64 @@ class _UserChatScreenState extends State<UserChatScreen> {
   void _confirmClearChat() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Limpar conversa'),
-        content: const Text(
-          'Tem certeza que deseja limpar todas as mensagens desta conversa? '
-          'Esta ação não pode ser desfeita.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? AppColors.darkSurface : null,
+          title: Text('Limpar conversa', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+          content: Text(
+            'Tem certeza que deseja limpar todas as mensagens desta conversa? '
+            'Esta ação não pode ser desfeita.',
+            style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _clearChat();
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Limpar'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _clearChat();
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Limpar'),
+            ),
+          ],
+        );
+      },
     );
   }
 
   void _confirmBlockUser() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Bloquear usuário'),
-        content: Text(
-          'Tem certeza que deseja bloquear ${widget.otherUser.name}? '
-          'Vocês não poderão mais trocar mensagens.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? AppColors.darkSurface : null,
+          title: Text('Bloquear usuário', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+          content: Text(
+            'Tem certeza que deseja bloquear ${widget.otherUser.name}? '
+            'Vocês não poderão mais trocar mensagens.',
+            style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _blockUser();
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Bloquear'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _blockUser();
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Bloquear'),
+            ),
+          ],
+        );
+      },
     );
   }
 

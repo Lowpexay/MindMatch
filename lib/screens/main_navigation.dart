@@ -162,19 +162,19 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+
     return Scaffold(
       key: MainNavigation.scaffoldKey,
-      backgroundColor: AppColors.gray50,
+      backgroundColor: theme.scaffoldBackgroundColor,
       drawer: const GlobalDrawer(),
       appBar: _buildAppBar(),
       body: PageView(
         controller: _pageController,
         onPageChanged: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          
-          // Notificar AiChatScreen quando se tornar ativo
+          setState(() => _currentIndex = index);
           if (index == 2) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               MainNavigation.aiChatKey.currentState?.checkAndInitializeWhenActive();
@@ -185,10 +185,10 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? AppColors.darkSurface : Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withOpacity(isDark ? 0.5 : 0.1),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),
@@ -200,22 +200,9 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(
-                  icon: Icons.home_rounded,
-                  label: 'Início',
-                  index: 0,
-                ),
-                _buildNavItem(
-                  icon: Icons.chat_rounded,
-                  label: 'Conversas',
-                  index: 1,
-                  hasNotification: true, // Mostrar badge de notificação
-                ),
-                _buildNavItem(
-                  icon: Icons.psychology,
-                  label: 'IA',
-                  index: 2,
-                ),
+                _buildNavItem(icon: Icons.home_rounded, label: 'Início', index: 0),
+                _buildNavItem(icon: Icons.chat_rounded, label: 'Conversas', index: 1, hasNotification: true),
+                _buildNavItem(icon: Icons.psychology, label: 'IA', index: 2),
               ],
             ),
           ),
@@ -231,7 +218,8 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
     bool hasNotification = false,
   }) {
     final isSelected = _currentIndex == index;
-    
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: () {
         _pageController.animateToPage(
@@ -239,12 +227,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOutCubic,
         );
-        
-        setState(() {
-          _currentIndex = index;
-        });
-        
-        // Notificar AiChatScreen quando for selecionado
+        setState(() => _currentIndex = index);
         if (index == 2) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             MainNavigation.aiChatKey.currentState?.checkAndInitializeWhenActive();
@@ -254,7 +237,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+          color: isSelected ? AppColors.primary.withOpacity(0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -264,15 +247,16 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
               children: [
                 Icon(
                   icon,
-                  color: isSelected ? AppColors.primary : AppColors.gray500,
+                  color: isSelected
+                      ? AppColors.primary
+                      : (isDark ? Colors.white70 : AppColors.gray500),
                   size: 24,
                 ),
-                if (hasNotification && index == 1) // Badge apenas para conversas
+                if (hasNotification && index == 1)
                   Consumer<ConversationsProvider>(
                     builder: (context, conversationsProvider, child) {
                       final unreadCount = conversationsProvider.unreadCount;
                       if (unreadCount == 0) return const SizedBox.shrink();
-                      
                       return Positioned(
                         right: 0,
                         top: 0,
@@ -282,10 +266,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
                             color: Colors.red,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          constraints: const BoxConstraints(
-                            minWidth: 16,
-                            minHeight: 16,
-                          ),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                           child: Text(
                             unreadCount > 99 ? '99+' : unreadCount.toString(),
                             style: const TextStyle(
@@ -307,7 +288,9 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? AppColors.primary : AppColors.gray500,
+                color: isSelected
+                    ? AppColors.primary
+                    : (isDark ? Colors.white70 : AppColors.gray500),
               ),
             ),
           ],
@@ -336,14 +319,15 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
         title = 'MindMatch';
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return AppBar(
-      backgroundColor: Colors.white,
+  backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
       elevation: 0,
       toolbarHeight: 80,
       leading: Builder(
         builder: (context) => IconButton(
           onPressed: () => MainNavigation.scaffoldKey.currentState?.openDrawer(),
-          icon: const Icon(Icons.menu, color: AppColors.textPrimary),
+          icon: Icon(Icons.menu, color: isDark ? Colors.white : AppColors.textPrimary),
         ),
       ),
       title: Column(
@@ -351,10 +335,10 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: isDark ? Colors.white : AppColors.textPrimary,
             ),
           ),
           if (subtitle != null)
@@ -362,7 +346,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
               subtitle,
               style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary,
+                color: isDark ? Colors.white70 : AppColors.textSecondary,
               ),
             ),
         ],
@@ -384,9 +368,9 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
                 // Chamar método da ConversationsScreen usando a chave global
                 MainNavigation.conversationsKey.currentState?.showConversationOptions();
               },
-              icon: const Icon(
+              icon: Icon(
                 Icons.more_vert,
-                color: AppColors.textPrimary,
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
           ),
@@ -399,10 +383,10 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
                 // Chamar método da AiChatScreen usando a chave global
                 _showAiChatOptions();
               },
-              icon: const Icon(
-                Icons.more_vert,
-                color: AppColors.textPrimary,
-              ),
+                icon: Icon(
+                  Icons.more_vert,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                ),
             ),
           ),
         
@@ -445,9 +429,9 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkSurface : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -458,7 +442,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.gray300,
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white24 : AppColors.gray300,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -479,17 +463,17 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
                     children: [
                       Text(
                         'Meu Perfil',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
                       Text(
                         'Gerencie sua conta',
                         style: TextStyle(
                           fontSize: 14,
-                          color: AppColors.textSecondary,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -581,20 +565,20 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w600,
-          color: textColor ?? AppColors.textPrimary,
+          color: textColor ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimary),
         ),
       ),
       subtitle: Text(
         subtitle,
         style: TextStyle(
           fontSize: 14,
-          color: AppColors.textSecondary,
+          color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : AppColors.textSecondary,
         ),
       ),
       trailing: Icon(
         Icons.arrow_forward_ios,
         size: 16,
-        color: AppColors.gray400,
+        color: Theme.of(context).brightness == Brightness.dark ? Colors.white38 : AppColors.gray400,
       ),
     );
   }
@@ -602,22 +586,33 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
   void _showHelpDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Ajuda e Suporte'),
-        content: const Text(
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? AppColors.darkSurface : null,
+          title: Text(
+            'Ajuda e Suporte',
+            style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary),
+          ),
+          content: Text(
           'MindMatch - Conectando pessoas com afinidades emocionais.\n\n'
           '📱 Versão: 1.0.0\n'
           '💙 Para suporte: mindmatch@exemplo.com\n\n'
           'Este app foi desenvolvido para promover conexões humanas '
           'significativas baseadas em bem-estar emocional.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fechar'),
+            style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                foregroundColor: isDark ? Colors.white : AppColors.primary,
+              ),
+              child: const Text('Fechar'),
+            ),
+          ],
+        );
+      },
     );
   }
 

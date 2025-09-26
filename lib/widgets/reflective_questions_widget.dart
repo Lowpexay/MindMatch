@@ -30,6 +30,9 @@ class _ReflectiveQuestionsWidgetState extends State<ReflectiveQuestionsWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+  final surface = isDark ? AppColors.darkSurface : Colors.white;
+    final textPrimary = isDark ? Colors.white : AppColors.textPrimary;
     if (widget.questions.isEmpty) {
       return _buildEmptyState();
     }
@@ -40,11 +43,11 @@ class _ReflectiveQuestionsWidgetState extends State<ReflectiveQuestionsWidget> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -62,13 +65,13 @@ class _ReflectiveQuestionsWidgetState extends State<ReflectiveQuestionsWidget> {
                 size: 28,
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Perguntas Reflexivas',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: textPrimary,
                   ),
                 ),
               ),
@@ -81,7 +84,7 @@ class _ReflectiveQuestionsWidgetState extends State<ReflectiveQuestionsWidget> {
           // Indicador de progresso
           LinearProgressIndicator(
             value: (_currentQuestionIndex + 1) / widget.questions.length,
-            backgroundColor: AppColors.gray200,
+            backgroundColor: isDark ? Colors.white12 : AppColors.gray200,
             valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
           ),
           
@@ -97,7 +100,7 @@ class _ReflectiveQuestionsWidgetState extends State<ReflectiveQuestionsWidget> {
             width: double.infinity,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppColors.gray50,
+              color: isDark ? const Color(0xFF0F0F0F) : AppColors.gray50,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: AppColors.primary.withOpacity(0.2),
@@ -106,10 +109,10 @@ class _ReflectiveQuestionsWidgetState extends State<ReflectiveQuestionsWidget> {
             ),
             child: Text(
               currentQuestion.question,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 height: 1.5,
-                color: AppColors.textPrimary,
+                color: textPrimary,
                 fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
@@ -157,7 +160,7 @@ class _ReflectiveQuestionsWidgetState extends State<ReflectiveQuestionsWidget> {
                 icon: const Icon(Icons.arrow_back),
                 label: const Text('Anterior'),
                 style: TextButton.styleFrom(
-                  foregroundColor: AppColors.textSecondary,
+                  foregroundColor: isDark ? Colors.white70 : AppColors.textSecondary,
                 ),
               ),
               TextButton.icon(
@@ -178,14 +181,15 @@ class _ReflectiveQuestionsWidgetState extends State<ReflectiveQuestionsWidget> {
   }
 
   Widget _buildEmptyState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+  color: isDark ? AppColors.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -199,11 +203,11 @@ class _ReflectiveQuestionsWidgetState extends State<ReflectiveQuestionsWidget> {
             color: AppColors.gray400,
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Carregando perguntas reflexivas...',
             style: TextStyle(
               fontSize: 16,
-              color: AppColors.textSecondary,
+              color: isDark ? Colors.white70 : AppColors.textSecondary,
             ),
           ),
         ],

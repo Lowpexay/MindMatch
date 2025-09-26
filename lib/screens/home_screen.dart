@@ -44,6 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Services
   FirebaseService? _firebaseService;
   AuthService? _authService;
+  // ignore: unused_field
   CourseService? _courseService;
 
   @override
@@ -396,8 +397,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    // scheme reserved for future use in additional refactors
+  final scheme = theme.colorScheme; // ignore: unused_local_variable
     return Container(
-      color: AppColors.gray50,
+      // Use scaffold background instead of fixed gray so dark theme applies
+      color: theme.scaffoldBackgroundColor,
       child: _isLoading
           ? _buildLoadingState()
           : SingleChildScrollView( // Mudança principal: ScrollView unificado
@@ -503,6 +508,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildWellnessIndicator() {
     final score = _todayMood!.wellnessScore;
     final color = score >= 70 ? Colors.green : score >= 40 ? Colors.orange : Colors.red;
@@ -543,10 +549,12 @@ class _HomeScreenState extends State<HomeScreen> {
     required String subtitle,
     required Widget child,
   }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -584,10 +592,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: scheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -595,7 +603,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         subtitle,
                         style: TextStyle(
                           fontSize: 14,
-                          color: AppColors.textSecondary,
+                          color: scheme.onSurface.withOpacity(0.7),
                         ),
                       ),
                     ],
@@ -616,10 +624,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCompletedQuestionsCard() {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -656,7 +665,8 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                // Will be overridden by theme-aware DefaultTextStyle below if needed
+                color: null,
               ),
               textAlign: TextAlign.center,
             ),
@@ -668,7 +678,7 @@ class _HomeScreenState extends State<HomeScreen> {
               'Você respondeu todas as perguntas reflexivas de hoje. Novas perguntas estarão disponíveis amanhã!',
               style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary,
+                color: scheme.onSurface.withOpacity(0.7),
                 height: 1.5,
               ),
               textAlign: TextAlign.center,
@@ -700,7 +710,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         'Respondidas',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: scheme.onSurface.withOpacity(0.7),
                         ),
                       ),
                     ],
@@ -724,7 +734,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         'Compatíveis',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: scheme.onSurface.withOpacity(0.7),
                         ),
                       ),
                     ],
@@ -832,7 +842,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.7),
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -862,7 +872,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
+                backgroundColor: Theme.of(context).colorScheme.surface,
                 foregroundColor: color,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -911,9 +921,9 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         height: MediaQuery.of(context).size.height * 0.8,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           children: [
@@ -1057,7 +1067,8 @@ class _HomeScreenState extends State<HomeScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.8),
+                // Slightly more transparent in dark theme so gradient below aparece
+                color: Theme.of(context).colorScheme.surface.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.4 : 0.8),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -1151,6 +1162,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // ignore: unused_element
   String _getGreeting() {
     final hour = DateTime.now().hour;
     final name = _userName.isNotEmpty ? ', $_userName' : '';
@@ -1303,6 +1315,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildUserProfileModal(Map<String, dynamic> user) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final compatibility = user['compatibility'] as double;
     final name = user['name'] ?? 'Usuário';
     final age = user['age'] as int?;
@@ -1321,9 +1335,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.8,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         children: [
@@ -1595,6 +1609,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ignore: unused_element
   void _showProfileMenu() {
     showModalBottomSheet(
       context: context,

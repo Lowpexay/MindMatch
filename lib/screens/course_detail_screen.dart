@@ -190,12 +190,14 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+  final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.course.title),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -483,10 +485,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Widget _buildLessonCard(Lesson lesson, int order, bool isCompleted) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: isCompleted ? Border.all(color: Colors.green, width: 2) : null,
         boxShadow: [
@@ -569,10 +572,10 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                   children: [
                     Text(
                       lesson.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: scheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -580,7 +583,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                       lesson.description,
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.textSecondary,
+                        color: scheme.onSurface.withOpacity(0.7),
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -600,7 +603,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                           '${(lesson.duration / 60).ceil()} min',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: scheme.onSurface.withOpacity(0.6),
                           ),
                         ),
                         if (isCompleted) ...[
@@ -671,10 +674,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Widget _buildExerciseCard(CourseExercise exercise, int order, bool isCompleted) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: isCompleted ? Border.all(color: Colors.green, width: 2) : null,
         boxShadow: [
@@ -721,10 +725,10 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                   children: [
                     Text(
                       exercise.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: scheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -732,7 +736,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                       exercise.description,
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.textSecondary,
+                        color: scheme.onSurface.withOpacity(0.7),
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -872,6 +876,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => Dialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         child: Container(
           constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
           child: QuizWidget(

@@ -53,6 +53,30 @@ class FirebaseService {
   static const String messagesCollection = 'messages';
   static const String conversationsCollection = 'conversations';
 
+  /// Delete basic user related data (best-effort) before account deletion.
+  /// This avoids leaving orphaned profile docs or storage assets.
+  Future<void> deleteUserData(String userId) async {
+    try {
+      // Delete user document if exists
+      final userDoc = _firestore.collection(usersCollection).doc(userId);
+      final snap = await userDoc.get();
+      if (snap.exists) {
+        await userDoc.delete();
+      }
+    } catch (e) {
+      print('⚠️ deleteUserData Firestore doc error: $e');
+    }
+    // Attempt to delete profile image
+    try {
+      final ref = _storage.ref().child('users/$userId/profile.jpg');
+      await ref.delete();
+    } catch (e) {
+      // Ignore if not found
+      print('ℹ️ deleteUserData storage image skip: $e');
+    }
+    // Could extend to conversations/messages if GDPR-like full wipe is needed.
+  }
+
     /// Faz upload da imagem de perfil do usuário para o Firebase Storage e retorna a URL pública.
     Future<String?> uploadUserProfileImage(String userId, Uint8List imageBytes) async {
       try {

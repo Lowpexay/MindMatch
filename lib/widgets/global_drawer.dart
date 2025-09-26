@@ -21,6 +21,8 @@ class GlobalDrawer extends StatelessWidget {
     final authService = Provider.of<AuthService>(context);
     final user = authService.currentUser;
 
+  final scheme = Theme.of(context).colorScheme;
+
     return Drawer(
       child: Column(
         children: [
@@ -29,17 +31,17 @@ class GlobalDrawer extends StatelessWidget {
             final headerHeight = min(200.0, MediaQuery.of(context).size.height * 0.25);
             return Container(
               height: headerHeight,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primary,
-                  AppColors.primary.withOpacity(0.8),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    scheme.primary,
+                    scheme.primary.withOpacity(0.8),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
-            ),
             child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(20),
@@ -96,10 +98,10 @@ class GlobalDrawer extends StatelessWidget {
                               children: [
                                 Text(
                                   displayName,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: scheme.onPrimary,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -109,7 +111,7 @@ class GlobalDrawer extends StatelessWidget {
                                   displayEmail,
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: scheme.onPrimary.withOpacity(0.85),
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -209,7 +211,13 @@ class GlobalDrawer extends StatelessWidget {
                   subtitle: 'Preferências do app',
                   onTap: () {
                     Navigator.pop(context);
-                    _showSettings(context);
+                    // Navigate to settings screen route
+                    try {
+                      context.push('/settings');
+                    } catch (_) {
+                      // Fallback if GoRouter not available in this context
+                      Navigator.pushNamed(context, '/settings');
+                    }
                   },
                 ),
                 
@@ -266,38 +274,39 @@ class GlobalDrawer extends StatelessWidget {
     required VoidCallback onTap,
     Color? iconColor,
   }) {
+    final scheme = Theme.of(context).colorScheme;
     return ListTile(
       leading: Container(
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-          color: (iconColor ?? AppColors.primary).withOpacity(0.1),
+          color: (iconColor ?? scheme.primary).withOpacity(0.12),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(
           icon,
-          color: iconColor ?? AppColors.primary,
+          color: iconColor ?? scheme.primary,
           size: 24,
         ),
       ),
       title: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
+          color: scheme.onSurface,
         ),
       ),
       subtitle: Text(
         subtitle,
         style: TextStyle(
           fontSize: 14,
-          color: AppColors.textSecondary,
+          color: scheme.onSurfaceVariant.withOpacity(0.8),
         ),
       ),
       trailing: Icon(
         Icons.chevron_right,
-        color: AppColors.gray400,
+        color: scheme.outlineVariant,
         size: 20,
       ),
       onTap: onTap,
@@ -374,33 +383,6 @@ class GlobalDrawer extends StatelessWidget {
       context,
       MaterialPageRoute(
         builder: (context) => const EventLogReportScreen(),
-      ),
-    );
-  }
-
-  void _showSettings(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Configurações'),
-        content: const Text(
-          'Ajuste suas preferências do aplicativo:\n\n'
-          '• Notificações\n'
-          '• Privacidade\n'
-          '• Tema do app\n'
-          '• Idioma\n'
-          '• Backup de dados',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fechar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Abrir Configurações'),
-          ),
-        ],
       ),
     );
   }

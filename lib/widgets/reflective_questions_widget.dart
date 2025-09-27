@@ -95,27 +95,46 @@ class _ReflectiveQuestionsWidgetState extends State<ReflectiveQuestionsWidget> {
           
           const SizedBox(height: 16),
           
-          // Pergunta
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F0F0F) : AppColors.gray50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.primary.withOpacity(0.2),
-                width: 1,
+          // Pergunta (altura padronizada para evitar deslocamento dos botões)
+          SizedBox(
+            height: 170, // altura fixa da área de pergunta
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F0F0F) : AppColors.gray50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.primary.withOpacity(0.2),
+                  width: 1,
+                ),
               ),
-            ),
-            child: Text(
-              currentQuestion.question,
-              style: TextStyle(
-                fontSize: 16,
-                height: 1.5,
-                color: textPrimary,
-                fontWeight: FontWeight.w500,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return Scrollbar(
+                    thumbVisibility: false,
+                    interactive: true,
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: Center(
+                          child: Text(
+                            currentQuestion.question,
+                            style: TextStyle(
+                              fontSize: 16,
+                              height: 1.5,
+                              color: textPrimary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
-              textAlign: TextAlign.center,
             ),
           ),
           

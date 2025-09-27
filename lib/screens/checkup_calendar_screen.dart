@@ -49,56 +49,10 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
                     bottomRight: Radius.circular(20),
                   ),
                 ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildStatCard(
-                          'Humor Médio',
-                          '${last7DaysStats['averageMood']?.toStringAsFixed(1) ?? '3.0'}',
-                          Icons.sentiment_satisfied,
-                          Colors.blue,
-                        ),
-                        _buildStatCard(
-                          'Energia Média',
-                          '${last7DaysStats['averageEnergy']?.toStringAsFixed(1) ?? '3.0'}',
-                          Icons.battery_charging_full,
-                          Colors.green,
-                        ),
-                        _buildStatCard(
-                          'Checkups',
-                          '${last7DaysStats['checkupsCompleted']?.toInt() ?? 0}',
-                          Icons.calendar_today,
-                          Colors.orange,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildStatCard(
-                          'Streak Atual',
-                          '${streakService.currentStreak}',
-                          Icons.local_fire_department,
-                          Colors.red,
-                        ),
-                        _buildStatCard(
-                          'Melhor Streak',
-                          '${streakService.bestStreak}',
-                          Icons.emoji_events,
-                          Colors.amber,
-                        ),
-                        _buildStatCard(
-                          'Total',
-                          '${historyService.totalCheckupsCompleted}',
-                          Icons.history,
-                          Colors.purple,
-                        ),
-                      ],
-                    ),
-                  ],
+                child: _buildStatsGrid(
+                  last7DaysStats: last7DaysStats,
+                  streakService: streakService,
+                  historyService: historyService,
                 ),
               ),
               
@@ -112,13 +66,18 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
                       onPressed: () => _changeMonth(-1),
                       icon: const Icon(Icons.chevron_left),
                     ),
-                    Text(
-                      _getMonthYearString(_selectedMonth),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
+                    Builder(
+                      builder: (context) {
+                        final isDark = Theme.of(context).brightness == Brightness.dark;
+                        return Text(
+                          _getMonthYearString(_selectedMonth),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white.withOpacity(0.9) : AppColors.textPrimary,
+                          ),
+                        );
+                      },
                     ),
                     IconButton(
                       onPressed: () => _changeMonth(1),
@@ -183,6 +142,68 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Grid responsivo com os 6 cards de métricas.
+  Widget _buildStatsGrid({
+    required Map<String, double> last7DaysStats,
+    required CheckupStreakService streakService,
+    required DailyCheckupHistoryService historyService,
+  }) {
+    // Em telas pequenas (largura < 600) usamos 3 colunas (2 linhas). Em telas maiores 6 em uma linha.
+    final width = MediaQuery.of(context).size.width;
+    final isWide = width >= 900; // breakpoint arbitrário
+    final crossAxisCount = isWide ? 6 : 3;
+
+    final items = [
+      _buildStatCard(
+        'Humor Médio',
+        '${last7DaysStats['averageMood']?.toStringAsFixed(1) ?? '3.0'}',
+        Icons.sentiment_satisfied,
+        Colors.blue,
+      ),
+      _buildStatCard(
+        'Energia Média',
+        '${last7DaysStats['averageEnergy']?.toStringAsFixed(1) ?? '3.0'}',
+        Icons.battery_charging_full,
+        Colors.green,
+      ),
+      _buildStatCard(
+        'Checkups',
+        '${last7DaysStats['checkupsCompleted']?.toInt() ?? 0}',
+        Icons.calendar_today,
+        Colors.orange,
+      ),
+      _buildStatCard(
+        'Streak Atual',
+        '${streakService.currentStreak}',
+        Icons.local_fire_department,
+        Colors.red,
+      ),
+      _buildStatCard(
+        'Melhor Streak',
+        '${streakService.bestStreak}',
+        Icons.emoji_events,
+        Colors.amber,
+      ),
+      _buildStatCard(
+        'Total',
+        '${historyService.totalCheckupsCompleted}',
+        Icons.history,
+        Colors.purple,
+      ),
+    ];
+
+    // Usar GridView.count com shrinkWrap para caber no header.
+    return GridView.count(
+      crossAxisCount: crossAxisCount,
+      childAspectRatio: 1.05,
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      children: items,
     );
   }
 

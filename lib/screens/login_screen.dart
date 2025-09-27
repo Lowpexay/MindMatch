@@ -154,35 +154,9 @@ class _LoginScreenState extends State<LoginScreen> {
               
               // Social login buttons
               _buildSocialButtons(),
-              
-              const SizedBox(height: 32),
-              
-              // Divider
-              Row(
-                children: [
-                  Expanded(child: Divider(color: Theme.of(context).brightness == Brightness.dark ? Colors.white12 : null)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'ou',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                  Expanded(child: Divider(color: Theme.of(context).brightness == Brightness.dark ? Colors.white12 : null)),
-                ],
-              ),
-              
-              const SizedBox(height: 32),
-              
-              // Form
-              _isLogin ? _buildLoginForm() : _buildSignupForm(),
-              
-              const SizedBox(height: 24),
-              
-              // Toggle between login/signup
+              const SizedBox(height: 16),
+
+              // Toggle between login/signup (agora logo abaixo do Google)
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -209,6 +183,33 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
+
+              const SizedBox(height: 24),
+              
+              // Divider
+              Row(
+                children: [
+                  Expanded(child: Divider(color: Theme.of(context).brightness == Brightness.dark ? Colors.white12 : null)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'ou',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: Theme.of(context).brightness == Brightness.dark ? Colors.white12 : null)),
+                ],
+              ),
+              
+              const SizedBox(height: 32),
+              
+              // Form
+              _isLogin ? _buildLoginForm() : _buildSignupForm(),
+              
+              // (toggle movido para cima)
             ],
           ),
         ),
@@ -217,39 +218,67 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildSocialButtons() {
+    const double maxButtonWidth = 420;
     return Column(
       children: [
-        // Google Sign In
-        ElevatedButton.icon(
-          onPressed: _isLoading ? null : _signInWithGoogle,
-          icon: Icon(Icons.g_mobiledata, size: 24),
-          label: Text(_isLogin ? 'Entrar com Google' : 'Cadastrar com Google'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: AppColors.textPrimary,
-            side: const BorderSide(color: AppColors.gray300),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: maxButtonWidth),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _signInWithGoogle,
+                icon: const Icon(Icons.g_mobiledata, size: 28),
+                label: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    _isLogin ? 'Entrar com Google' : 'Cadastrar com Google',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                style: () {
+                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  return ElevatedButton.styleFrom(
+                    backgroundColor: isDark ? AppColors.primary : Colors.white,
+                    foregroundColor: isDark ? Colors.white : AppColors.textPrimary,
+                    side: isDark ? const BorderSide(color: Colors.transparent, width: 0) : const BorderSide(color: AppColors.gray300, width: 1),
+                    minimumSize: const Size(double.infinity, 54),
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    textStyle: const TextStyle(fontSize: 16),
+                    elevation: isDark ? 2 : 0,
+                  );
+                }(),
+              ),
             ),
           ),
         ),
-        
         const SizedBox(height: 12),
-        
         // Apple Sign In (iOS only) - Temporariamente desabilitado
         /*
         if (Theme.of(context).platform == TargetPlatform.iOS)
-          ElevatedButton.icon(
-            onPressed: _isLoading ? null : _signInWithApple,
-            icon: const Icon(Icons.apple, size: 24),
-            label: Text(_isLogin ? 'Entrar com Apple' : 'Cadastrar com Apple'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.darkSurface,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: maxButtonWidth),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _signInWithApple,
+                  icon: const Icon(Icons.apple, size: 28),
+                  label: Text(_isLogin ? 'Entrar com Apple' : 'Cadastrar com Apple'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.darkSurface,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 54),
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
               ),
             ),
           ),
@@ -297,22 +326,29 @@ class _LoginScreenState extends State<LoginScreen> {
           
           const SizedBox(height: 24),
           
-          ElevatedButton(
-            onPressed: _isLoading ? null : _signInWithEmail,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _signInWithEmail,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 54),
+                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  child: _isLoading 
+                      ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                      : const Text('Entrar'),
+                ),
               ),
             ),
-            child: _isLoading 
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text(
-                    'Entrar',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
           ),
           
           const SizedBox(height: 16),
@@ -470,14 +506,17 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 24),
           
           // Tags
-          const Text(
-            'Tags de interesse:',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
+          Builder(builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return Text(
+              'Tags de interesse:',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : AppColors.textPrimary,
+              ),
+            );
+          }),
           
           const SizedBox(height: 12),
           
@@ -494,14 +533,17 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 24),
           
           // Goals
-          const Text(
-            'Seu objetivo no app:',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
+          Builder(builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return Text(
+              'Seu objetivo no app:',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : AppColors.textPrimary,
+              ),
+            );
+          }),
           
           const SizedBox(height: 12),
           
@@ -519,22 +561,29 @@ class _LoginScreenState extends State<LoginScreen> {
           
           const SizedBox(height: 32),
           
-          ElevatedButton(
-            onPressed: _isLoading ? null : _signUpWithEmail,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _signUpWithEmail,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 54),
+                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  child: _isLoading 
+                      ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                      : const Text('Criar conta'),
+                ),
               ),
             ),
-            child: _isLoading 
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text(
-                    'Criar conta',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
           ),
         ],
       ),

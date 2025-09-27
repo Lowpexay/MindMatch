@@ -369,7 +369,14 @@ class CheckupStreakService extends ChangeNotifier {
     _dailyCheckups.sort((a, b) => b.date.compareTo(a.date));
     
     await _saveDailyCheckups();
-    notifyListeners();
+    // Se ainda não marcou o streak de hoje como completo, integrar com streak
+    if (!_todayCompleted) {
+      // Atualiza campos internos de streak sem duplicar lógica
+      // Reaproveitando fluxo existente chamando completeCheckup()
+      await completeCheckup();
+    } else {
+      notifyListeners();
+    }
   }
 
   /// Obter checkup de hoje

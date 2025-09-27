@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:mindmatch/screens/courses_screen.dart';
+import 'package:mindmatch/widgets/navbar_new.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:typed_data';
@@ -22,7 +24,11 @@ class MainNavigation extends StatefulWidget {
   // Chave global para acessar a própria MainNavigation
   static final GlobalKey<_MainNavigationState> mainNavigationKey = GlobalKey<_MainNavigationState>();
   // Chave global para acessar o drawer
-  static final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+  static final GlobalKey<ScaffoldState> scaffoldKey =
+      GlobalKey<ScaffoldState>();
+  // Chave global para acessar métodos da ConversationsScreen
+  static final GlobalKey<CoursesScreenState> coursesKey =
+      GlobalKey<CoursesScreenState>();
   // Chave global para acessar métodos da ConversationsScreen
   static final GlobalKey<ConversationsScreenState> conversationsKey = GlobalKey<ConversationsScreenState>();
   // Chave global para acessar métodos da AiChatScreen
@@ -51,6 +57,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
 
   final List<Widget> _screens = [
     const HomeScreen(),
+    CoursesScreen(key: MainNavigation.coursesKey),
     ConversationsScreen(key: MainNavigation.conversationsKey),
     AiChatScreen(key: MainNavigation.aiChatKey, userMood: null), // IA sem contexto de humor específico
   ];
@@ -104,7 +111,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
       final authService = Provider.of<AuthService>(context, listen: false);
       final firebaseService = Provider.of<FirebaseService>(context, listen: false);
       final userId = authService.currentUser?.uid;
-      
+
       if (userId != null) {
         final userProfile = await firebaseService.getUserProfile(userId);
         setState(() {
@@ -127,7 +134,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final globalNotificationService = Provider.of<GlobalNotificationService>(context, listen: false);
-      
+
       if (authService.isAuthenticated) {
         await globalNotificationService.initialize(authService);
         _notificationServiceInitialized = true;
@@ -146,11 +153,11 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOutCubic,
       );
-      
+
       setState(() {
         _currentIndex = index;
       });
-      
+
       // Notificar AiChatScreen quando se tornar ativo
       if (index == 2) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -167,48 +174,56 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
     final isDark = scheme.brightness == Brightness.dark;
 
     return Scaffold(
-      key: MainNavigation.scaffoldKey,
-      backgroundColor: theme.scaffoldBackgroundColor,
-      drawer: const GlobalDrawer(),
-      appBar: _buildAppBar(),
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (index) {
-          setState(() => _currentIndex = index);
-          if (index == 2) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
+        key: MainNavigation.scaffoldKey,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        drawer: const GlobalDrawer(),
+        appBar: _buildAppBar(),
+        body: PageView(
+          controller: _pageController,
+          onPageChanged: (index) {
+            setState(() => _currentIndex = index);
+            if (index == 2) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
               MainNavigation.aiChatKey.currentState?.checkAndInitializeWhenActive();
+              });
+            }
+          },
+          children: _screens,
+        ),
+        bottomNavigationBar: CustomNavbar(
+          selectedIndex: _currentIndex,
+          onItemTapped: (index) {
+            setState(() {
+              _currentIndex = index;
             });
-          }
-        },
-        children: _screens,
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.5 : 0.1),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(icon: Icons.home_rounded, label: 'Início', index: 0),
-                _buildNavItem(icon: Icons.chat_rounded, label: 'Conversas', index: 1, hasNotification: true),
-                _buildNavItem(icon: Icons.psychology, label: 'IA', index: 2),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+          },
+        )
+        // Container(
+        //   decoration: BoxDecoration(
+        //     color: isDark ? AppColors.darkSurface : Colors.white,
+        //     boxShadow: [
+        //       BoxShadow(
+        //         color: Colors.black.withOpacity(isDark ? 0.5 : 0.1),
+        //         blurRadius: 8,
+        //         offset: const Offset(0, -2),
+        //       ),
+        //     ],
+        //   ),
+        //   child: SafeArea(
+        //     child: Padding(
+        //       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        //       child: Row(
+        //         mainAxisAlignment: MainAxisAlignment.spaceAround,
+        //         children: [
+        //           _buildNavItem(icon: Icons.home_rounded, label: 'Início', index: 0),
+        //           _buildNavItem(icon: Icons.chat_rounded, label: 'Conversas', index: 1, hasNotification: true),
+        //           _buildNavItem(icon: Icons.psychology, label: 'IA', index: 2),
+        //         ],
+        //       ),
+        //     ),
+        //   ),
+        // ),
+        );
   }
 
   Widget _buildNavItem({
@@ -302,7 +317,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
   PreferredSizeWidget _buildAppBar() {
     String title;
     String? subtitle;
-    
+
     switch (_currentIndex) {
       case 0:
         title = 'MindMatch';
@@ -321,7 +336,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return AppBar(
-  backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
       elevation: 0,
       toolbarHeight: 80,
       leading: Builder(
@@ -358,7 +373,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
             margin: const EdgeInsets.only(right: 8),
             child: const CheckupHeartWidget(),
           ),
-        
+
         // Mostrar ações baseadas na aba atual
         if (_currentIndex == 1) // Conversas
           Container(
@@ -374,7 +389,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
               ),
             ),
           ),
-        
+
         if (_currentIndex == 2) // IA Chat
           Container(
             margin: const EdgeInsets.only(right: 8),
@@ -383,13 +398,13 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
                 // Chamar método da AiChatScreen usando a chave global
                 _showAiChatOptions();
               },
-                icon: Icon(
-                  Icons.more_vert,
-                  color: isDark ? Colors.white : AppColors.textPrimary,
-                ),
+              icon: Icon(
+                Icons.more_vert,
+                color: isDark ? Colors.white : AppColors.textPrimary,
+              ),
             ),
           ),
-        
+
         // Avatar do usuário sempre visível
         Container(
           margin: const EdgeInsets.only(right: 16),
@@ -409,7 +424,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
   String _getGreeting() {
     final hour = DateTime.now().hour;
     final name = _userName.isNotEmpty ? ', $_userName' : '';
-    
+
     if (hour < 12) {
       return 'Bom dia$name!';
     } else if (hour < 18) {
@@ -447,7 +462,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
               ),
             ),
             const SizedBox(height: 20),
-            
+
             // Header do perfil
             Row(
               children: [
@@ -482,7 +497,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
               ],
             ),
             const SizedBox(height: 24),
-            
+
             // Opções do menu
             _buildMenuOption(
               icon: Icons.edit,
@@ -493,7 +508,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
                 context.go('/profile');
               },
             ),
-            
+
             _buildMenuOption(
               icon: Icons.settings,
               title: 'Configurações',
@@ -503,7 +518,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
                 context.go('/settings');
               },
             ),
-            
+
             _buildMenuOption(
               icon: Icons.help_outline,
               title: 'Ajuda e Suporte',
@@ -513,9 +528,9 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
                 _showHelpDialog();
               },
             ),
-            
+
             const Divider(height: 24),
-            
+
             _buildMenuOption(
               icon: Icons.logout,
               title: 'Sair',
@@ -527,7 +542,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
                 await _handleLogout();
               },
             ),
-            
+
             // Espaço para SafeArea
             SizedBox(height: MediaQuery.of(context).padding.bottom),
           ],
@@ -595,11 +610,11 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
             style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary),
           ),
           content: Text(
-          'MindMatch - Conectando pessoas com afinidades emocionais.\n\n'
-          '📱 Versão: 1.0.0\n'
-          '💙 Para suporte: mindmatch@exemplo.com\n\n'
-          'Este app foi desenvolvido para promover conexões humanas '
-          'significativas baseadas em bem-estar emocional.',
+            'MindMatch - Conectando pessoas com afinidades emocionais.\n\n'
+            '📱 Versão: 1.0.0\n'
+            '💙 Para suporte: mindmatch@exemplo.com\n\n'
+            'Este app foi desenvolvido para promover conexões humanas '
+            'significativas baseadas em bem-estar emocional.',
             style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
           ),
           actions: [

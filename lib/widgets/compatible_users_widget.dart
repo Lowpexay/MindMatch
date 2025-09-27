@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../widgets/user_avatar.dart';
+import '../screens/profile_screen.dart';
 import '../utils/app_colors.dart';
 
 class CompatibleUsersWidget extends StatelessWidget {
@@ -53,9 +55,7 @@ class CompatibleUsersWidget extends StatelessWidget {
               ),
             ],
           ),
-          
           const SizedBox(height: 20),
-          
           if (compatibleUsers.isEmpty)
             _buildEmptyState()
           else
@@ -99,6 +99,7 @@ class CompatibleUsersWidget extends StatelessWidget {
     );
   }
 
+
   Widget _buildUsersList(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
@@ -110,9 +111,76 @@ class CompatibleUsersWidget extends StatelessWidget {
           Divider(color: isDark ? Colors.white12 : null),
           const SizedBox(height: 20),
         ],
-        
+
         // Lista dos demais usuários
-        ...compatibleUsers.skip(3).map((user) => _buildUserCard(context, user)),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () {
+              showDialog(
+                context: context,
+                barrierDismissible: true,
+                builder: (BuildContext context) {
+                  return BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+                    child: AlertDialog(
+                      backgroundColor: AppColorsProfile.whiteBack,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      title: Text(
+                        'Selecione alguém para conversar!',
+                        style: TextStyle(
+                          fontSize: 17,
+                          color: AppColorsProfile.blackFont,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      content: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: compatibleUsers
+                              .skip(3)
+                              .map((user) => _buildUserCard(user))
+                              .toList(),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: Text(
+                            'Fechar',
+                            style: TextStyle(
+                              color: AppColorsProfile.purpleBack,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              backgroundColor: AppColorsProfile.purpleBack,
+              shadowColor: Colors.transparent,
+              elevation: 0,
+            ),
+            child: Text(
+              'Conhecer outros usuários',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppColorsProfile.whiteBack,
+                fontSize: 16
+              ),
+            ),
+          ),
+        )
       ],
     );
   }
@@ -120,7 +188,7 @@ class CompatibleUsersWidget extends StatelessWidget {
   Widget _buildTopThreeUsers(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final top3 = compatibleUsers.take(3).toList();
-    
+
     return Column(
       children: [
         Text(
@@ -166,17 +234,16 @@ class CompatibleUsersWidget extends StatelessWidget {
       print('✅ Decoded podium base64 image for $name: ${imageBytes.length} bytes');
     } catch (e) {
       print('❌ Error decoding podium base64 for $name: $e');
-      imageBytes = null;
+      imageBytes = null
     }
-  } else {
-    print('ℹ️ No base64 image for podium user $name');
-  }
-  
-  print('🏆 Building podium user $position for $name:');
-  print('   - profileImageUrl: $profileImage');
-  print('   - profileImageBase64: ${profileImageBase64 != null ? '${profileImageBase64.length} chars' : 'null'}');
-  print('   - imageBytes: ${imageBytes != null ? '${imageBytes.length} bytes' : 'null'}');
-    
+
+    print('🏆 Building podium user $position for $name:');
+    print('   - profileImageUrl: $profileImage');
+    print(
+        '   - profileImageBase64: ${profileImageBase64 != null ? '${profileImageBase64.length} chars' : 'null'}');
+    print(
+        '   - imageBytes: ${imageBytes != null ? '${imageBytes.length} bytes' : 'null'}');
+
     return GestureDetector(
       onTap: () => onUserTapped(user),
       child: Column(
@@ -226,9 +293,9 @@ class CompatibleUsersWidget extends StatelessWidget {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           // Nome
           SizedBox(
             width: 80,
@@ -244,7 +311,7 @@ class CompatibleUsersWidget extends StatelessWidget {
               ),
             ),
           ),
-          
+
           // Porcentagem
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -266,6 +333,7 @@ class CompatibleUsersWidget extends StatelessWidget {
     );
   }
 
+
   Widget _buildUserCard(BuildContext context, Map<String, dynamic> user) {
   final compatibility = user['compatibility'] as double;
   final name = user['name'] ?? 'Usuário';
@@ -286,15 +354,14 @@ class CompatibleUsersWidget extends StatelessWidget {
       print('❌ Error decoding base64 for $name: $e');
       imageBytes = null;
     }
-  } else {
-    print('ℹ️ No base64 image for $name');
-  }
-  
-  print('🎭 Building user card for $name:');
-  print('   - profileImageUrl: $profileImage');
-  print('   - profileImageBase64: ${profileImageBase64 != null ? '${profileImageBase64.length} chars' : 'null'}');
-  print('   - imageBytes: ${imageBytes != null ? '${imageBytes.length} bytes' : 'null'}');
-    
+
+    print('🎭 Building user card for $name:');
+    print('   - profileImageUrl: $profileImage');
+    print(
+        '   - profileImageBase64: ${profileImageBase64 != null ? '${profileImageBase64.length} chars' : 'null'}');
+    print(
+        '   - imageBytes: ${imageBytes != null ? '${imageBytes.length} bytes' : 'null'}');
+
     // Parse tags
     final tags = <String>[];
     final tagsString = user['tags_string'] as String?;
@@ -304,7 +371,7 @@ class CompatibleUsersWidget extends StatelessWidget {
 
     // Determinar emoção predominante baseada no humor
     final predominantEmotion = _getPredominantEmotion(user);
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: Material(
@@ -327,17 +394,23 @@ class CompatibleUsersWidget extends StatelessWidget {
                 // Avatar com porcentagem
                 Stack(
                   children: [
-                    UserAvatar(
-                      imageUrl: profileImage,
-                      imageBytes: imageBytes,
-                      radius: 30,
-                      // no fallback asset; use default icon when missing
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent, // sua cor desejada
+                        shape: BoxShape.circle,
+                      ),
+                      child: UserAvatar(
+                        imageUrl: profileImage,
+                        imageBytes: imageBytes,
+                        radius: 30,
+                      ),
                     ),
                     Positioned(
                       bottom: -2,
                       right: -2,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: _getCompatibilityColor(compatibility),
                           borderRadius: BorderRadius.circular(10),
@@ -355,9 +428,9 @@ class CompatibleUsersWidget extends StatelessWidget {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(width: 16),
-                
+
                 // Informações do usuário
                 Expanded(
                   child: Column(
@@ -386,7 +459,7 @@ class CompatibleUsersWidget extends StatelessWidget {
                           ],
                         ],
                       ),
-                      
+
                       // Cidade
                       if (city != null && city.isNotEmpty) ...[
                         const SizedBox(height: 4),
@@ -408,7 +481,7 @@ class CompatibleUsersWidget extends StatelessWidget {
                           ],
                         ),
                       ],
-                      
+
                       // Emoção predominante
                       const SizedBox(height: 6),
                       Row(
@@ -420,7 +493,7 @@ class CompatibleUsersWidget extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            'Sentindo-se ${predominantEmotion['emotion']}',
+                            '${predominantEmotion['emotion']}',
                             style: TextStyle(
                               fontSize: 12,
                               color: predominantEmotion['color'],
@@ -429,53 +502,55 @@ class CompatibleUsersWidget extends StatelessWidget {
                           ),
                         ],
                       ),
-                      
-                      // Bio
-                      if (bio != null && bio.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          bio,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? Colors.white70 : AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                      
-                      // Tags
-                      if (tags.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 4,
-                          children: tags.map((tag) => Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              tag,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          )).toList(),
-                        ),
-                      ],
+                      // // Bio
+                      // if (bio != null && bio.isNotEmpty) ...[
+                      //   const SizedBox(height: 4),
+                      //   Text(
+                      //     bio,
+                      //     maxLines: 1,
+                      //     overflow: TextOverflow.ellipsis,
+                      //     style: TextStyle(
+                      //       fontSize: 12,
+                      //       color: AppColors.textSecondary,
+                      //     ),
+                      //   ),
+                      // ],
+
+                      // // Tags
+                      // if (tags.isNotEmpty) ...[
+                      //   const SizedBox(height: 8),
+                      //   Wrap(
+                      //     spacing: 4,
+                      //     children: tags
+                      //         .map((tag) => Container(
+                      //               padding: const EdgeInsets.symmetric(
+                      //                   horizontal: 8, vertical: 2),
+                      //               decoration: BoxDecoration(
+                      //                 color: AppColors.primary.withOpacity(0.1),
+                      //                 borderRadius: BorderRadius.circular(8),
+                      //               ),
+                      //               child: Text(
+                      //                 tag,
+                      //                 style: TextStyle(
+                      //                   fontSize: 10,
+                      //                   color: AppColors.primary,
+                      //                   fontWeight: FontWeight.w500,
+                      //                 ),
+                      //               ),
+                      //             ))
+                      //         .toList(),
+                      //   ),
+                      // ],
                     ],
                   ),
                 ),
-                
-                // Seta
+
                 Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
                   color: isDark ? Colors.white54 : AppColors.textSecondary,
                 ),
+                // Seta
               ],
             ),
           ),
@@ -498,15 +573,15 @@ class CompatibleUsersWidget extends StatelessWidget {
     final energy = (user['energy'] as int?) ?? 5;
     final clarity = (user['clarity'] as int?) ?? 5;
     final stress = (user['stress'] as int?) ?? 5;
-    
+
     // Calcular scores
     final positiveScore = ((happiness + energy + clarity) / 3);
     final negativeScore = stress.toDouble();
-    
+
     String emotion;
     IconData icon;
     Color color;
-    
+
     if (positiveScore >= 7 && negativeScore <= 3) {
       emotion = 'Radiante';
       icon = Icons.sentiment_very_satisfied;
@@ -532,7 +607,7 @@ class CompatibleUsersWidget extends StatelessWidget {
       icon = Icons.sentiment_neutral;
       color = Colors.blue;
     }
-    
+
     return {
       'emotion': emotion,
       'icon': icon,

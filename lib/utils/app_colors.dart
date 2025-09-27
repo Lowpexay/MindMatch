@@ -12,12 +12,12 @@ class AppColors {
   static const Color success = Color(0xFF10B981);
   static const Color warning = Color(0xFFF59E0B);
   static const Color info = Color(0xFF3B82F6);
-  
+
   // Text colors
   static const Color textPrimary = Color(0xFF1F2937);
   static const Color textSecondary = Color(0xFF6B7280);
   static const Color textMuted = Color(0xFF9CA3AF);
-  
+
   // Neutral colors
   static const Color gray50 = Color(0xFFF9FAFB);
   static const Color gray100 = Color(0xFFF3F4F6);
@@ -29,4 +29,10 @@ class AppColors {
   static const Color gray700 = Color(0xFF374151);
   static const Color gray800 = Color(0xFF1F2937);
   static const Color gray900 = Color(0xFF111827);
+
+  static const Color whiteBack = Color(0xFFF9FAFA);
+  static const Color purpleBack = Color(0xFF6365F1);
+  static const Color blackFont = Color(0xFF262626);
+  static const Color lightGreyFont = Color(0xFFcac9c9);
+  static const Color lighterGreyBack = Color.fromARGB(255, 240, 239, 239);
 }

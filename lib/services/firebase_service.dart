@@ -274,6 +274,32 @@ class FirebaseService {
     }
   }
 
+  // -------------------------
+  // User Extra Data Helpers
+  // -------------------------
+  // Armazena dados auxiliares do usuário (ex.: estado de checkup diário) em subdocumento
+  Future<Map<String, dynamic>?> getUserExtraData(String userId) async {
+    try {
+      final doc = await _firestore.collection('users').doc(userId).collection('meta').doc('extra').get();
+      if (doc.exists) {
+        final data = doc.data();
+        if (data != null) return Map<String, dynamic>.from(data);
+      }
+    } catch (e) {
+      print('⚠️ getUserExtraData error: $e');
+    }
+    return null;
+  }
+
+  Future<void> updateUserExtraData(String userId, Map<String, dynamic> updates) async {
+    try {
+      final ref = _firestore.collection('users').doc(userId).collection('meta').doc('extra');
+      await ref.set(updates, SetOptions(merge: true));
+    } catch (e) {
+      print('⚠️ updateUserExtraData error: $e');
+    }
+  }
+
   // Ultra simple profile creation - bypassing potential type issues
   Future<void> createBasicProfile(String userId, String name, String email) async {
     try {

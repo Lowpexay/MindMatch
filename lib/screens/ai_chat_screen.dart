@@ -817,7 +817,7 @@ class AiChatScreenState extends State<AiChatScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
                 child: Image.asset(
-                  'assets/images/luma_chat_avatar.png',
+                  'assets/images/oiLuma.png',
                   width: 36,
                   height: 36,
                   fit: BoxFit.cover,

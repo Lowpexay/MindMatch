@@ -6,6 +6,8 @@ class AppColors {
   static const Color accent = Color(0xFFEC4899);
   static const Color background = Color(0xFFF8FAFC);
   static const Color surface = Color(0xFFFFFFFF);
+  // Dark surfaces
+  static const Color darkSurface = Color(0xFF262626);
   static const Color error = Color(0xFFEF4444);
   static const Color success = Color(0xFF10B981);
   static const Color warning = Color(0xFFF59E0B);

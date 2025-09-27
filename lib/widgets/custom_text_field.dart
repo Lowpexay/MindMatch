@@ -36,15 +36,16 @@ class _CustomTextFieldState extends State<CustomTextField> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           widget.label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+            color: isDark ? Colors.white : AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
@@ -56,16 +57,17 @@ class _CustomTextFieldState extends State<CustomTextField> {
           maxLines: widget.maxLines,
           maxLength: widget.maxLength,
           enabled: widget.enabled,
+          style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary),
           decoration: InputDecoration(
             hintText: widget.hintText,
-            hintStyle: const TextStyle(
-              color: AppColors.textMuted,
+            hintStyle: TextStyle(
+              color: isDark ? Colors.white54 : AppColors.textMuted,
             ),
             suffixIcon: widget.obscureText
                 ? IconButton(
                     icon: Icon(
                       _isObscured ? Icons.visibility : Icons.visibility_off,
-                      color: AppColors.textMuted,
+                      color: isDark ? Colors.white54 : AppColors.textMuted,
                     ),
                     onPressed: () {
                       setState(() {
@@ -76,11 +78,11 @@ class _CustomTextFieldState extends State<CustomTextField> {
                 : widget.suffixIcon,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.gray300),
+              borderSide: BorderSide(color: isDark ? Colors.white24 : AppColors.gray300),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.gray300),
+              borderSide: BorderSide(color: isDark ? Colors.white24 : AppColors.gray300),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -95,7 +97,9 @@ class _CustomTextFieldState extends State<CustomTextField> {
               borderSide: const BorderSide(color: AppColors.error, width: 2),
             ),
             filled: true,
-            fillColor: widget.enabled ? Colors.white : AppColors.gray50,
+            fillColor: widget.enabled
+                ? (isDark ? AppColors.darkSurface : Colors.white)
+                : (isDark ? AppColors.darkSurface : AppColors.gray50),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 16,

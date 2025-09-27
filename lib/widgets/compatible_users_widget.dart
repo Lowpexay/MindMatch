@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../widgets/user_avatar.dart';
 import '../screens/profile_screen.dart';
 import '../utils/app_colors.dart';
@@ -19,14 +18,17 @@ class CompatibleUsersWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+  final surface = isDark ? AppColors.darkSurface : Colors.white;
+    final textPrimary = isDark ? Colors.white : AppColors.textPrimary;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -43,12 +45,12 @@ class CompatibleUsersWidget extends StatelessWidget {
                 size: 28,
               ),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'Pessoas com mais afinidade',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: textPrimary,
                 ),
               ),
             ],
@@ -97,14 +99,16 @@ class CompatibleUsersWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildUsersList(context) {
+
+  Widget _buildUsersList(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
         // Top 3 usuários em destaque
         if (compatibleUsers.length >= 3) ...[
-          _buildTopThreeUsers(),
+          _buildTopThreeUsers(context),
           const SizedBox(height: 20),
-          const Divider(),
+          Divider(color: isDark ? Colors.white12 : null),
           const SizedBox(height: 20),
         ],
 
@@ -181,17 +185,18 @@ class CompatibleUsersWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildTopThreeUsers() {
+  Widget _buildTopThreeUsers(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final top3 = compatibleUsers.take(3).toList();
 
     return Column(
       children: [
-        const Text(
+        Text(
           '🏆 Top 3 Compatibilidades',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: isDark ? Colors.white : AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 16),
@@ -200,40 +205,36 @@ class CompatibleUsersWidget extends StatelessWidget {
           children: [
             // 2º lugar
             if (top3.length > 1)
-              _buildPodiumUser(top3[1], 2, Colors.grey[400]!),
-
+              _buildPodiumUser(top3[1], 2, Colors.grey[400]!, context),
+            
             // 1º lugar
-            _buildPodiumUser(top3[0], 1, Colors.amber),
-
+            _buildPodiumUser(top3[0], 1, Colors.amber, context),
+            
             // 3º lugar
             if (top3.length > 2)
-              _buildPodiumUser(top3[2], 3, Colors.brown[300]!),
+              _buildPodiumUser(top3[2], 3, Colors.brown[300]!, context),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildPodiumUser(
-      Map<String, dynamic> user, int position, Color medalColor) {
-    final compatibility = user['compatibility'] as double;
-    final name = user['name'] ?? 'Usuário';
-    final profileImage = user['profileImageUrl'] as String?;
-    final profileImageBase64 = user['profileImageBase64'] as String?;
-
-    // Decodificar base64 com tratamento de erro
-    Uint8List? imageBytes;
-    if (profileImageBase64 != null && profileImageBase64.isNotEmpty) {
-      try {
-        imageBytes = base64Decode(profileImageBase64);
-        print(
-            '✅ Decoded podium base64 image for $name: ${imageBytes.length} bytes');
-      } catch (e) {
-        print('❌ Error decoding podium base64 for $name: $e');
-        imageBytes = null;
-      }
-    } else {
-      print('ℹ️ No base64 image for podium user $name');
+  Widget _buildPodiumUser(Map<String, dynamic> user, int position, Color medalColor, BuildContext context) {
+  final compatibility = user['compatibility'] as double;
+  final name = user['name'] ?? 'Usuário';
+  final profileImage = user['profileImageUrl'] as String?;
+  final profileImageBase64 = user['profileImageBase64'] as String?;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  // Decodificar base64 com tratamento de erro
+  Uint8List? imageBytes;
+  if (profileImageBase64 != null && profileImageBase64.isNotEmpty) {
+    try {
+      imageBytes = base64Decode(profileImageBase64);
+      print('✅ Decoded podium base64 image for $name: ${imageBytes.length} bytes');
+    } catch (e) {
+      print('❌ Error decoding podium base64 for $name: $e');
+      imageBytes = null
     }
 
     print('🏆 Building podium user $position for $name:');
@@ -306,7 +307,7 @@ class CompatibleUsersWidget extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
           ),
@@ -332,27 +333,26 @@ class CompatibleUsersWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildUserCard(Map<String, dynamic> user) {
-    final compatibility = user['compatibility'] as double;
-    final name = user['name'] ?? 'Usuário';
-    final age = user['age'] as int?;
-    final city = user['city'] as String?;
-    final bio = user['bio'] as String?;
-    final profileImage = user['profileImageUrl'] as String?;
-    final profileImageBase64 = user['profileImageBase64'] as String?;
 
-    // Decodificar base64 com tratamento de erro
-    Uint8List? imageBytes;
-    if (profileImageBase64 != null && profileImageBase64.isNotEmpty) {
-      try {
-        imageBytes = base64Decode(profileImageBase64);
-        print('✅ Decoded base64 image for $name: ${imageBytes.length} bytes');
-      } catch (e) {
-        print('❌ Error decoding base64 for $name: $e');
-        imageBytes = null;
-      }
-    } else {
-      print('ℹ️ No base64 image for $name');
+  Widget _buildUserCard(BuildContext context, Map<String, dynamic> user) {
+  final compatibility = user['compatibility'] as double;
+  final name = user['name'] ?? 'Usuário';
+  final age = user['age'] as int?;
+  final city = user['city'] as String?;
+  final bio = user['bio'] as String?;
+  final profileImage = user['profileImageUrl'] as String?;
+  final profileImageBase64 = user['profileImageBase64'] as String?;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  // Decodificar base64 com tratamento de erro
+  Uint8List? imageBytes;
+  if (profileImageBase64 != null && profileImageBase64.isNotEmpty) {
+    try {
+      imageBytes = base64Decode(profileImageBase64);
+      print('✅ Decoded base64 image for $name: ${imageBytes.length} bytes');
+    } catch (e) {
+      print('❌ Error decoding base64 for $name: $e');
+      imageBytes = null;
     }
 
     print('🎭 Building user card for $name:');
@@ -382,10 +382,10 @@ class CompatibleUsersWidget extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.gray50,
+              color: isDark ? AppColors.darkSurface : AppColors.gray50,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: AppColors.gray200,
+                color: isDark ? Colors.white12 : AppColors.gray200,
                 width: 1,
               ),
             ),
@@ -441,10 +441,10 @@ class CompatibleUsersWidget extends StatelessWidget {
                         children: [
                           Text(
                             name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
+                              color: isDark ? Colors.white : AppColors.textPrimary,
                             ),
                           ),
                           if (age != null) ...[
@@ -453,7 +453,7 @@ class CompatibleUsersWidget extends StatelessWidget {
                               '$age anos',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: AppColors.textSecondary,
+                                color: isDark ? Colors.white70 : AppColors.textSecondary,
                               ),
                             ),
                           ],
@@ -468,14 +468,14 @@ class CompatibleUsersWidget extends StatelessWidget {
                             Icon(
                               Icons.location_on_outlined,
                               size: 14,
-                              color: AppColors.textSecondary,
+                              color: isDark ? Colors.white70 : AppColors.textSecondary,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               city,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: AppColors.textSecondary,
+                                color: isDark ? Colors.white70 : AppColors.textSecondary,
                               ),
                             ),
                           ],
@@ -502,7 +502,6 @@ class CompatibleUsersWidget extends StatelessWidget {
                           ),
                         ],
                       ),
-
                       // // Bio
                       // if (bio != null && bio.isNotEmpty) ...[
                       //   const SizedBox(height: 4),
@@ -549,7 +548,7 @@ class CompatibleUsersWidget extends StatelessWidget {
                 Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
-                  color: AppColors.textSecondary,
+                  color: isDark ? Colors.white54 : AppColors.textSecondary,
                 ),
                 // Seta
               ],

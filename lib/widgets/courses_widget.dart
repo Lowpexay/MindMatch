@@ -20,6 +20,7 @@ class CoursesWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayCourses = showAll ? courses : courses.take(3).toList();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -44,10 +45,10 @@ class CoursesWidget extends StatelessWidget {
                       Expanded(
                         child: Text(
                           title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: isDark ? Colors.white : AppColors.textPrimary,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -111,6 +112,7 @@ class CoursesWidget extends StatelessWidget {
       builder: (context, progressService, child) {
         final isCompleted = progressService.isCourseCompletedById(course.id);
         final completionPercentage = progressService.getCourseCompletionPercentage(course.id);
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         
         return Container(
           width: isGrid ? null : 220,
@@ -129,11 +131,11 @@ class CoursesWidget extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? AppColors.darkSurface : Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -253,10 +255,10 @@ class CoursesWidget extends StatelessWidget {
                           children: [
                             Text(
                               course.title,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
+                                color: isDark ? Colors.white : AppColors.textPrimary,
                               ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -266,7 +268,7 @@ class CoursesWidget extends StatelessWidget {
                               course.description,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: AppColors.textSecondary,
+                                color: isDark ? Colors.white70 : AppColors.textSecondary,
                               ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -323,14 +325,14 @@ class CoursesWidget extends StatelessWidget {
                                         Icon(
                                           Icons.play_circle_outline,
                                           size: 16,
-                                          color: AppColors.textSecondary,
+                                          color: isDark ? Colors.white70 : AppColors.textSecondary,
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
                                           '${course.lessonsCount} aulas',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: AppColors.textSecondary,
+                                            color: isDark ? Colors.white70 : AppColors.textSecondary,
                                           ),
                                         ),
                                       ],
@@ -342,14 +344,14 @@ class CoursesWidget extends StatelessWidget {
                                         Icon(
                                           Icons.quiz_outlined,
                                           size: 16,
-                                          color: AppColors.textSecondary,
+                                          color: isDark ? Colors.white70 : AppColors.textSecondary,
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
                                           '${course.exercisesCount} exercícios',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: AppColors.textSecondary,
+                                            color: isDark ? Colors.white70 : AppColors.textSecondary,
                                           ),
                                         ),
                                       ],

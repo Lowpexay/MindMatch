@@ -138,7 +138,7 @@ class _LumaVoiceWidgetState extends State<LumaVoiceWidget>
                           ),
                           child: ClipOval(
                             child: Image.asset(
-                              'assets/images/foto_da_luma.png',
+                              'assets/images/oiLuma.png',
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 // Fallback para emoji se a imagem não carregar

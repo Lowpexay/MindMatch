@@ -66,6 +66,37 @@ class AiChatScreenState extends State<AiChatScreen> {
     // Inicializar ElevenLabs
     try {
       _elevenLabsService = ElevenLabsService();
+      // Callbacks para controlar estado de fala sem bloquear botão
+      _elevenLabsService!.onStart = () {
+        if (mounted) {
+          setState(() {
+            _isSpeakingNow = true;
+          });
+        }
+      };
+      _elevenLabsService!.onComplete = () {
+        if (mounted) {
+          setState(() {
+            _isSpeakingNow = false;
+            _currentSpeechText = null;
+          });
+        }
+      };
+      _elevenLabsService!.onStop = () {
+        if (mounted) {
+          setState(() {
+            _isSpeakingNow = false;
+            _currentSpeechText = null;
+          });
+        }
+      };
+      _elevenLabsService!.onError = (error) {
+        if (mounted) {
+          setState(() {
+            _isSpeakingNow = false;
+          });
+        }
+      };      
       print('✅ ElevenLabs inicializado');
     } catch (e) {
       print('⚠️ ElevenLabs não disponível: $e');
@@ -487,7 +518,8 @@ class AiChatScreenState extends State<AiChatScreen> {
 
       // 🔊 FALAR RESPOSTA SE MODO VOZ ATIVO
       if (_interactionMode == 'voice') {
-        await _speakMessage(response);
+        // Não usar await aqui para não manter o botão em loading enquanto a Luma fala
+        _speakMessage(response);
       }
 
     } catch (e) {
@@ -521,11 +553,12 @@ class AiChatScreenState extends State<AiChatScreen> {
   Widget build(BuildContext context) {
     // REMOVIDO: Inicialização automática quando a tela é construída
     // Agora só inicializa quando o usuário realmente acessa a aba
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     // Se estiver no modo visual de voz, mostrar a interface da Luma
     if (_isVisualVoiceMode) {
       return Scaffold(
-        backgroundColor: AppColors.gray50,
+  backgroundColor: isDark ? AppColors.darkSurface : AppColors.gray50,
         body: Column(
           children: [
             // Interface visual da Luma
@@ -540,11 +573,11 @@ class AiChatScreenState extends State<AiChatScreen> {
             // Input de texto para modo voz
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : Colors.white,
+                boxShadow: const [
                   BoxShadow(
-                    color: Colors.black12,
+                    color: Colors.black26,
                     blurRadius: 4,
                     offset: Offset(0, -2),
                   ),
@@ -573,14 +606,14 @@ class AiChatScreenState extends State<AiChatScreen> {
                           focusNode: _messageFocus,
                           decoration: InputDecoration(
                             hintText: 'Digite sua mensagem para a Luma...',
-                            hintStyle: TextStyle(color: AppColors.textSecondary),
+                            hintStyle: TextStyle(color: isDark ? Colors.white54 : AppColors.textSecondary),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(25),
-                              borderSide: BorderSide(color: AppColors.gray300),
+                              borderSide: BorderSide(color: isDark ? Colors.white24 : AppColors.gray300),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(25),
-                              borderSide: BorderSide(color: AppColors.gray300),
+                              borderSide: BorderSide(color: isDark ? Colors.white24 : AppColors.gray300),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(25),
@@ -591,6 +624,7 @@ class AiChatScreenState extends State<AiChatScreen> {
                               vertical: 12,
                             ),
                           ),
+                          style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary),
                           maxLines: null,
                           textInputAction: TextInputAction.send,
                           onSubmitted: (_) => _sendMessage(),
@@ -628,7 +662,7 @@ class AiChatScreenState extends State<AiChatScreen> {
     
     // Modo texto normal
     return Scaffold(
-      backgroundColor: AppColors.gray50,
+  backgroundColor: isDark ? AppColors.darkSurface : AppColors.gray50,
       body: Column(
         children: [
           // Status do humor do usuário (se disponível)
@@ -656,11 +690,11 @@ class AiChatScreenState extends State<AiChatScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                       borderRadius: BorderRadius.circular(18),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withOpacity(isDark ? 0.5 : 0.1),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -684,7 +718,7 @@ class AiChatScreenState extends State<AiChatScreen> {
                           'Pensando...',
                           style: TextStyle(
                             fontSize: 14,
-                            color: AppColors.textSecondary,
+                            color: isDark ? Colors.white70 : AppColors.textSecondary,
                             fontStyle: FontStyle.italic,
                           ),
                         ),
@@ -757,6 +791,7 @@ class AiChatScreenState extends State<AiChatScreen> {
   }
 
   Widget _buildMessageBubble(ChatMessage message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -782,7 +817,7 @@ class AiChatScreenState extends State<AiChatScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
                 child: Image.asset(
-                  'assets/images/luma_chat_avatar.png',
+                  'assets/images/oiLuma.png',
                   width: 36,
                   height: 36,
                   fit: BoxFit.cover,
@@ -821,14 +856,16 @@ class AiChatScreenState extends State<AiChatScreen> {
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: message.isUser ? AppColors.primary : Colors.white,
+                color: message.isUser
+                    ? AppColors.primary
+                    : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
                 borderRadius: BorderRadius.circular(18).copyWith(
                   bottomLeft: message.isUser ? const Radius.circular(18) : const Radius.circular(4),
                   bottomRight: message.isUser ? const Radius.circular(4) : const Radius.circular(18),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withOpacity(isDark ? 0.5 : 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -842,7 +879,9 @@ class AiChatScreenState extends State<AiChatScreen> {
                     style: TextStyle(
                       fontSize: 15,
                       height: 1.4,
-                      color: message.isUser ? Colors.white : AppColors.textPrimary,
+                      color: message.isUser
+                          ? Colors.white
+                          : (isDark ? Colors.white : AppColors.textPrimary),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -852,7 +891,7 @@ class AiChatScreenState extends State<AiChatScreen> {
                       fontSize: 11,
                       color: message.isUser
                           ? Colors.white.withOpacity(0.7)
-                          : AppColors.textSecondary,
+                          : (isDark ? Colors.white70 : AppColors.textSecondary),
                     ),
                   ),
                 ],
@@ -875,13 +914,14 @@ class AiChatScreenState extends State<AiChatScreen> {
   }
 
   Widget _buildMessageInput() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+  color: isDark ? AppColors.darkSurface : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withOpacity(isDark ? 0.45 : 0.1),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),
@@ -945,12 +985,12 @@ class AiChatScreenState extends State<AiChatScreen> {
                     decoration: BoxDecoration(
                       color: _isRecordingAudio 
                         ? Colors.red.withOpacity(0.1)
-                        : AppColors.gray100,
+                        : (isDark ? const Color(0xFF121212) : AppColors.gray100),
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
                         color: _isRecordingAudio 
                           ? Colors.red
-                          : AppColors.gray300,
+                          : (isDark ? Colors.white24 : AppColors.gray300),
                         width: 1,
                       ),
                     ),
@@ -966,7 +1006,7 @@ class AiChatScreenState extends State<AiChatScreen> {
                           ? Colors.red
                           : (_speechRecognitionAvailable 
                               ? AppColors.primary 
-                              : AppColors.gray400),
+                              : (isDark ? Colors.white38 : AppColors.gray400)),
                         size: 20,
                       ),
                     ),
@@ -976,20 +1016,20 @@ class AiChatScreenState extends State<AiChatScreen> {
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: AppColors.gray50,
+                      color: isDark ? const Color(0xFF121212) : AppColors.gray50,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: AppColors.gray300,
+                        color: isDark ? Colors.white12 : AppColors.gray300,
                         width: 1,
                       ),
                     ),
                     child: TextField(
                       controller: _messageController,
                       focusNode: _messageFocus,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Digite sua mensagem...',
                         hintStyle: TextStyle(
-                          color: AppColors.textSecondary,
+                          color: isDark ? Colors.white54 : AppColors.textSecondary,
                           fontSize: 15,
                         ),
                         border: InputBorder.none,
@@ -998,9 +1038,9 @@ class AiChatScreenState extends State<AiChatScreen> {
                           vertical: 12,
                         ),
                       ),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
-                        color: AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                       maxLines: null,
                       textCapitalization: TextCapitalization.sentences,
@@ -1056,7 +1096,10 @@ class AiChatScreenState extends State<AiChatScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+  backgroundColor: isDark ? AppColors.darkSurface : null,
         title: Row(
           children: [
             Container(
@@ -1078,18 +1121,19 @@ class AiChatScreenState extends State<AiChatScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            const Text('Olá! Sou a Luma'),
+            Text('Olá! Sou a Luma', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Como você gostaria de conversar comigo?',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white70 : AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 20),
@@ -1102,8 +1146,8 @@ class AiChatScreenState extends State<AiChatScreen> {
               ),
               child: ListTile(
                 leading: const Icon(Icons.text_fields, color: AppColors.primary),
-                title: const Text('Chat por Texto'),
-                subtitle: const Text('Conversaremos apenas escrevendo'),
+                title: Text('Chat por Texto', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+                subtitle: Text('Conversaremos apenas escrevendo', style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
                 onTap: () => _finishSetup('text'),
               ),
             ),
@@ -1119,8 +1163,8 @@ class AiChatScreenState extends State<AiChatScreen> {
                 ),
                 child: ListTile(
                   leading: const Icon(Icons.mic_rounded, color: AppColors.primary),
-                  title: const Text('Chat com Áudio'),
-                  subtitle: const Text('Você pode falar ou escrever suas mensagens'),
+                  title: Text('Chat com Áudio', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+                  subtitle: Text('Você pode falar ou escrever suas mensagens', style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
                   onTap: () => _finishSetup('text'),
                 ),
               ),
@@ -1135,14 +1179,15 @@ class AiChatScreenState extends State<AiChatScreen> {
               ),
               child: ListTile(
                 leading: const Icon(Icons.record_voice_over, color: AppColors.primary),
-                title: const Text('Chat por Voz Completo'),
-                subtitle: const Text('Conversaremos apenas por áudio'),
+                title: Text('Chat por Voz Completo', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+                subtitle: Text('Conversaremos apenas por áudio', style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
                 onTap: () => _finishSetup('voice'),
               ),
             ),
           ],
         ),
-      ),
+      );
+      },
     );
   }
 
@@ -1180,20 +1225,13 @@ class AiChatScreenState extends State<AiChatScreen> {
     if (_interactionMode != 'voice' || _elevenLabsService == null) return;
     
     try {
-      // Atualizar estado visual
+      // Definir texto atual (estado de fala controlado pelos callbacks)
       setState(() {
-        _isSpeakingNow = true;
         _currentSpeechText = text;
       });
       
       print('🌐 Falando com ElevenLabs: $text');
       await _elevenLabsService!.speak(text, voiceId: '21m00Tcm4TlvDq8ikWAM');
-      
-      // Limpar estado visual após falar
-      setState(() {
-        _isSpeakingNow = false;
-        _currentSpeechText = null;
-      });
       
     } catch (e) {
       print('❌ Erro ao falar: $e');
@@ -1208,17 +1246,20 @@ class AiChatScreenState extends State<AiChatScreen> {
   void showChatOptions() {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
+  backgroundColor: Theme.of(context).brightness == Brightness.dark ? AppColors.darkSurface : null,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Container(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               _isVisualVoiceMode ? 'Opções da Conversa por Voz' : 'Opções da Luma',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 20),
@@ -1227,8 +1268,8 @@ class AiChatScreenState extends State<AiChatScreen> {
             if (_isVisualVoiceMode)
               ListTile(
                 leading: const Icon(Icons.chat_bubble_outline, color: AppColors.primary),
-                title: const Text('Voltar ao Chat por Texto'),
-                subtitle: const Text('Conversar com balões de mensagem'),
+                title: Text('Voltar ao Chat por Texto', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+                subtitle: Text('Conversar com balões de mensagem', style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
                 onTap: () {
                   Navigator.pop(context);
                   _switchToTextMode();
@@ -1237,8 +1278,8 @@ class AiChatScreenState extends State<AiChatScreen> {
             else
               ListTile(
                 leading: const Icon(Icons.record_voice_over, color: AppColors.primary),
-                title: const Text('Chat por Voz'),
-                subtitle: const Text('Conversar com a Luma visualmente'),
+                title: Text('Chat por Voz', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+                subtitle: Text('Conversar com a Luma visualmente', style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
                 onTap: () {
                   Navigator.pop(context);
                   _switchToVoiceMode();
@@ -1247,8 +1288,8 @@ class AiChatScreenState extends State<AiChatScreen> {
             
             ListTile(
               leading: const Icon(Icons.refresh, color: AppColors.primary),
-              title: const Text('Reiniciar conversa'),
-              subtitle: const Text('Começar uma nova conversa com a Luma'),
+              title: Text('Reiniciar conversa', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+              subtitle: Text('Começar uma nova conversa com a Luma', style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
               onTap: () {
                 Navigator.pop(context);
                 _restartConversation();
@@ -1259,8 +1300,8 @@ class AiChatScreenState extends State<AiChatScreen> {
             if (_isVisualVoiceMode)
               ListTile(
                 leading: const Icon(Icons.volume_off, color: AppColors.error),
-                title: const Text('Parar fala atual'),
-                subtitle: const Text('Interromper a Luma se estiver falando'),
+                title: Text('Parar fala atual', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+                subtitle: Text('Interromper a Luma se estiver falando', style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
                 onTap: () {
                   Navigator.pop(context);
                   _handleLumaTap();
@@ -1268,8 +1309,8 @@ class AiChatScreenState extends State<AiChatScreen> {
               ),
             ListTile(
               leading: const Icon(Icons.auto_awesome, color: AppColors.primary),
-              title: const Text('Sobre a Luma'),
-              subtitle: const Text('Conheça sua assistente de bem-estar'),
+              title: Text('Sobre a Luma', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+              subtitle: Text('Conheça sua assistente de bem-estar', style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
               onTap: () {
                 Navigator.pop(context);
                 _showAboutAI();
@@ -1277,8 +1318,8 @@ class AiChatScreenState extends State<AiChatScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.tips_and_updates, color: AppColors.primary),
-              title: const Text('Dicas de conversa'),
-              subtitle: const Text('Como aproveitar melhor nosso tempo juntas'),
+              title: Text('Dicas de conversa', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+              subtitle: Text('Como aproveitar melhor nosso tempo juntas', style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
               onTap: () {
                 Navigator.pop(context);
                 _showChatTips();
@@ -1286,7 +1327,8 @@ class AiChatScreenState extends State<AiChatScreen> {
             ),
           ],
         ),
-      ),
+      );
+      },
     );
   }
 
@@ -1305,9 +1347,12 @@ class AiChatScreenState extends State<AiChatScreen> {
   void _showAboutAI() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Sobre a Luma ✨'),
-        content: const Text(
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+  backgroundColor: isDark ? AppColors.darkSurface : null,
+        title: Text('Sobre a Luma ✨', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+        content: Text(
           'Olá! Sou a Luma, sua assistente de bem-estar emocional. Meu nome significa "luz" em latim, '
           'representando a esperança e clareza que busco trazer para sua jornada.\n\n'
           '💙 Meu propósito:\n'
@@ -1317,6 +1362,7 @@ class AiChatScreenState extends State<AiChatScreen> {
           '• Apoiar seu autoconhecimento\n'
           '• Estar presente nos momentos difíceis\n\n'
           'Em que posso te ajudar? :D',
+          style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
         ),
         actions: [
           TextButton(
@@ -1324,16 +1370,20 @@ class AiChatScreenState extends State<AiChatScreen> {
             child: const Text('Obrigado(a), Luma! 💙'),
           ),
         ],
-      ),
+      );
+      },
     );
   }
 
   void _showChatTips() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Dicas para nossa conversa 🌟'),
-        content: const Text(
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+  backgroundColor: isDark ? AppColors.darkSurface : null,
+        title: Text('Dicas para nossa conversa 🌟', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
+        content: Text(
           '🗣️ **Seja autêntico(a)**: Seus sentimentos são sempre válidos aqui\n\n'
           '⏰ **Sem pressa**: Vamos no seu ritmo, sem pressão\n\n'
           '🎯 **Compartilhe detalhes**: Quanto mais você me contar, melhor posso te acompanhar\n\n'
@@ -1341,6 +1391,7 @@ class AiChatScreenState extends State<AiChatScreen> {
           '🔄 **Continue a conversa**: Cada troca constrói nossa conexão\n\n'
           '💪 **Celebre pequenas vitórias**: Toda conquista merece reconhecimento\n\n'
           'Lembre-se: este é seu espaço. Use-o como se sentir mais confortável! 💙',
+          style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
         ),
         actions: [
           TextButton(
@@ -1348,7 +1399,8 @@ class AiChatScreenState extends State<AiChatScreen> {
             child: const Text('Vamos conversar!'),
           ),
         ],
-      ),
+      );
+      },
     );
   }
 }

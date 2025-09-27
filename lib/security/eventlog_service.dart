@@ -6,7 +6,24 @@ import 'package:flutter/foundation.dart';
 class EventLogService {
   // Configurações do ManageEngine EventLog Analyzer
   static const String _apiKey = 'mte1zjc3ndktmzdhzs00zwq5ltk5otgtmgzjztgzndm2owu2';
-  static const String _baseUrl = 'http://10.0.0.168:8400';
+  // Host padrão agora usa o hostname informado em vez de IP fixo
+  static String _host = 'desktop-ne646bh';
+  static int _webPort = 8400; // Porta HTTP usada na interface
+  static int _syslogPort = 514; // Porta Syslog padrão
+  static String get _baseUrl => 'http://$_host:$_webPort';
+  // Habilita/desabilita logs verbosos de diagnóstico
+  static bool debug = true;
+  // Buffer local em memória para refletir imediatamente no app (realtime) caso API de leitura demore
+  static final List<Map<String,dynamic>> _localLoginBuffer = [];
+  static const int _localBufferMax = 200;
+
+  /// Permite trocar dinamicamente o host/porta (ex: se máquina mudar ou usar IP em rede)
+  static void configure({String? host, int? webPort, int? syslogPort}) {
+    if (host != null && host.trim().isNotEmpty) _host = host.trim();
+    if (webPort != null) _webPort = webPort;
+    if (syslogPort != null) _syslogPort = syslogPort;
+    if (debug) debugPrint('⚙️ EventLogService configurado: host=$_host webPort=$_webPort syslogPort=$_syslogPort');
+  }
   
   // Headers padrão para as requisições
   static Map<String, String> get _headers => {
@@ -36,6 +53,164 @@ class EventLogService {
       debugPrint('❌ Error logging login attempt: $e');
       return false;
     }
+  }
+
+  /// Buscar tentativas de login (sucesso e falha) diretamente do EventLog (sem mock)
+  /// Retorna eventos normalizados com: timestamp, user(email), status(SUCCESS/FAILURE), ip, device, eventId.
+  static Future<List<Map<String, dynamic>>> getLoginAttempts({int limit = 50}) async {
+    try {
+      final now = DateTime.now();
+      final start = now.subtract(const Duration(days: 7));
+
+      // 1) REST API oficial
+      final rest = await _fetchEventsByIds(['4624','4625'], start, now, limit);
+      if (rest.isNotEmpty) {
+        if (debug) debugPrint('✅ getLoginAttempts: usando REST events (${rest.length})');
+        return _sortAndTrim(rest, limit);
+      }
+
+      // 2) Custom endpoints já existentes para falhas + sucessos separadamente
+      final failuresCustom = await _tryCustomSearch(null, start, now);
+      final successesCustom = await _fetchSuccessfulLogins(null, start, now);
+      final customCombined = <Map<String,dynamic>>[];
+      if (failuresCustom.isNotEmpty || successesCustom.isNotEmpty) {
+        customCombined.addAll(failuresCustom.map(_mapParsedToUnifiedFailure));
+        customCombined.addAll(successesCustom.map(_mapParsedToUnifiedSuccess));
+        if (customCombined.isNotEmpty) {
+          if (debug) debugPrint('✅ getLoginAttempts: usando custom search (${customCombined.length})');
+          return _sortAndTrim(customCombined, limit);
+        }
+      }
+
+      // 3) Legacy /api/json/search (interface web) - pode retornar mistura
+      final legacy = await _fetchLegacyApi(limit: limit);
+      if (legacy.isNotEmpty) {
+        if (debug) debugPrint('✅ getLoginAttempts: usando legacy api/json/search (${legacy.length})');
+        return _sortAndTrim(legacy, limit);
+      }
+
+      if (debug) debugPrint('⚠️ getLoginAttempts: nenhum endpoint retornou dados');
+      if (_localLoginBuffer.isNotEmpty) {
+        if (debug) debugPrint('ℹ️ usando buffer local (${_localLoginBuffer.length})');
+        return _localLoginBuffer.take(limit).toList();
+      }
+      return [];
+    } catch (e) {
+      if (debug) debugPrint('❌ getLoginAttempts error: $e');
+      if (_localLoginBuffer.isNotEmpty) return _localLoginBuffer.take(limit).toList();
+      return [];
+    }
+  }
+
+  /// Helper: buscar eventos por lista de Event IDs
+  static Future<List<Map<String, dynamic>>> _fetchEventsByIds(List<String> ids, DateTime start, DateTime end, int limit) async {
+    try {
+      final endpoint = '$_baseUrl/restapi/events/search';
+      final queryParams = {
+        'authToken': _apiKey,
+        'eventId': ids.join(','),
+        'startTime': start.millisecondsSinceEpoch.toString(),
+        'endTime': end.millisecondsSinceEpoch.toString(),
+        'maxRecords': limit.toString(),
+        'source': 'MindMatch*',
+      };
+      final uri = Uri.parse(endpoint).replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: {'Accept': 'application/json','AuthToken': _apiKey}).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final parsed = _parseEventLogResponse(data);
+        // Normalizar status
+        return parsed.map((e){
+          final eventId = e['event_id']?.toString() ?? e['eventid']?.toString() ?? '';
+          final success = eventId == '4624';
+            return {
+              'timestamp': e['timestamp'],
+              'user': e['username'] ?? e['user'] ?? 'Unknown',
+              'ip': e['ip_address'] ?? 'Unknown',
+              'device': e['device_info'] ?? 'Unknown',
+              'status': success ? 'SUCCESS' : 'FAILURE',
+              'eventId': eventId,
+            }; 
+        }).toList();
+      }
+    } catch (e) {
+      if (debug) debugPrint('⚠️ _fetchEventsByIds failed: $e');
+    }
+    return [];
+  }
+
+  /// Buscar via endpoint legado /api/json/search usado pela interface antiga
+  static Future<List<Map<String, dynamic>>> _fetchLegacyApi({int limit = 50}) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/json/search?AUTHTOKEN=$_apiKey&limit=$limit&orderby=timestamp');
+      final response = await http.get(uri, headers: {'Accept':'application/json'}).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        List list;
+        if (data is Map && data['events'] is List) {
+          list = data['events'];
+        } else if (data is List) {
+          list = data;
+        } else {
+          return [];
+        }
+        return list.map<Map<String,dynamic>>((raw){
+          final m = Map<String,dynamic>.from(raw as Map);
+          final eventId = (m['eventId'] ?? m['EventID'] ?? '').toString();
+          String status;
+            if (m['status'] != null) {
+              status = m['status'].toString().toUpperCase();
+            } else if (eventId == '4624') {
+              status = 'SUCCESS';
+            } else if (eventId == '4625') {
+              status = 'FAILURE';
+            } else {
+              status = 'UNKNOWN';
+            }
+          return {
+            'timestamp': m['timestamp'] ?? m['TimeGenerated'] ?? DateTime.now().toIso8601String(),
+            'user': m['user'] ?? m['username'] ?? m['User'] ?? 'Unknown',
+            'ip': m['ip'] ?? m['ip_address'] ?? m['IPAddress'] ?? 'Unknown',
+            'device': m['device'] ?? m['device_info'] ?? m['Computer'] ?? 'Unknown',
+            'status': status,
+            'eventId': eventId,
+          };
+        }).toList();
+      }
+    } catch (e) {
+      if (debug) debugPrint('⚠️ _fetchLegacyApi falhou: $e');
+    }
+    return [];
+  }
+
+  static List<Map<String,dynamic>> _sortAndTrim(List<Map<String,dynamic>> list, int limit){
+    list.sort((a,b){
+      final ta = DateTime.tryParse(a['timestamp'] ?? '') ?? DateTime.now();
+      final tb = DateTime.tryParse(b['timestamp'] ?? '') ?? DateTime.now();
+      return tb.compareTo(ta);
+    });
+    return list.take(limit).toList();
+  }
+
+  static Map<String,dynamic> _mapParsedToUnifiedFailure(Map<String,dynamic> e){
+    return {
+      'timestamp': e['timestamp'],
+      'user': e['username'] ?? e['user'] ?? 'Unknown',
+      'ip': e['ip_address'] ?? 'Unknown',
+      'device': e['device_info'] ?? 'Unknown',
+      'status': 'FAILURE',
+      'eventId': e['event_id'] ?? e['eventid'] ?? '4625',
+    };
+  }
+  static Map<String,dynamic> _mapParsedToUnifiedSuccess(Map<String,dynamic> e){
+    return {
+      'timestamp': e['timestamp'],
+      'user': e['username'] ?? e['user'] ?? 'Unknown',
+      'ip': e['ip_address'] ?? 'Unknown',
+      'device': e['device_info'] ?? 'Unknown',
+      'status': 'SUCCESS',
+      'eventId': e['event_id'] ?? e['eventid'] ?? '4624',
+    };
   }
 
   /// Registrar evento de segurança genérico
@@ -1081,7 +1256,7 @@ class EventLogService {
   }) async {
     try {
       // Conectar via TCP na porta 514 (syslog padrão)
-      final socket = await Socket.connect('10.0.0.168', 514);
+  final socket = await Socket.connect(_host, _syslogPort).timeout(const Duration(seconds: 3));
       
       // Formato que FUNCIONA - confirmado em 19:20:xx
       final priority = success ? 13 : 11;
@@ -1102,11 +1277,11 @@ class EventLogService {
       await socket.flush();
       await socket.close();
       
-      debugPrint('📤 Syslog TCP sent: $syslogMessage');
+      if (debug) debugPrint('📤 Syslog TCP sent: $syslogMessage');
       return true;
       
     } catch (e) {
-      debugPrint('⚠️ Syslog TCP failed: $e');
+      if (debug) debugPrint('⚠️ Syslog TCP failed: $e');
       return false;
     }
   }
@@ -1139,19 +1314,15 @@ class EventLogService {
       
       final syslogMessage = '<$priority>$timestamp $hostname $tag: $message';
       
-      socket.send(
-        utf8.encode(syslogMessage),
-        InternetAddress('10.0.0.168'),
-        514,
-      );
+      socket.send(utf8.encode(syslogMessage), InternetAddress(_host), _syslogPort);
       
       socket.close();
       
-      debugPrint('📤 Syslog UDP sent: $syslogMessage');
+      if (debug) debugPrint('📤 Syslog UDP sent: $syslogMessage');
       return true;
       
     } catch (e) {
-      debugPrint('⚠️ Syslog UDP failed: $e');
+      if (debug) debugPrint('⚠️ Syslog UDP failed: $e');
       return false;
     }
   }
@@ -1164,10 +1335,22 @@ class EventLogService {
     String? deviceInfo,
   }) async {
     try {
-      debugPrint('🔍 Logging ${success ? 'successful' : 'failed'} login attempt for: $email');
+      if (debug) debugPrint('🔍 Logging ${success ? 'successful' : 'failed'} login attempt for: $email');
 
       final timestamp = DateTime.now().toIso8601String();
       final eventId = success ? 4624 : 4625; // Windows Event IDs
+      // Inserir imediatamente no buffer local para a UI
+      _localLoginBuffer.insert(0, {
+        'timestamp': timestamp,
+        'user': email,
+        'ip': ipAddress,
+        'device': deviceInfo ?? 'Mobile',
+        'status': success ? 'SUCCESS' : 'FAILURE',
+        'eventId': eventId.toString(),
+      });
+      if (_localLoginBuffer.length > _localBufferMax) {
+        _localLoginBuffer.removeRange(_localBufferMax, _localLoginBuffer.length);
+      }
       
       // Método 1: Syslog over TCP (porta 514)
       bool syslogSent = await _sendSyslogTCP(
@@ -1180,8 +1363,10 @@ class EventLogService {
       );
       
       if (syslogSent) {
-        debugPrint('✅ Login event sent via Syslog TCP');
+        if (debug) debugPrint('✅ Login event sent via Syslog TCP');
         return true;
+      } else if (debug) {
+        debugPrint('↩️ TCP falhou, tentando UDP...');
       }
       
       // Método 2: Syslog over UDP (fallback)
@@ -1195,17 +1380,17 @@ class EventLogService {
       );
       
       if (udpSent) {
-        debugPrint('✅ Login event sent via Syslog UDP');
+        if (debug) debugPrint('✅ Login event sent via Syslog UDP');
         return true;
       }
       
       // Fallback: log localmente para debug
       final syslogMessage = '<14>$timestamp MindMatch.app SecurityEvent: EventID=$eventId User=$email IP=$ipAddress Device=${deviceInfo ?? 'Unknown'} Status=${success ? 'SUCCESS' : 'FAILURE'}';
-      debugPrint('📝 Fallback: Event logged locally - $syslogMessage');
+      if (debug) debugPrint('📝 Fallback (local): $syslogMessage');
       return true;
       
     } catch (e) {
-      debugPrint('❌ Error logging login attempt: $e');
+      if (debug) debugPrint('❌ Error logging login attempt: $e');
       // Ainda consideramos como sucesso para não bloquear o app
       return true;
     }

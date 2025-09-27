@@ -66,6 +66,37 @@ class AiChatScreenState extends State<AiChatScreen> {
     // Inicializar ElevenLabs
     try {
       _elevenLabsService = ElevenLabsService();
+      // Callbacks para controlar estado de fala sem bloquear botão
+      _elevenLabsService!.onStart = () {
+        if (mounted) {
+          setState(() {
+            _isSpeakingNow = true;
+          });
+        }
+      };
+      _elevenLabsService!.onComplete = () {
+        if (mounted) {
+          setState(() {
+            _isSpeakingNow = false;
+            _currentSpeechText = null;
+          });
+        }
+      };
+      _elevenLabsService!.onStop = () {
+        if (mounted) {
+          setState(() {
+            _isSpeakingNow = false;
+            _currentSpeechText = null;
+          });
+        }
+      };
+      _elevenLabsService!.onError = (error) {
+        if (mounted) {
+          setState(() {
+            _isSpeakingNow = false;
+          });
+        }
+      };      
       print('✅ ElevenLabs inicializado');
     } catch (e) {
       print('⚠️ ElevenLabs não disponível: $e');
@@ -487,7 +518,8 @@ class AiChatScreenState extends State<AiChatScreen> {
 
       // 🔊 FALAR RESPOSTA SE MODO VOZ ATIVO
       if (_interactionMode == 'voice') {
-        await _speakMessage(response);
+        // Não usar await aqui para não manter o botão em loading enquanto a Luma fala
+        _speakMessage(response);
       }
 
     } catch (e) {
@@ -1193,20 +1225,13 @@ class AiChatScreenState extends State<AiChatScreen> {
     if (_interactionMode != 'voice' || _elevenLabsService == null) return;
     
     try {
-      // Atualizar estado visual
+      // Definir texto atual (estado de fala controlado pelos callbacks)
       setState(() {
-        _isSpeakingNow = true;
         _currentSpeechText = text;
       });
       
       print('🌐 Falando com ElevenLabs: $text');
       await _elevenLabsService!.speak(text, voiceId: '21m00Tcm4TlvDq8ikWAM');
-      
-      // Limpar estado visual após falar
-      setState(() {
-        _isSpeakingNow = false;
-        _currentSpeechText = null;
-      });
       
     } catch (e) {
       print('❌ Erro ao falar: $e');

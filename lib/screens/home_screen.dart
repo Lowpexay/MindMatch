@@ -8,10 +8,12 @@ import '../services/gemini_service.dart';
 import '../services/checkup_streak_service.dart';
 import '../services/achievement_service.dart';
 import '../services/course_service.dart';
+import '../services/daily_checkup_history_service.dart';
 import '../models/mood_data.dart';
 import '../models/question_models.dart';
 import '../models/conversation_models.dart';
 import '../models/course_models.dart';
+import '../models/daily_checkup.dart';
 import '../utils/app_colors.dart';
 import '../widgets/mood_check_widget.dart';
 import '../widgets/reflective_questions_widget.dart';
@@ -40,6 +42,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String _userName = ''; // Nome do usuário
   List<Course> _courses = []; // Lista de cursos
   // Removido: _supportMessage - mensagens da Luma agora só aparecem na aba dela
+  bool _dailyCheckupCompleted = false;
+  bool _editingDailyCheckup = false;
   
   // Services
   FirebaseService? _firebaseService;
@@ -82,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadCompatibleUsers(userId),
         _loadSampleCourses(),
       ]);
-
+      _evaluateDailyCheckupCompletion();
     } catch (e) {
       print('❌ Error loading initial data: $e');
     } finally {
@@ -395,6 +399,47 @@ class _HomeScreenState extends State<HomeScreen> {
     return true; // Todas as perguntas foram respondidas
   }
 
+  void _evaluateDailyCheckupCompletion() {
+    final historyService = Provider.of<DailyCheckupHistoryService>(context, listen: false);
+    final todayRecord = historyService.getCheckupForDate(DateTime.now());
+    final allAnswered = _areAllQuestionsAnswered();
+    final hasMood = _todayMood != null;
+    if (todayRecord != null && todayRecord.isCompleted) {
+      _dailyCheckupCompleted = true;
+      _editingDailyCheckup = false;
+    } else if (hasMood && allAnswered) {
+      _markDailyCheckupCompleted();
+    } else {
+      _dailyCheckupCompleted = false;
+    }
+  }
+
+  Future<void> _markDailyCheckupCompleted() async {
+    if (_todayMood == null) return;
+    final historyService = Provider.of<DailyCheckupHistoryService>(context, listen: false);
+    final streakService = Provider.of<CheckupStreakService>(context, listen: false);
+    final mood = _todayMood!;
+    final now = DateTime.now();
+
+    final checkup = DailyCheckup(
+      date: DateTime(now.year, now.month, now.day),
+      moodScore: mood.happiness.toDouble(),
+      energyLevel: mood.energy.toDouble(),
+      stressLevel: mood.stress.toDouble(),
+      sleepQuality: 0, // ainda não coletado
+      notes: mood.notes,
+      completedAt: now,
+      isCompleted: true,
+      completionPercentage: 100,
+    );
+    await historyService.addCheckup(checkup);
+    await streakService.updateTodayCheckup(checkup);
+    setState(() {
+      _dailyCheckupCompleted = true;
+      _editingDailyCheckup = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -416,29 +461,34 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 24),
                   ],
                   
-                  // Mood Check Section
-                  _buildSectionCard(
-                    icon: Icons.mood,
-                    title: 'Como você está se sentindo hoje?',
-                    subtitle: _todayMood != null 
-                        ? 'Estado registrado - clique para alterar'
-                        : 'Registre seu estado emocional',
-                    child: Column(
-                      children: [
-                        // Se ainda não registrou o humor, mostra o widget completo
-                        if (_todayMood == null) 
-                          MoodCheckWidget(
-                            initialMood: _todayMood,
-                            onMoodSubmitted: _handleMoodSubmission,
-                          )
-                        // Se já registrou, mostra apenas um resumo com botão para alterar
-                        else 
-                          _buildMoodSummaryCard(),
-                      ],
+                  // Checkup Diário - só mostra se não foi concluído
+                  if (!_dailyCheckupCompleted || _editingDailyCheckup) ...[
+                    _buildSectionCard(
+                      icon: Icons.checklist,
+                      title: 'Checkup Diário',
+                      subtitle: 'Como você está se sentindo hoje?',
+                      child: Column(
+                        children: [
+                          // Se ainda não registrou o humor, mostra o widget completo
+                          if (_todayMood == null || _editingDailyCheckup) 
+                            MoodCheckWidget(
+                              initialMood: _todayMood,
+                              onMoodSubmitted: _handleMoodSubmission,
+                            )
+                          // Se já registrou, mostra apenas um resumo com botão para alterar
+                          else 
+                            _buildMoodSummaryCard(),
+                        ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 24),
+                  ],
                   
-                  const SizedBox(height: 24),
+                  // Daily Checkup Summary - mostra quando o checkup diário está completo
+                  if (_dailyCheckupCompleted && !_editingDailyCheckup) ...[
+                    _buildDailyCheckupSummaryCard(),
+                    const SizedBox(height: 24),
+                  ],
                   
                   // Reflective Questions Section - só mostra se não foram todas respondidas
                   if (!_areAllQuestionsAnswered()) ...[
@@ -1233,7 +1283,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _todayMood = updatedMood;
       });
-
+      _evaluateDailyCheckupCompletion();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Estado emocional registrado! 💖'),
@@ -1300,6 +1350,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       }
+      _evaluateDailyCheckupCompletion();
     } catch (e) {
       print('❌ Error saving question response: $e');
     }
@@ -1662,4 +1713,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  Widget _buildDailyCheckupSummaryCard() { return const SizedBox.shrink(); }
+  Widget _chipMetric(String label, String value, String emoji) { return const SizedBox.shrink(); }
 }

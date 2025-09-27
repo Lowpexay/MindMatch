@@ -1,0 +1,112 @@
+import 'package:flutter/material.dart';
+import 'package:mindmatch/utils/app_colors.dart';
+
+class CustomNavbar extends StatelessWidget {
+  final int selectedIndex;
+  final Function(int) onItemTapped;
+
+  const CustomNavbar({
+    super.key,
+    required this.selectedIndex,
+    required this.onItemTapped,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          height: 70,
+          decoration: BoxDecoration(
+            color: AppColors.whiteBack,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 6,
+                offset: Offset(0, -2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(Icons.home, 'Home', 0),
+              _buildNavItem(Icons.video_library, 'Videos', 1),
+              SizedBox(width: 60), // espaço para o avatar
+              _buildNavItem(Icons.chat_bubble_outline, 'Chats', 2),
+              _buildNavItem(Icons.person_outline, 'Perfil', 3),
+            ],
+          ),
+        ),
+
+        Positioned(
+          top: -25,
+          left: MediaQuery.of(context).size.width / 2 - 30,
+          child: Column(
+            children: [
+              Container(
+                height: 60,
+                width: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.deepPurple.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const CircleAvatar(
+                  backgroundImage: AssetImage('assets/images/foto_da_luma.png'),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                height: 4,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, String label, int index) {
+    final isSelected = selectedIndex == index;
+
+    return GestureDetector(
+      onTap: () => onItemTapped(index),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            color: isSelected ? AppColors.purpleBack : AppColors.blackFont,
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isSelected ? AppColors.purpleBack : AppColors.blackFont,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          Container(
+            height: 1,
+            color: isSelected ? AppColors.purpleBack : AppColors.whiteBack,
+          ),
+        ],
+      ),
+    );
+  }
+}

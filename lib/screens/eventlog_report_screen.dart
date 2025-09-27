@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import '../security/eventlog_service.dart';
 import '../utils/app_colors.dart';
 
 class EventLogReportScreen extends StatefulWidget {
@@ -11,8 +10,7 @@ class EventLogReportScreen extends StatefulWidget {
 }
 
 class _EventLogReportScreenState extends State<EventLogReportScreen> {
-  final String _eventLogServer = '10.0.0.168:8400';
-  final String _apiKey = 'mte1zjc3ndktmzdhzs00zwq5ltk5otgtmgzjztgzndm2owu2';
+  // Agora usamos EventLogService centralizado; estes campos antigos foram removidos.
   
   List<Map<String, dynamic>> _loginAttempts = [];
   bool _isLoading = false;
@@ -30,82 +28,8 @@ class _EventLogReportScreenState extends State<EventLogReportScreen> {
 
   // Verificar conectividade com o ManageEngine EventLog Analyzer
   Future<bool> _checkConnection() async {
-    try {
-      final response = await http.get(
-        Uri.parse('http://$_eventLogServer/api/json/dashboard?AUTHTOKEN=$_apiKey'),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(const Duration(seconds: 10));
-
-      return response.statusCode == 200;
-    } catch (e) {
-      print('Erro ao conectar com EventLog Analyzer: $e');
-      return false;
-    }
-  }
-
-  // Buscar eventos reais do ManageEngine
-  Future<List<Map<String, dynamic>>> _getEventsFromManageEngine() async {
-    try {
-      final response = await http.get(
-        Uri.parse('http://$_eventLogServer/api/json/search?AUTHTOKEN=$_apiKey&limit=50&orderby=timestamp'),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(const Duration(seconds: 30));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        
-        // Processar dados do ManageEngine EventLog Analyzer
-        if (data is Map && data.containsKey('events')) {
-          return List<Map<String, dynamic>>.from(data['events']);
-        } else if (data is List) {
-          return List<Map<String, dynamic>>.from(data);
-        }
-      }
-    } catch (e) {
-      print('Erro ao buscar eventos do ManageEngine: $e');
-    }
-    
-    // Retornar dados baseados nos eventos reais que vimos no EventLog
-    return _getMockEventsBasedOnReal();
-  }
-
-  // Dados baseados nos eventos reais que estão sendo enviados
-  List<Map<String, dynamic>> _getMockEventsBasedOnReal() {
-    return [
-      {
-        'timestamp': '2025-09-01T19:40:06.946Z',
-        'user': 'ggramacho19@gmail.com',
-        'device': 'Mobile_Device',
-        'ip': '192.168.1.100',
-        'event': 'LOGIN_FAILURE',
-        'status': 'FAILURE',
-        'eventId': '4625',
-        'domain': 'gmail.com',
-        'app': 'MindMatch'
-      },
-      {
-        'timestamp': '2025-09-01T19:40:00.698Z',
-        'user': 'ggramacho19@gmail.com',
-        'device': 'Mobile_Device',
-        'ip': '192.168.1.100',
-        'event': 'LOGIN_FAILURE',
-        'status': 'FAILURE',
-        'eventId': '4625',
-        'domain': 'gmail.com',
-        'app': 'MindMatch'
-      },
-      {
-        'timestamp': '2025-09-01T19:39:54.362Z',
-        'user': 'ggramacho19@gmail.com',
-        'device': 'Mobile_Device',
-        'ip': '192.168.1.100',
-        'event': 'LOGIN_FAILURE',
-        'status': 'FAILURE',
-        'eventId': '4625',
-        'domain': 'gmail.com',
-        'app': 'MindMatch'
-      },
-    ];
+    // Usa método de teste já existente
+    return await EventLogService.testConnection();
   }
 
   Future<void> _loadEventLogData() async {
@@ -118,13 +42,13 @@ class _EventLogReportScreenState extends State<EventLogReportScreen> {
       // Verificar conectividade com ManageEngine
       _isConnected = await _checkConnection();
       
-      // Carregar eventos (real ou mock)
-      final events = await _getEventsFromManageEngine();
+  // Carregar eventos reais (sucesso + falha) via serviço
+  final events = await EventLogService.getLoginAttempts(limit: 80);
       
       // Processar estatísticas
       _totalAttempts = events.length;
-      _successfulLogins = events.where((e) => e['status'] == 'SUCCESS').length;
-      _failedLogins = events.where((e) => e['status'] == 'FAILURE').length;
+  _successfulLogins = events.where((e) => (e['status'] ?? '').toString().toUpperCase() == 'SUCCESS').length;
+  _failedLogins = events.where((e) => (e['status'] ?? '').toString().toUpperCase() == 'FAILURE').length;
 
       setState(() {
         _loginAttempts = events;
@@ -329,8 +253,8 @@ class _EventLogReportScreenState extends State<EventLogReportScreen> {
   }
 
   Widget _buildEventCard(Map<String, dynamic> event) {
-    final isSuccess = event['status'] == 'SUCCESS';
-    final timestamp = DateTime.tryParse(event['timestamp'] ?? '') ?? DateTime.now();
+  final isSuccess = (event['status'] ?? '').toString().toUpperCase() == 'SUCCESS';
+  final timestamp = DateTime.tryParse(event['timestamp'] ?? '') ?? DateTime.now();
     
     return Card(
       margin: const EdgeInsets.only(bottom: 8),

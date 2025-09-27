@@ -14,12 +14,14 @@ import 'services/achievement_service.dart';
 import 'services/course_service.dart';
 import 'services/course_progress_service.dart';
 import 'services/daily_checkup_history_service.dart';
+import 'services/theme_service.dart';
 import 'providers/conversations_provider.dart';
 import 'screens/profile_edit_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_navigation.dart';
+import 'screens/settings_screen.dart';
 import 'utils/app_colors.dart';
 
 void main() async {
@@ -97,20 +99,49 @@ class MindMatchApp extends StatelessWidget {
           update: (context, authService, firebaseService, previous) =>
               previous ?? ConversationsProvider(firebaseService, authService),
         ),
+        ChangeNotifierProvider(create: (_) => ThemeService()),
       ],
-      child: MaterialApp.router(
-        title: 'MindMatch',
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: AppColors.primary,
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-          fontFamily: 'Roboto',
-        ),
-        routerConfig: _router,
-        debugShowCheckedModeBanner: false,
+      child: Consumer<ThemeService>(
+        builder: (context, themeService, _) {
+          // Light theme (original look) - minimal overrides
+          final lightTheme = ThemeData(
+            primarySwatch: Colors.blue,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: AppColors.primary,
+              brightness: Brightness.light,
+            ),
+            useMaterial3: true,
+            fontFamily: 'Roboto',
+          );
+          // Dark theme: keep brand color, make background truly dark/black
+          final baseDark = ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: AppColors.primary,
+              brightness: Brightness.dark,
+            ),
+            useMaterial3: true,
+            fontFamily: 'Roboto',
+          );
+          final darkTheme = baseDark.copyWith(
+            scaffoldBackgroundColor: AppColors.darkSurface,
+            canvasColor: AppColors.darkSurface,
+            colorScheme: baseDark.colorScheme.copyWith(
+              background: AppColors.darkSurface,
+              surface: AppColors.darkSurface,
+              surfaceVariant: const Color(0xFF1A1A1A),
+              onSurface: Colors.white,
+              onBackground: Colors.white,
+            ),
+            dialogBackgroundColor: AppColors.darkSurface,
+            cardColor: AppColors.darkSurface,
+          );
+          return MaterialApp.router(
+            title: 'MindMatch',
+            theme: themeService.isDark ? darkTheme : lightTheme,
+            routerConfig: _router,
+            debugShowCheckedModeBanner: false,
+          );
+        },
       ),
     );
   }
@@ -162,6 +193,11 @@ final GoRouter _router = GoRouter(
     GoRoute(
       path: '/profileEdit',
       builder: (context, state) => const ProfileEditScreen(),
+    ),
+    // Settings route to be implemented
+    GoRoute(
+      path: '/settings',
+      builder: (context, state) => const SettingsScreen(),
     ),
 
   ],
@@ -222,7 +258,7 @@ class _SplashScreenState extends State<SplashScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(60),
                 child: Image.asset(
-                  'assets/images/luma_chat_avatar.png',
+                  'assets/images/luma_com_fundo.png',
                   width: 120,
                   height: 120,
                   fit: BoxFit.contain, // Mudando para contain para preservar transparência

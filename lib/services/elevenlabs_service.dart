@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
 import '../config/api_keys.dart';
@@ -8,6 +9,12 @@ import '../config/api_keys.dart';
 class ElevenLabsService {
   static const Duration _timeoutDuration = Duration(seconds: 30);
   bool _isSpeaking = false;
+  
+  // Callbacks externos para UI
+  VoidCallback? onStart;
+  VoidCallback? onComplete;
+  VoidCallback? onStop;
+  Function(Object error)? onError;
   
   // Player de áudio para reprodução
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -28,6 +35,7 @@ class ElevenLabsService {
     
     try {
       _isSpeaking = true;
+      onStart?.call();
       
       // Fazer requisição para a API do ElevenLabs
       final response = await http.post(
@@ -67,9 +75,11 @@ class ElevenLabsService {
       }
     } catch (e) {
       print('❌ Erro ElevenLabs: $e');
+      onError?.call(e);
       rethrow;
     } finally {
       _isSpeaking = false;
+      onComplete?.call();
     }
   }
   
@@ -98,6 +108,7 @@ class ElevenLabsService {
   void stop() {
     _isSpeaking = false;
     _audioPlayer.stop();
+    onStop?.call();
   }
   
   /// Obter vozes disponíveis

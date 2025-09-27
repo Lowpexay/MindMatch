@@ -8,10 +8,12 @@ import '../services/gemini_service.dart';
 import '../services/checkup_streak_service.dart';
 import '../services/achievement_service.dart';
 import '../services/course_service.dart';
+import '../services/daily_checkup_history_service.dart';
 import '../models/mood_data.dart';
 import '../models/question_models.dart';
 import '../models/conversation_models.dart';
 import '../models/course_models.dart';
+import '../models/daily_checkup.dart';
 import '../utils/app_colors.dart';
 import '../widgets/mood_check_widget.dart';
 import '../widgets/reflective_questions_widget.dart';
@@ -40,10 +42,14 @@ class _HomeScreenState extends State<HomeScreen> {
   String _userName = ''; // Nome do usuário
   List<Course> _courses = []; // Lista de cursos
   // Removido: _supportMessage - mensagens da Luma agora só aparecem na aba dela
+  bool _dailyCheckupCompleted = false;
+  bool _editingDailyCheckup = false;
+  DateTime? _dailyCheckupDate; // Data do último checkup diário concluído (início do dia)
   
   // Services
   FirebaseService? _firebaseService;
   AuthService? _authService;
+  // ignore: unused_field
   CourseService? _courseService;
 
   @override
@@ -77,11 +83,12 @@ class _HomeScreenState extends State<HomeScreen> {
       await Future.wait([
         _loadUserName(userId),
         _loadTodayMood(userId),
+        _loadPersistedDailyCheckup(userId),
         _loadDailyQuestions(),
         _loadCompatibleUsers(userId),
         _loadSampleCourses(),
       ]);
-
+      _evaluateDailyCheckupCompletion();
     } catch (e) {
       print('❌ Error loading initial data: $e');
     } finally {
@@ -117,6 +124,34 @@ class _HomeScreenState extends State<HomeScreen> {
       // As mensagens da Luma agora só aparecem quando o usuário vai para a aba dela
     } catch (e) {
       print('❌ Error loading mood: $e');
+    }
+  }
+
+  // Carrega do Firestore (user extra data) se o usuário já concluiu o checkup hoje
+  Future<void> _loadPersistedDailyCheckup(String userId) async {
+    try {
+      final extra = await _firebaseService?.getUserExtraData(userId);
+      if (extra != null) {
+        final ts = extra['dailyCheckupDate'];
+        if (ts is int) {
+          final date = DateTime.fromMillisecondsSinceEpoch(ts);
+          final start = DateTime(date.year, date.month, date.day);
+          final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+          if (start == today) {
+            _dailyCheckupDate = start;
+            // Se não carregou o mood (ex.: falhou _loadTodayMood) tentar reconstruir
+            if (_todayMood == null) {
+              final moodMap = extra['dailyCheckupMood'];
+              if (moodMap is Map<String, dynamic>) {
+                try { _todayMood = MoodData.fromMap(moodMap); } catch (_) {}
+              }
+            }
+            _dailyCheckupCompleted = true;
+          }
+        }
+      }
+    } catch (e) {
+      print('⚠️ Error loading persisted daily checkup: $e');
     }
   }
 
@@ -394,10 +429,78 @@ class _HomeScreenState extends State<HomeScreen> {
     return true; // Todas as perguntas foram respondidas
   }
 
+  void _evaluateDailyCheckupCompletion() {
+    final historyService = Provider.of<DailyCheckupHistoryService>(context, listen: false);
+    final todayRecord = historyService.getCheckupForDate(DateTime.now());
+    final hasMood = _todayMood != null;
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    if (_dailyCheckupDate != null && _dailyCheckupDate == today) {
+      // Já marcado via persistência
+      _dailyCheckupCompleted = true;
+      _editingDailyCheckup = false;
+      return;
+    }
+    if (todayRecord != null && todayRecord.isCompleted) {
+      _dailyCheckupDate = today;
+      _dailyCheckupCompleted = true;
+      _editingDailyCheckup = false;
+    } else if (hasMood) {
+      // Se já temos humor de hoje mas não está marcado, marcar agora (persistindo)
+      _markDailyCheckupCompleted(persist: true);
+    } else {
+      _dailyCheckupCompleted = false;
+    }
+  }
+
+  Future<void> _markDailyCheckupCompleted({bool persist = false}) async {
+    if (_todayMood == null) return;
+    final historyService = Provider.of<DailyCheckupHistoryService>(context, listen: false);
+    final streakService = Provider.of<CheckupStreakService>(context, listen: false);
+    final mood = _todayMood!;
+    final now = DateTime.now();
+
+    final checkup = DailyCheckup(
+      date: DateTime(now.year, now.month, now.day),
+      moodScore: mood.happiness.toDouble(),
+      energyLevel: mood.energy.toDouble(),
+      stressLevel: mood.stress.toDouble(),
+      sleepQuality: 0, // ainda não coletado
+      notes: mood.notes,
+      completedAt: now,
+      isCompleted: true,
+      completionPercentage: 100,
+    );
+    await historyService.addCheckup(checkup);
+    await streakService.updateTodayCheckup(checkup);
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    if (persist) {
+      try {
+        final userId = _authService?.currentUser?.uid;
+        if (userId != null) {
+          await _firebaseService?.updateUserExtraData(userId, {
+            'dailyCheckupDate': startOfDay.millisecondsSinceEpoch,
+            'dailyCheckupMood': mood.toMap(),
+          });
+        }
+      } catch (e) {
+        print('⚠️ Failed to persist daily checkup (mark): $e');
+      }
+    }
+    setState(() {
+      _dailyCheckupDate = startOfDay;
+      _dailyCheckupCompleted = true;
+      _editingDailyCheckup = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    // scheme reserved for future use in additional refactors
+  final scheme = theme.colorScheme; // ignore: unused_local_variable
     return Container(
-      color: AppColors.gray50,
+      // Use scaffold background instead of fixed gray so dark theme applies
+      color: theme.scaffoldBackgroundColor,
       child: _isLoading
           ? _buildLoadingState()
           : SingleChildScrollView( // Mudança principal: ScrollView unificado
@@ -411,28 +514,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 24),
                   ],
                   
-                  // Mood Check Section
+                  // Checkup Diário - seção sempre exibida; conteúdo muda conforme estado
                   _buildSectionCard(
-                    icon: Icons.mood,
-                    title: 'Como você está se sentindo hoje?',
-                    subtitle: _todayMood != null 
-                        ? 'Estado registrado - clique para alterar'
-                        : 'Registre seu estado emocional',
+                    icon: Icons.checklist,
+                    title: 'Checkup Diário',
+                    subtitle: 'Como você está se sentindo hoje?',
                     child: Column(
                       children: [
-                        // Se ainda não registrou o humor, mostra o widget completo
-                        if (_todayMood == null) 
+                        if (!_dailyCheckupCompleted || _editingDailyCheckup || _todayMood == null)
                           MoodCheckWidget(
                             initialMood: _todayMood,
                             onMoodSubmitted: _handleMoodSubmission,
                           )
-                        // Se já registrou, mostra apenas um resumo com botão para alterar
-                        else 
+                        else
                           _buildMoodSummaryCard(),
                       ],
                     ),
                   ),
-                  
                   const SizedBox(height: 24),
                   
                   // Reflective Questions Section - só mostra se não foram todas respondidas
@@ -503,6 +601,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildWellnessIndicator() {
     final score = _todayMood!.wellnessScore;
     final color = score >= 70 ? Colors.green : score >= 40 ? Colors.orange : Colors.red;
@@ -543,10 +642,12 @@ class _HomeScreenState extends State<HomeScreen> {
     required String subtitle,
     required Widget child,
   }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -584,10 +685,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: scheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -595,7 +696,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         subtitle,
                         style: TextStyle(
                           fontSize: 14,
-                          color: AppColors.textSecondary,
+                          color: scheme.onSurface.withOpacity(0.7),
                         ),
                       ),
                     ],
@@ -616,10 +717,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCompletedQuestionsCard() {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -656,7 +758,8 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                // Will be overridden by theme-aware DefaultTextStyle below if needed
+                color: null,
               ),
               textAlign: TextAlign.center,
             ),
@@ -668,7 +771,7 @@ class _HomeScreenState extends State<HomeScreen> {
               'Você respondeu todas as perguntas reflexivas de hoje. Novas perguntas estarão disponíveis amanhã!',
               style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary,
+                color: scheme.onSurface.withOpacity(0.7),
                 height: 1.5,
               ),
               textAlign: TextAlign.center,
@@ -700,7 +803,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         'Respondidas',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: scheme.onSurface.withOpacity(0.7),
                         ),
                       ),
                     ],
@@ -724,7 +827,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         'Compatíveis',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: scheme.onSurface.withOpacity(0.7),
                         ),
                       ),
                     ],
@@ -832,7 +935,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.7),
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -862,7 +965,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
+                backgroundColor: Theme.of(context).colorScheme.surface,
                 foregroundColor: color,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -911,9 +1014,9 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         height: MediaQuery.of(context).size.height * 0.8,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           children: [
@@ -1007,7 +1110,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(24),
                     image: const DecorationImage(
-                      image: AssetImage('assets/images/luma_chat_avatar.png'),
+                      image: AssetImage('assets/images/oiLuma.png'),
                       fit: BoxFit.cover,
                     ),
                     boxShadow: [
@@ -1057,38 +1160,54 @@ class _HomeScreenState extends State<HomeScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.8),
+                // Slightly more transparent in dark theme so gradient below aparece
+                color: Theme.of(context).colorScheme.surface.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.4 : 0.8),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Olá! Percebi que você está passando por um momento difícil. 💙',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textPrimary,
-                      height: 1.4,
-                    ),
+                  Builder(
+                    builder: (context) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      return Text(
+                        'Olá! Percebi que você está passando por um momento difícil. 💙',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
+                          height: 1.4,
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Lembre-se de que é completamente normal ter dias mais desafiadores. Você não está sozinho(a) nessa jornada. Estou aqui para conversar, ouvir e ajudar você a encontrar maneiras de se sentir melhor.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                      height: 1.5,
-                    ),
+                  Builder(
+                    builder: (context) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      return Text(
+                        'Lembre-se de que é completamente normal ter dias mais desafiadores. Você não está sozinho(a) nessa jornada. Estou aqui para conversar, ouvir e ajudar você a encontrar maneiras de se sentir melhor.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? Colors.white70 : AppColors.textSecondary,
+                          height: 1.5,
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    'Que tal conversarmos um pouco? Às vezes, dividir nossos sentimentos pode trazer alívio e clareza. ✨',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                      height: 1.5,
-                    ),
+                  Builder(
+                    builder: (context) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      return Text(
+                        'Que tal conversarmos um pouco? Às vezes, dividir nossos sentimentos pode trazer alívio e clareza. ✨',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? Colors.white70 : AppColors.textSecondary,
+                          height: 1.5,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -1151,6 +1270,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // ignore: unused_element
   String _getGreeting() {
     final hour = DateTime.now().hour;
     final name = _userName.isNotEmpty ? ', $_userName' : '';
@@ -1221,7 +1341,8 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _todayMood = updatedMood;
       });
-
+      // Marcar imediatamente como completo (independente das perguntas reflexivas)
+      await _markDailyCheckupCompleted(persist: true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Estado emocional registrado! 💖'),
@@ -1288,6 +1409,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       }
+      _evaluateDailyCheckupCompletion();
     } catch (e) {
       print('❌ Error saving question response: $e');
     }
@@ -1303,6 +1425,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildUserProfileModal(Map<String, dynamic> user) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final compatibility = user['compatibility'] as double;
     final name = user['name'] ?? 'Usuário';
     final age = user['age'] as int?;
@@ -1321,9 +1445,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.8,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         children: [
@@ -1595,6 +1719,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ignore: unused_element
   void _showProfileMenu() {
     showModalBottomSheet(
       context: context,
@@ -1647,4 +1772,5 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
 }

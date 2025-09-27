@@ -35,14 +35,17 @@ class _MoodCheckWidgetState extends State<MoodCheckWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+  final surface = isDark ? AppColors.darkSurface : Colors.white;
+    final textPrimary = isDark ? Colors.white : AppColors.textPrimary;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -60,12 +63,12 @@ class _MoodCheckWidgetState extends State<MoodCheckWidget> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: const Text(
+                child: Text(
                   'Como você está se sentindo hoje?',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: textPrimary,
                   ),
                 ),
               ),
@@ -128,6 +131,7 @@ class _MoodCheckWidgetState extends State<MoodCheckWidget> {
             ),
             maxLines: 2,
             maxLength: 200,
+            style: TextStyle(color: textPrimary),
           ),
           
           const SizedBox(height: 20),
@@ -167,6 +171,9 @@ class _MoodCheckWidgetState extends State<MoodCheckWidget> {
     required IconData icon,
     bool isStress = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? Colors.white : AppColors.textPrimary;
+    final textSecondary = isDark ? Colors.white70 : AppColors.textSecondary;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -176,10 +183,10 @@ class _MoodCheckWidgetState extends State<MoodCheckWidget> {
             const SizedBox(width: 8),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
+                color: textPrimary,
               ),
             ),
             const Spacer(),
@@ -229,14 +236,14 @@ class _MoodCheckWidgetState extends State<MoodCheckWidget> {
                 isStress ? 'Calmo' : 'Baixo',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.textSecondary,
+                  color: textSecondary,
                 ),
               ),
               Text(
                 isStress ? 'Estressado' : 'Alto',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.textSecondary,
+                  color: textSecondary,
                 ),
               ),
             ],

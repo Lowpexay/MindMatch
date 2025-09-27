@@ -43,8 +43,9 @@ class ConversationsScreenState extends State<ConversationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color: AppColors.gray50,
+      color: isDark ? AppColors.darkSurface : AppColors.gray50,
       child: _isLoading
           ? _buildLoadingState()
           : _conversations.isEmpty
@@ -54,17 +55,18 @@ class ConversationsScreenState extends State<ConversationsScreen> {
   }
 
   Widget _buildLoadingState() {
-    return const Center(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
           Text(
             'Carregando conversas...',
             style: TextStyle(
               fontSize: 16,
-              color: AppColors.textSecondary,
+              color: isDark ? Colors.white70 : AppColors.textSecondary,
             ),
           ),
         ],
@@ -73,6 +75,7 @@ class ConversationsScreenState extends State<ConversationsScreen> {
   }
 
   Widget _buildEmptyState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -93,12 +96,12 @@ class ConversationsScreenState extends State<ConversationsScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Nenhuma conversa ainda',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
@@ -106,7 +109,7 @@ class ConversationsScreenState extends State<ConversationsScreen> {
               'Quando você começar a conversar com outras pessoas, suas conversas aparecerão aqui.',
               style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary,
+                color: isDark ? Colors.white70 : AppColors.textSecondary,
                 height: 1.5,
               ),
               textAlign: TextAlign.center,
@@ -163,15 +166,16 @@ class ConversationsScreenState extends State<ConversationsScreen> {
     final otherUser = conversation.otherUser;
     final lastMessage = conversation.lastMessage;
     final unreadCount = conversation.unreadCount;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+  color: isDark ? AppColors.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withOpacity(isDark ? 0.5 : 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -198,7 +202,7 @@ class ConversationsScreenState extends State<ConversationsScreen> {
                   decoration: BoxDecoration(
                     color: Colors.green,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white, width: 2),
+                    border: Border.all(color: isDark ? AppColors.darkSurface : Colors.white, width: 2),
                   ),
                 ),
               ),
@@ -209,10 +213,10 @@ class ConversationsScreenState extends State<ConversationsScreen> {
             Expanded(
               child: Text(
                 otherUser.name,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
                 ),
               ),
             ),
@@ -247,7 +251,7 @@ class ConversationsScreenState extends State<ConversationsScreen> {
                       'Você: ',
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.textSecondary,
+                        color: isDark ? Colors.white70 : AppColors.textSecondary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -256,7 +260,9 @@ class ConversationsScreenState extends State<ConversationsScreen> {
                       lastMessage.content,
                       style: TextStyle(
                         fontSize: 14,
-                        color: unreadCount > 0 ? AppColors.textPrimary : AppColors.textSecondary,
+                        color: isDark
+                            ? (unreadCount > 0 ? Colors.white : Colors.white70)
+                            : (unreadCount > 0 ? AppColors.textPrimary : AppColors.textSecondary),
                         fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
                       ),
                       maxLines: 1,
@@ -269,7 +275,7 @@ class ConversationsScreenState extends State<ConversationsScreen> {
                       'Iniciar conversa',
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.textSecondary,
+                        color: isDark ? Colors.white70 : AppColors.textSecondary,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -283,7 +289,7 @@ class ConversationsScreenState extends State<ConversationsScreen> {
                   _formatMessageTime(lastMessage?.timestamp ?? conversation.createdAt),
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: isDark ? Colors.white70 : AppColors.textSecondary,
                   ),
                 ),
                 const Spacer(),
@@ -292,7 +298,9 @@ class ConversationsScreenState extends State<ConversationsScreen> {
                   Icon(
                     Icons.done_all,
                     size: 16,
-                    color: unreadCount == 0 ? AppColors.primary : AppColors.gray400,
+                    color: unreadCount == 0
+                        ? AppColors.primary
+                        : (isDark ? Colors.white38 : AppColors.gray400),
                   ),
                 ],
               ],
@@ -301,7 +309,7 @@ class ConversationsScreenState extends State<ConversationsScreen> {
         ),
         trailing: Icon(
           Icons.chevron_right,
-          color: AppColors.gray400,
+          color: isDark ? Colors.white38 : AppColors.gray400,
         ),
         onTap: () => _openChat(otherUser),
       ),
@@ -349,23 +357,26 @@ class ConversationsScreenState extends State<ConversationsScreen> {
   void showConversationOptions() {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Container(
+  backgroundColor: Theme.of(context).brightness == Brightness.dark ? AppColors.darkSurface : null,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Container(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'Opções de Conversa',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 20),
             ListTile(
               leading: const Icon(Icons.search, color: AppColors.primary),
-              title: const Text('Buscar conversas'),
+              title: Text('Buscar conversas', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
               onTap: () {
                 Navigator.pop(context);
                 _showSearchDialog();
@@ -373,7 +384,7 @@ class ConversationsScreenState extends State<ConversationsScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.mark_chat_read, color: AppColors.primary),
-              title: const Text('Marcar todas como lidas'),
+              title: Text('Marcar todas como lidas', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
               onTap: () {
                 Navigator.pop(context);
                 _markAllAsRead();
@@ -381,20 +392,32 @@ class ConversationsScreenState extends State<ConversationsScreen> {
             ),
           ],
         ),
-      ),
+      );
+      },
     );
   }
 
   void _showSearchDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Buscar conversas'),
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+  backgroundColor: isDark ? AppColors.darkSurface : null,
+        title: Text('Buscar conversas', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
         content: TextField(
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'Digite o nome da pessoa...',
-            border: OutlineInputBorder(),
+            hintStyle: TextStyle(color: isDark ? Colors.white54 : AppColors.textSecondary),
+            border: const OutlineInputBorder(),
+            enabledBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: isDark ? Colors.white24 : AppColors.gray300),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: AppColors.primary),
+            ),
           ),
+          style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary),
           onChanged: (value) {
             // TODO: Implementar busca
           },
@@ -409,7 +432,8 @@ class ConversationsScreenState extends State<ConversationsScreen> {
             child: const Text('Buscar'),
           ),
         ],
-      ),
+      );
+      },
     );
   }
 

@@ -25,7 +25,85 @@ class CheckupStreakService extends ChangeNotifier {
   bool get todayCompleted => _todayCompleted;
 
   CheckupStreakService() {
+    // Inicializar com usuário atual (se já logado)
     _checkCurrentUser();
+    // Escutar mudanças de autenticação para garantir isolamento por usuário
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      _handleAuthChange(user);
+    });
+  }
+
+  /// Lida com mudanças de autenticação garantindo que os dados do streak
+  /// sejam únicos por usuário. Também migra dados locais 'anonymous' para
+  /// o primeiro usuário logado (caso o usuário tenha usado o app antes de logar).
+  Future<void> _handleAuthChange(User? user) async {
+    final newUserId = user?.uid;
+    if (newUserId == _currentUserId) return; // Nada mudou
+
+    // Se usuário deslogou: atualizar id e recarregar dados anônimos
+    if (newUserId == null) {
+      _currentUserId = null;
+      await _loadStreakData();
+      await _loadDailyCheckups();
+      return;
+    }
+
+    // Usuário logou ou trocou: migrar dados anônimos se necessário
+    await _migrateAnonymousDataIfNeeded(newUserId);
+
+    _currentUserId = newUserId;
+    await _loadStreakData();
+    await _loadDailyCheckups();
+  }
+
+  /// Migra dados salvos sob o namespace 'anonymous' para o usuário real
+  /// apenas se o usuário ainda não tiver dados próprios.
+  Future<void> _migrateAnonymousDataIfNeeded(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final anonymousStreakKey = '${_streakKeyPrefix}anonymous';
+      final anonymousCurrentKey = '${_currentStreakKeyPrefix}anonymous';
+      final anonymousLastKey = '${_lastCheckupKeyPrefix}anonymous';
+      final anonymousDailyKey = '${_dailyCheckupKeyPrefix}anonymous';
+
+      final userStreakKey = '${_streakKeyPrefix}$userId';
+      final userHasData = prefs.containsKey(userStreakKey);
+
+      // Apenas migrar se usuário não tem dados e existir algo anônimo
+      if (userHasData) return;
+      final hasAnonymous = prefs.containsKey(anonymousStreakKey) || prefs.containsKey(anonymousCurrentKey);
+      if (!hasAnonymous) return;
+
+      // Copiar valores
+      if (prefs.containsKey(anonymousStreakKey)) {
+        final v = prefs.getString(anonymousStreakKey);
+        if (v != null) await prefs.setString(userStreakKey, v);
+      }
+      if (prefs.containsKey(anonymousCurrentKey)) {
+        final v = prefs.getInt(anonymousCurrentKey);
+        if (v != null) await prefs.setInt('${_currentStreakKeyPrefix}$userId', v);
+      }
+      if (prefs.containsKey(anonymousLastKey)) {
+        final v = prefs.getString(anonymousLastKey);
+        if (v != null) await prefs.setString('${_lastCheckupKeyPrefix}$userId', v);
+      }
+      if (prefs.containsKey(anonymousDailyKey)) {
+        final v = prefs.getString(anonymousDailyKey);
+        if (v != null) await prefs.setString('${_dailyCheckupKeyPrefix}$userId', v);
+      }
+
+      // (Opcional) Limpar chaves anônimas para evitar reutilização cruzada
+      await prefs.remove(anonymousStreakKey);
+      await prefs.remove(anonymousCurrentKey);
+      await prefs.remove(anonymousLastKey);
+      await prefs.remove(anonymousDailyKey);
+
+      if (kDebugMode) {
+        print('📦 Migração de streak anônimo concluída para usuário $userId');
+      }
+    } catch (e) {
+      print('⚠️ Falha ao migrar dados anônimos: $e');
+    }
   }
 
   Future<void> _checkCurrentUser() async {
@@ -291,7 +369,14 @@ class CheckupStreakService extends ChangeNotifier {
     _dailyCheckups.sort((a, b) => b.date.compareTo(a.date));
     
     await _saveDailyCheckups();
-    notifyListeners();
+    // Se ainda não marcou o streak de hoje como completo, integrar com streak
+    if (!_todayCompleted) {
+      // Atualiza campos internos de streak sem duplicar lógica
+      // Reaproveitando fluxo existente chamando completeCheckup()
+      await completeCheckup();
+    } else {
+      notifyListeners();
+    }
   }
 
   /// Obter checkup de hoje

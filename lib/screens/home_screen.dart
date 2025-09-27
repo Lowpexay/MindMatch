@@ -44,6 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Removido: _supportMessage - mensagens da Luma agora só aparecem na aba dela
   bool _dailyCheckupCompleted = false;
   bool _editingDailyCheckup = false;
+  DateTime? _dailyCheckupDate; // Data do último checkup diário concluído (início do dia)
   
   // Services
   FirebaseService? _firebaseService;
@@ -82,6 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await Future.wait([
         _loadUserName(userId),
         _loadTodayMood(userId),
+        _loadPersistedDailyCheckup(userId),
         _loadDailyQuestions(),
         _loadCompatibleUsers(userId),
         _loadSampleCourses(),
@@ -122,6 +124,34 @@ class _HomeScreenState extends State<HomeScreen> {
       // As mensagens da Luma agora só aparecem quando o usuário vai para a aba dela
     } catch (e) {
       print('❌ Error loading mood: $e');
+    }
+  }
+
+  // Carrega do Firestore (user extra data) se o usuário já concluiu o checkup hoje
+  Future<void> _loadPersistedDailyCheckup(String userId) async {
+    try {
+      final extra = await _firebaseService?.getUserExtraData(userId);
+      if (extra != null) {
+        final ts = extra['dailyCheckupDate'];
+        if (ts is int) {
+          final date = DateTime.fromMillisecondsSinceEpoch(ts);
+          final start = DateTime(date.year, date.month, date.day);
+          final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+          if (start == today) {
+            _dailyCheckupDate = start;
+            // Se não carregou o mood (ex.: falhou _loadTodayMood) tentar reconstruir
+            if (_todayMood == null) {
+              final moodMap = extra['dailyCheckupMood'];
+              if (moodMap is Map<String, dynamic>) {
+                try { _todayMood = MoodData.fromMap(moodMap); } catch (_) {}
+              }
+            }
+            _dailyCheckupCompleted = true;
+          }
+        }
+      }
+    } catch (e) {
+      print('⚠️ Error loading persisted daily checkup: $e');
     }
   }
 
@@ -402,19 +432,27 @@ class _HomeScreenState extends State<HomeScreen> {
   void _evaluateDailyCheckupCompletion() {
     final historyService = Provider.of<DailyCheckupHistoryService>(context, listen: false);
     final todayRecord = historyService.getCheckupForDate(DateTime.now());
-    final allAnswered = _areAllQuestionsAnswered();
     final hasMood = _todayMood != null;
-    if (todayRecord != null && todayRecord.isCompleted) {
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    if (_dailyCheckupDate != null && _dailyCheckupDate == today) {
+      // Já marcado via persistência
       _dailyCheckupCompleted = true;
       _editingDailyCheckup = false;
-    } else if (hasMood && allAnswered) {
-      _markDailyCheckupCompleted();
+      return;
+    }
+    if (todayRecord != null && todayRecord.isCompleted) {
+      _dailyCheckupDate = today;
+      _dailyCheckupCompleted = true;
+      _editingDailyCheckup = false;
+    } else if (hasMood) {
+      // Se já temos humor de hoje mas não está marcado, marcar agora (persistindo)
+      _markDailyCheckupCompleted(persist: true);
     } else {
       _dailyCheckupCompleted = false;
     }
   }
 
-  Future<void> _markDailyCheckupCompleted() async {
+  Future<void> _markDailyCheckupCompleted({bool persist = false}) async {
     if (_todayMood == null) return;
     final historyService = Provider.of<DailyCheckupHistoryService>(context, listen: false);
     final streakService = Provider.of<CheckupStreakService>(context, listen: false);
@@ -434,7 +472,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     await historyService.addCheckup(checkup);
     await streakService.updateTodayCheckup(checkup);
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    if (persist) {
+      try {
+        final userId = _authService?.currentUser?.uid;
+        if (userId != null) {
+          await _firebaseService?.updateUserExtraData(userId, {
+            'dailyCheckupDate': startOfDay.millisecondsSinceEpoch,
+            'dailyCheckupMood': mood.toMap(),
+          });
+        }
+      } catch (e) {
+        print('⚠️ Failed to persist daily checkup (mark): $e');
+      }
+    }
     setState(() {
+      _dailyCheckupDate = startOfDay;
       _dailyCheckupCompleted = true;
       _editingDailyCheckup = false;
     });
@@ -461,34 +514,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 24),
                   ],
                   
-                  // Checkup Diário - só mostra se não foi concluído
-                  if (!_dailyCheckupCompleted || _editingDailyCheckup) ...[
-                    _buildSectionCard(
-                      icon: Icons.checklist,
-                      title: 'Checkup Diário',
-                      subtitle: 'Como você está se sentindo hoje?',
-                      child: Column(
-                        children: [
-                          // Se ainda não registrou o humor, mostra o widget completo
-                          if (_todayMood == null || _editingDailyCheckup) 
-                            MoodCheckWidget(
-                              initialMood: _todayMood,
-                              onMoodSubmitted: _handleMoodSubmission,
-                            )
-                          // Se já registrou, mostra apenas um resumo com botão para alterar
-                          else 
-                            _buildMoodSummaryCard(),
-                        ],
-                      ),
+                  // Checkup Diário - seção sempre exibida; conteúdo muda conforme estado
+                  _buildSectionCard(
+                    icon: Icons.checklist,
+                    title: 'Checkup Diário',
+                    subtitle: 'Como você está se sentindo hoje?',
+                    child: Column(
+                      children: [
+                        if (!_dailyCheckupCompleted || _editingDailyCheckup || _todayMood == null)
+                          MoodCheckWidget(
+                            initialMood: _todayMood,
+                            onMoodSubmitted: _handleMoodSubmission,
+                          )
+                        else
+                          _buildMoodSummaryCard(),
+                      ],
                     ),
-                    const SizedBox(height: 24),
-                  ],
-                  
-                  // Daily Checkup Summary - mostra quando o checkup diário está completo
-                  if (_dailyCheckupCompleted && !_editingDailyCheckup) ...[
-                    _buildDailyCheckupSummaryCard(),
-                    const SizedBox(height: 24),
-                  ],
+                  ),
+                  const SizedBox(height: 24),
                   
                   // Reflective Questions Section - só mostra se não foram todas respondidas
                   if (!_areAllQuestionsAnswered()) ...[
@@ -1067,7 +1110,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(24),
                     image: const DecorationImage(
-                      image: AssetImage('assets/images/luma_chat_avatar.png'),
+                      image: AssetImage('assets/images/oiLuma.png'),
                       fit: BoxFit.cover,
                     ),
                     boxShadow: [
@@ -1283,7 +1326,8 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _todayMood = updatedMood;
       });
-      _evaluateDailyCheckupCompletion();
+      // Marcar imediatamente como completo (independente das perguntas reflexivas)
+      await _markDailyCheckupCompleted(persist: true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Estado emocional registrado! 💖'),
@@ -1714,6 +1758,4 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildDailyCheckupSummaryCard() { return const SizedBox.shrink(); }
-  Widget _chipMetric(String label, String value, String emoji) { return const SizedBox.shrink(); }
 }

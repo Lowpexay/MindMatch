@@ -14,6 +14,7 @@ class AppColorsProfile {
   static const Color purpleBack = Color(0xFF6365F1);
   static const Color blackFont = Color(0xFF262626);
   static const Color lightGreyFont = Color(0xFFcac9c9);
+  static const Color lighterGreyBack = Color.fromARGB(255, 240, 239, 239);
 }
 
 class ProfileScreen extends StatelessWidget {

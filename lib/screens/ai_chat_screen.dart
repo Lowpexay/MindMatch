@@ -562,7 +562,8 @@ class AiChatScreenState extends State<AiChatScreen> {
   // Exibir navbar dentro do chatbot conforme solicitado
   // Navbar sempre visível nesta tela conforme pedido
   const bool showPersistentNavbar = true;
-  const double navBarReservedHeight = 70; // altura da navbar para padding inferior
+  // Ajuste: reduzir espaço inferior para trazer conteúdo mais perto da navbar
+  const double navBarReservedHeight = 40; // altura da navbar para padding inferior (reduzido de 70)
     
     // Se estiver no modo visual de voz, mostrar a interface da Luma
     if (_isVisualVoiceMode) {
@@ -869,12 +870,11 @@ class AiChatScreenState extends State<AiChatScreen> {
     return CustomNavbar(
       selectedIndex: currentIndex,
       onItemTapped: (index) {
-        // Se escolher a mesma aba que estava, apenas fechar o chat
+        // Novo comportamento: se tocar na mesma aba, não faz nada (permanece no chat)
         if (index == currentIndex) {
-          Navigator.of(context).maybePop();
-          return;
+          return; // ignora toque redundante
         }
-        // Fechar e trocar aba
+        // Trocar para outra aba: primeiro fecha o chat, depois muda a aba principal
         Navigator.of(context).pop();
         MainNavigation.mainNavigationKey.currentState?.switchToTab(index);
       },

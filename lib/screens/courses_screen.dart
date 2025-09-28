@@ -1,91 +1,62 @@
 import 'package:flutter/material.dart';
-import 'package:mindmatch/utils/app_colors.dart';
+import 'package:provider/provider.dart';
+import '../services/course_service.dart';
+import '../widgets/courses_widget.dart';
 
 class CoursesScreen extends StatefulWidget {
   const CoursesScreen({super.key});
 
   @override
-  State<CoursesScreen> createState() => CoursesScreenState();
+  State<CoursesScreen> createState() => _CoursesScreenState();
 }
 
-class CoursesScreenState extends State<CoursesScreen> {
-  int selectedIndex = 0;
+class _CoursesScreenState extends State<CoursesScreen> {
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      await Provider.of<CourseService>(context, listen: false).loadCourses();
+    } catch (e) {
+      _error = 'Erro ao carregar cursos';
+    } finally {
+      if (mounted) setState(() { _loading = false; });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final courseService = Provider.of<CourseService>(context);
+    final courses = courseService.courses;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.blackFont : AppColors.lighterGreyBack,
-      appBar: AppBar(
-        title: const Text("Cursos"),
-        backgroundColor: isDark ? AppColors.blackFont : AppColors.whiteBack,
-      ),
-      body: SingleChildScrollView(
+    if (_loading && courses.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null && courses.isEmpty) {
+      return Center(
         child: Column(
-          children: [
-            const SizedBox(height: 16),
-            MenuCategorias(
-              selectedIndex: selectedIndex,
-              onChanged: (index) {
-                setState(() {
-                  selectedIndex = index;
-                });
-              },
-            ),
-            const SizedBox(height: 24),
-            Text('Conteúdo da aba: ${selectedIndex + 1}'),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ✅ Widget interno: MenuCategorias como classe
-class MenuCategorias extends StatelessWidget {
-  final int selectedIndex;
-  final Function(int) onChanged;
-
-  const MenuCategorias({
-    super.key,
-    required this.selectedIndex,
-    required this.onChanged,
-  });
-
-  final List<String> categorias = const ['Em Destaque', 'Favoritos', 'Concluídos'];
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: List.generate(categorias.length, (index) {
-        final isSelected = selectedIndex == index;
-
-        return GestureDetector(
-          onTap: () => onChanged(index),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                categorias[index],
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.deepPurple : Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 4),
-              if (isSelected)
-                Container(
-                  height: 2,
-                  width: 40,
-                  color: Colors.deepPurple,
-                ),
+              Text(_error!, style: TextStyle(color: isDark ? Colors.white : Colors.red)),
+              const SizedBox(height: 12),
+              ElevatedButton(onPressed: _load, child: const Text('Tentar novamente')),
             ],
-          ),
-        );
-      }),
+        ),
+      );
+    }
+
+    return CoursesWidget(
+      courses: courses,
+      title: 'Todos os Cursos',
+      showAll: true,
     );
   }
 }

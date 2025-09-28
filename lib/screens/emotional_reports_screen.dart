@@ -142,14 +142,15 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
   }
 
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.blackFont : AppColors.whiteBack,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: isDark ? Colors.grey.withOpacity(0.5) :  Colors.grey.withOpacity(0.1),
             spreadRadius: 1,
             blurRadius: 3,
             offset: const Offset(0, 1),
@@ -162,10 +163,10 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color:  isDark ? AppColors.whiteBack : AppColors.blackFont,
             ),
           ),
           Text(
@@ -181,10 +182,11 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
   }
 
   Widget _buildWeeklyChart(CheckupStreakService streakService) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.blackFont : AppColors.whiteBack,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -198,12 +200,12 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Humor dos Últimos 7 Dias',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color:  isDark ? AppColors.whiteBack : AppColors.blackFont,
             ),
           ),
           const SizedBox(height: 16),
@@ -345,10 +347,11 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
   }
 
   Widget _buildAchievementsSection(AchievementService achievementService) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color:  isDark ? AppColors.blackFont : AppColors.whiteBack,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -364,12 +367,12 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'Conquistas',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  color: isDark ? AppColors.whiteBack : AppColors.blackFont,
                 ),
               ),
               const Spacer(),
@@ -420,6 +423,7 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
   }
 
   Widget _buildAchievementItem(Achievement achievement) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -452,7 +456,7 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
                   achievement.title,
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: achievement.isUnlocked ? Colors.black87 : Colors.grey,
+                    color:  isDark ? (achievement.isUnlocked ? Colors.white : Colors.grey) : (achievement.isUnlocked ? Colors.black87 : Colors.grey),
                   ),
                 ),
                 Text(
@@ -492,14 +496,15 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
   }
 
   void _showAllAchievements(BuildContext context, AchievementService achievementService) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         height: MediaQuery.of(context).size.height * 0.8,
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.blackFont : AppColors.whiteBack,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
@@ -512,10 +517,10 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
               ),
               child: Row(
                 children: [
-                  const Text(
+                  Text(
                     'Todas as Conquistas',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: isDark ? AppColors.whiteBack : AppColors.blackFont,
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                     ),
@@ -567,10 +572,11 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
   }
 
   Widget _buildMonthlyProgress(CheckupStreakService streakService) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color:  isDark ? AppColors.blackFont : AppColors.whiteBack,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -584,12 +590,12 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Progresso do Mês',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: isDark ? AppColors.whiteBack : AppColors.blackFont,
             ),
           ),
           const SizedBox(height: 16),
@@ -601,10 +607,10 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
                   children: [
                     Text(
                       '${DateTime.now().day}/30 dias',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color:  isDark ? AppColors.whiteBack : AppColors.blackFont,
                       ),
                     ),
                     const Text(
@@ -632,11 +638,12 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
 
   Widget _buildHistoryList(CheckupStreakService streakService) {
     final recentCheckups = streakService.getRecentCheckups(days: 30);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? AppColors.blackFont : AppColors.whiteBack,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -650,12 +657,12 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Histórico Recente',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color:  isDark ? AppColors.whiteBack : AppColors.blackFont,
             ),
           ),
           const SizedBox(height: 16),
@@ -700,6 +707,7 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
   }
 
   Widget _buildHistoryItem(DailyCheckup checkup) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -744,9 +752,9 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
                   children: [
                     Text(
                       _formatDateHistory(checkup.date),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color:  isDark ? AppColors.whiteBack : AppColors.blackFont,
                       ),
                     ),
                     const Spacer(),
@@ -941,11 +949,11 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
 
   Widget _buildRecentAchievements(AchievementService achievementService) {
     final recentAchievements = achievementService.getRecentAchievements();
-    
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color:  isDark ? AppColors.blackFont : AppColors.whiteBack,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -959,12 +967,12 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Conquistas Recentes',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: isDark ? AppColors.whiteBack : AppColors.blackFont,
             ),
           ),
           const SizedBox(height: 16),
@@ -1010,6 +1018,8 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
   }
 
   Widget _buildRecentAchievementItem(Achievement achievement) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -1046,7 +1056,7 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
                       'Você conquistou o emblema ',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey.shade700,
+                        color:  isDark ? AppColors.whiteBack : AppColors.blackFont,
                       ),
                     ),
                   ],
@@ -1097,6 +1107,8 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
   Widget _buildCourseProgressSection(CourseProgressService courseProgressService) {
     final totalLessons = courseProgressService.totalCompletedLessons;
     final totalExercises = courseProgressService.totalCompletedExercises;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     
     // Dados fictícios dos cursos para calcular cursos completados
     final courseData = {
@@ -1110,13 +1122,14 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color:  isDark ? AppColors.blackFont : AppColors.whiteBack,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: isDark ? Colors.grey.withOpacity(0.5) :  Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -1138,13 +1151,13 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
                 ),
               ),
               const SizedBox(width: 16),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Progresso dos Cursos',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: isDark ? AppColors.whiteBack : AppColors.blackFont,
                   ),
                 ),
               ),

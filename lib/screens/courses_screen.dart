@@ -73,11 +73,12 @@ class _CoursesScreenState extends State<CoursesScreen> {
       body: SingleChildScrollView(
         child: Container(
         width: MediaQuery.of(context).size.width, 
-        color: AppColors.whiteBack,
+        color:  isDark ? AppColors.blackFont : AppColors.whiteBack,
+        padding: EdgeInsetsGeometry.all(5),
         child: 
         Card(
               margin: const EdgeInsets.symmetric(horizontal: 16),
-              color: AppColors.whiteBack,
+              color:  isDark ? AppColors.blackFont : AppColors.whiteBack,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -150,11 +151,12 @@ class _CoursesScreenState extends State<CoursesScreen> {
 ) {
   final double larguraTotal = MediaQuery.of(context).size.width;
   final double larguraImagem = larguraTotal * 0.20;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
 
   return Container(
     margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 5),
     decoration: BoxDecoration(
-      color: AppColors.whiteBack,
+      color:  isDark ? AppColors.blackFont : AppColors.whiteBack,
       borderRadius: BorderRadius.circular(12),
       boxShadow: [
         BoxShadow(

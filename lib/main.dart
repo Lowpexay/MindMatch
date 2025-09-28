@@ -20,6 +20,7 @@ import 'screens/profile_edit_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/courses_screen.dart';
 import 'screens/main_navigation.dart';
 import 'screens/settings_screen.dart';
 import 'utils/app_colors.dart';
@@ -193,6 +194,10 @@ final GoRouter _router = GoRouter(
     GoRoute(
       path: '/profileEdit',
       builder: (context, state) => const ProfileEditScreen(),
+    ),
+    GoRoute(
+      path: '/courses',
+      builder: (context, state) => const CoursesScreen(),
     ),
     // Settings route to be implemented
     GoRoute(

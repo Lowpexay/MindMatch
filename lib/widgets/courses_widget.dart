@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../models/course_models.dart';
 import '../utils/app_colors.dart';
@@ -62,6 +63,7 @@ class CoursesWidget extends StatelessWidget {
                     child: TextButton(
                       onPressed: () {
                         // TODO: Navegar para tela de todos os cursos
+                        context.go("/courses");
                       },
                       child: Text(
                         'Ver todos',

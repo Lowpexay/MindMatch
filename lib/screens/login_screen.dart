@@ -139,7 +139,11 @@ class _LoginScreenState extends State<LoginScreen> {
               keyboardType: TextInputType.emailAddress,
               validator: (value) {
                 if (value == null || value.isEmpty) return 'Por favor, insira seu e-mail';
-                if (!RegExp(r'^[\\w\\.-]+@[\\w\\.-]+\\.[A-Za-z]{2,}$').hasMatch(value)) return 'E-mail inválido';
+                final trimmed = value.trim();
+                // Regex corrigido: o anterior usava \\ dentro de raw string, quebrando o \w.
+                // Este permite letras, números, ponto, hífen e underscore nas partes antes/depois do @
+                final emailRegex = RegExp(r'^[\w.-]+@[\w.-]+\.[A-Za-z]{2,}$');
+                if (!emailRegex.hasMatch(trimmed)) return 'E-mail inválido';
                 return null;
               },
             ),
@@ -225,8 +229,27 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      await authService.signInWithEmail(_emailController.text.trim(), _passwordController.text);
-      if (mounted) await SafeNavigation.safeNavigate(context, '/home');
+      try {
+        await authService.signInWithEmail(_emailController.text.trim(), _passwordController.text);
+      } catch (e) {
+        // Tratamento similar ao fluxo de signup para erros de canal/Pigeon que acontecem mas o login funciona
+        if (e.toString().contains('PigeonUserDetails') ||
+            e.toString().contains('channel-error') ||
+            e.toString().contains('List<Object?>')) {
+          // Pequeno delay e continuamos se o usuário estiver autenticado
+          await Future.delayed(const Duration(milliseconds: 400));
+        } else {
+          rethrow;
+        }
+      }
+      if (mounted) {
+        final authService2 = Provider.of<AuthService>(context, listen: false);
+        if (authService2.currentUser != null) {
+          await SafeNavigation.safeNavigate(context, '/home');
+        } else {
+          _showSnack('Falha ao autenticar. Tente novamente.', error: true);
+        }
+      }
     } catch (e) {
       if (mounted) _showSnack('Erro ao entrar: $e', error: true);
     } finally {

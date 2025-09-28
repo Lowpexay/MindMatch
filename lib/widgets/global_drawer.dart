@@ -147,23 +147,32 @@ class GlobalDrawer extends StatelessWidget {
                 
                 _buildMenuItem(
                   context,
-                  icon: Icons.chat,
+                  icon: Icons.video_library,
+                  title: 'Cursos',
+                  subtitle: 'Conteúdo e evolução',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _navigateToCourses(context);
+                  },
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.chat_bubble_outline,
                   title: 'Conversas',
-                  subtitle: 'Chat com pessoas',
+                  subtitle: 'Chats com usuários',
                   onTap: () {
                     Navigator.pop(context);
                     _navigateToConversations(context);
                   },
                 ),
-                
                 _buildMenuItem(
                   context,
                   icon: Icons.psychology,
-                  title: 'Chat Luma',
-                  subtitle: 'IA para apoio emocional',
+                  title: 'Luma (IA)',
+                  subtitle: 'Assistente emocional',
                   onTap: () {
                     Navigator.pop(context);
-                    _navigateToLuma(context);
+                    _openAiChat(context);
                   },
                 ),
                 
@@ -329,42 +338,59 @@ class GlobalDrawer extends StatelessWidget {
     }
   }
 
-  void _navigateToConversations(BuildContext context) {
-    // Navega para a aba de Conversas (índice 1)
+  void _navigateToCourses(BuildContext context) {
     final state = MainNavigation.mainNavigationKey.currentState;
     if (state != null) {
       state.switchToTab(1);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Navegando para Conversas...'),
-          backgroundColor: AppColors.primary,
-        ),
-      );
+      _fallbackSnack(context, 'Navegando para Cursos...');
     }
   }
 
-  void _navigateToLuma(BuildContext context) {
-    // Navega para a aba da Luma (índice 2) 
+  void _navigateToConversations(BuildContext context) {
+    // Novo índice das conversas = 2
     final state = MainNavigation.mainNavigationKey.currentState;
     if (state != null) {
       state.switchToTab(2);
     } else {
+      _fallbackSnack(context, 'Navegando para Conversas...');
+    }
+  }
+
+  void _openAiChat(BuildContext context) {
+    final state = MainNavigation.mainNavigationKey.currentState;
+    if (state != null) {
+      Navigator.pop(context);
+      // Usa método exposto para abrir overlay do AI Chat
+      MainNavigation.openAIChat();
+    } else {
+      // Fallback se por algum motivo não estamos dentro da MainNavigation
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Navegando para Chat Luma...'),
-          backgroundColor: AppColors.primary,
-        ),
+        const SnackBar(content: Text('Não foi possível abrir o Chat da Luma agora.')),
       );
     }
   }
 
   void _navigateToProfile(BuildContext context) {
     // Navega para a tela de perfil
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const ProfileScreen(),
+    final state = MainNavigation.mainNavigationKey.currentState;
+    if (state != null) {
+      state.switchToTab(3);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ProfileScreen(),
+        ),
+      );
+    }
+  }
+
+  void _fallbackSnack(BuildContext context, String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: AppColors.primary,
       ),
     );
   }

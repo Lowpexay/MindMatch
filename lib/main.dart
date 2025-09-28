@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
@@ -23,6 +24,12 @@ import 'screens/login_screen.dart';
 import 'screens/main_navigation.dart';
 import 'screens/settings_screen.dart';
 import 'utils/app_colors.dart';
+// Multi-step signup flow screens
+import 'screens/signup/signup_basic_screen.dart';
+import 'screens/signup/signup_bio_screen.dart';
+import 'screens/signup/signup_interests_screen.dart';
+import 'screens/signup/signup_goal_screen.dart';
+import 'screens/signup/signup_photo_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -140,6 +147,16 @@ class MindMatchApp extends StatelessWidget {
             theme: themeService.isDark ? darkTheme : lightTheme,
             routerConfig: _router,
             debugShowCheckedModeBanner: false,
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('en', 'US'),
+              Locale('pt', 'BR'),
+            ],
+            locale: const Locale('pt', 'BR'),
           );
         },
       ),
@@ -198,6 +215,35 @@ final GoRouter _router = GoRouter(
     GoRoute(
       path: '/settings',
       builder: (context, state) => const SettingsScreen(),
+    ),
+    // --- Multi-step signup flow ---
+    GoRoute(
+      path: '/signupBasic',
+      builder: (context, state) => const SignupBasicScreen(),
+    ),
+    GoRoute(
+      path: '/signupBio',
+      builder: (context, state) => SignupBioScreen(
+        data: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+      ),
+    ),
+    GoRoute(
+      path: '/signupInterests',
+      builder: (context, state) => SignupInterestsScreen(
+        data: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+      ),
+    ),
+    GoRoute(
+      path: '/signupGoal',
+      builder: (context, state) => SignupGoalScreen(
+        data: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+      ),
+    ),
+    GoRoute(
+      path: '/signupPhoto',
+      builder: (context, state) => SignupPhotoScreen(
+        data: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+      ),
     ),
 
   ],

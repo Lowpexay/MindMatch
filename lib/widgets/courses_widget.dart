@@ -9,12 +9,14 @@ class CoursesWidget extends StatelessWidget {
   final List<Course> courses;
   final String title;
   final bool showAll;
+  final VoidCallback? onViewAll;
 
   const CoursesWidget({
     Key? key,
     required this.courses,
     this.title = 'Cursos Recomendados',
     this.showAll = false,
+    this.onViewAll,
   }) : super(key: key);
 
   @override
@@ -60,9 +62,7 @@ class CoursesWidget extends StatelessWidget {
                   Expanded(
                     flex: 1,
                     child: TextButton(
-                      onPressed: () {
-                        // TODO: Navegar para tela de todos os cursos
-                      },
+                      onPressed: onViewAll,
                       child: Text(
                         'Ver todos',
                         style: TextStyle(

@@ -572,7 +572,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     icon: Icons.school,
                     title: 'Cursos de Bem-Estar Mental',
                     subtitle: 'Aprenda técnicas para melhorar sua saúde mental',
-                    child: CoursesWidget(courses: _courses),
+                    child: CoursesWidget(
+                      courses: _courses,
+                      onViewAll: () {
+                        // Navegar para aba de Cursos (índice 1)
+                        final navState = MainNavigation.mainNavigationKey.currentState;
+                        if (navState != null) {
+                          navState.switchToTab(1);
+                        }
+                      },
+                    ),
                   ),
                   
                   const SizedBox(height: 32), // Espaço no final
@@ -1252,15 +1261,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _navigateToLumaChat() {
-    // Usar a navegação estática da MainNavigation para ir para a aba do AI Chat
-    // Importar MainNavigation se necessário
+    // Abre o chat da Luma como overlay dedicado (não é mais aba fixa)
     try {
-      // Navegar para a aba 2 (AI Chat) da MainNavigation
-      // Como estamos usando IndexedStack na MainNavigation, podemos usar o método estático
-      MainNavigation.navigateToAIChat();
+      MainNavigation.openAIChat();
     } catch (e) {
-      print('❌ Erro ao navegar para o chat da Luma: $e');
-      // Fallback: tentar navegar diretamente
+      // Fallback direto se MainNavigation não estiver montado
       Navigator.push(
         context,
         MaterialPageRoute(

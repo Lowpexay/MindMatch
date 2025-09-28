@@ -192,10 +192,11 @@ class _EventLogReportScreenState extends State<EventLogReportScreen> {
   }
 
   Widget _buildStatCard(String title, String value, Color color, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color:  isDark ? AppColors.blackFont : AppColors.whiteBack,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(

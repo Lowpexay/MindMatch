@@ -10,12 +10,14 @@ class CoursesWidget extends StatelessWidget {
   final List<Course> courses;
   final String title;
   final bool showAll;
+  final VoidCallback? onViewAll;
 
   const CoursesWidget({
     Key? key,
     required this.courses,
     this.title = 'Cursos Recomendados',
     this.showAll = false,
+    this.onViewAll,
   }) : super(key: key);
 
   @override

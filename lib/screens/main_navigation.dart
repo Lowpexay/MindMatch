@@ -10,13 +10,13 @@ import '../utils/app_colors.dart';
 import '../widgets/global_drawer.dart';
 import '../widgets/checkup_heart_widget.dart';
 import '../widgets/user_avatar.dart';
-import '../providers/conversations_provider.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import '../services/global_notification_service.dart';
 import 'home_screen.dart';
 import 'ai_chat_screen.dart';
 import 'conversations_screen.dart';
+import 'profile_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -27,20 +27,23 @@ class MainNavigation extends StatefulWidget {
   static final GlobalKey<ScaffoldState> scaffoldKey =
       GlobalKey<ScaffoldState>();
   // Chave global para acessar métodos da ConversationsScreen
-  static final GlobalKey<CoursesScreenState> coursesKey =
-      GlobalKey<CoursesScreenState>();
+  // Chave para futuras interações com a aba de cursos (se necessário)
+  static final GlobalKey debugCoursesPlaceholderKey = GlobalKey();
   // Chave global para acessar métodos da ConversationsScreen
   static final GlobalKey<ConversationsScreenState> conversationsKey = GlobalKey<ConversationsScreenState>();
-  // Chave global para acessar métodos da AiChatScreen
+  // AI Chat não é mais uma aba fixa; abriremos como overlay / rota separada.
   static final GlobalKey<AiChatScreenState> aiChatKey = GlobalKey<AiChatScreenState>();
+  // Última aba ativa (para exibir seleção quando abrirmos o AI Chat com navbar)
+  static int lastTabIndex = 0;
 
-  // Método estático para navegar para a aba do chat IA
-  static void navigateToAIChat() {
+  // Método estático para abrir o AI Chat (overlay / rota dedicada)
+  static void openAIChat() {
     final state = mainNavigationKey.currentState;
-    if (state != null) {
-      state.switchToTab(2); // Índice 2 é a aba do AI Chat
-    }
+    state?._openAiChat();
   }
+
+  // Alias de compatibilidade (usado em chamadas antigas)
+  static void navigateToAIChat() => openAIChat();
 
   @override
   State<MainNavigation> createState() => _MainNavigationState();
@@ -55,11 +58,12 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
   PageController _pageController = PageController();
   late AnimationController _animationController;
 
+  // Ordem nova: 0 Home | 1 Vídeos (Cursos) | 2 Chats (conversas usuários) | 3 Perfil
   final List<Widget> _screens = [
     const HomeScreen(),
-    CoursesScreen(key: MainNavigation.coursesKey),
+    const CoursesScreen(),
     ConversationsScreen(key: MainNavigation.conversationsKey),
-    AiChatScreen(key: MainNavigation.aiChatKey, userMood: null), // IA sem contexto de humor específico
+    const ProfileScreen(),
   ];
 
   @override
@@ -157,21 +161,22 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
       setState(() {
         _currentIndex = index;
       });
-
-      // Notificar AiChatScreen quando se tornar ativo
-      if (index == 2) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          MainNavigation.aiChatKey.currentState?.checkAndInitializeWhenActive();
-        });
-      }
+      MainNavigation.lastTabIndex = index;
     }
+  }
+
+  // Abre o AI Chat como uma nova rota (não altera o índice das abas)
+  void _openAiChat() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AiChatScreen(key: MainNavigation.aiChatKey),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final isDark = scheme.brightness == Brightness.dark;
 
     return Scaffold(
         key: MainNavigation.scaffoldKey,
@@ -180,23 +185,15 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
         appBar: _buildAppBar(),
         body: PageView(
           controller: _pageController,
-          onPageChanged: (index) {
-            setState(() => _currentIndex = index);
-            if (index == 2) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-              MainNavigation.aiChatKey.currentState?.checkAndInitializeWhenActive();
-              });
-            }
-          },
+          onPageChanged: (index) => setState(() => _currentIndex = index),
           children: _screens,
         ),
         bottomNavigationBar: CustomNavbar(
           selectedIndex: _currentIndex,
           onItemTapped: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
+            switchToTab(index);
           },
+          onCenterAvatarTap: _openAiChat,
         )
         // Container(
         //   decoration: BoxDecoration(
@@ -226,93 +223,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
         );
   }
 
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required int index,
-    bool hasNotification = false,
-  }) {
-    final isSelected = _currentIndex == index;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return GestureDetector(
-      onTap: () {
-        _pageController.animateToPage(
-          index,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOutCubic,
-        );
-        setState(() => _currentIndex = index);
-        if (index == 2) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            MainNavigation.aiChatKey.currentState?.checkAndInitializeWhenActive();
-          });
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.12) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              children: [
-                Icon(
-                  icon,
-                  color: isSelected
-                      ? AppColors.primary
-                      : (isDark ? Colors.white70 : AppColors.gray500),
-                  size: 24,
-                ),
-                if (hasNotification && index == 1)
-                  Consumer<ConversationsProvider>(
-                    builder: (context, conversationsProvider, child) {
-                      final unreadCount = conversationsProvider.unreadCount;
-                      if (unreadCount == 0) return const SizedBox.shrink();
-                      return Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                          child: Text(
-                            unreadCount > 99 ? '99+' : unreadCount.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected
-                    ? AppColors.primary
-                    : (isDark ? Colors.white70 : AppColors.gray500),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // _buildNavItem removido (antigo navbar custom) - nova navbar em `navbar_new.dart`.
 
   PreferredSizeWidget _buildAppBar() {
     String title;
@@ -324,11 +235,16 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
         subtitle = _getGreeting();
         break;
       case 1:
-        title = 'Conversas';
+        title = 'Cursos';
+        subtitle = 'Conteúdo e evolução';
         break;
       case 2:
-        title = 'Luma';
-        subtitle = 'Sua assistente de bem-estar';
+        title = 'Conversas';
+        subtitle = 'Chats com a comunidade';
+        break;
+      case 3:
+        title = 'Perfil';
+        subtitle = 'Seu espaço pessoal';
         break;
       default:
         title = 'MindMatch';
@@ -375,28 +291,13 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
           ),
 
         // Mostrar ações baseadas na aba atual
-        if (_currentIndex == 1) // Conversas
+        if (_currentIndex == 2) // Conversas
           Container(
             margin: const EdgeInsets.only(right: 8),
             child: IconButton(
               onPressed: () {
                 // Chamar método da ConversationsScreen usando a chave global
                 MainNavigation.conversationsKey.currentState?.showConversationOptions();
-              },
-              icon: Icon(
-                Icons.more_vert,
-                color: isDark ? Colors.white : AppColors.textPrimary,
-              ),
-            ),
-          ),
-
-        if (_currentIndex == 2) // IA Chat
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            child: IconButton(
-              onPressed: () {
-                // Chamar método da AiChatScreen usando a chave global
-                _showAiChatOptions();
               },
               icon: Icon(
                 Icons.more_vert,
@@ -434,10 +335,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
     }
   }
 
-  void _showAiChatOptions() {
-    // Chamar método do AiChatScreen usando a chave global
-    MainNavigation.aiChatKey.currentState?.showChatOptions();
-  }
+  // _showAiChatOptions removido: AI Chat não é aba. Pode ser aberto via botão flutuante futuramente.
 
   void _showUserMenu() {
     showModalBottomSheet(
@@ -650,3 +548,4 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
     }
   }
 }
+

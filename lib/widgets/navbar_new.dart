@@ -15,13 +15,14 @@ class CustomNavbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Container(
           height: 70,
           decoration: BoxDecoration(
-            color: AppColors.whiteBack,
+            color: isDark ? AppColors.blackFont : AppColors.whiteBack,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             boxShadow: [
               BoxShadow(
@@ -34,11 +35,11 @@ class CustomNavbar extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(Icons.home, 'Home', 0),
-              _buildNavItem(Icons.video_library, 'Videos', 1),
+              _buildNavItem(Icons.home, 'Home', 0, context),
+              _buildNavItem(Icons.video_library, 'Videos', 1, context),
               SizedBox(width: 60), // espaço para o avatar
-              _buildNavItem(Icons.chat_bubble_outline, 'Chats', 2),
-              _buildNavItem(Icons.person_outline, 'Perfil', 3),
+              _buildNavItem(Icons.chat_bubble_outline, 'Chats', 2, context),
+              _buildNavItem(Icons.person_outline, 'Perfil', 3, context),
             ],
           ),
         ),
@@ -56,7 +57,7 @@ class CustomNavbar extends StatelessWidget {
                   width: 60,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 4),
+                    border: Border.all(color: isDark ? AppColors.blackFont : AppColors.whiteBack, width: 4),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.deepPurple.withOpacity(0.3),
@@ -86,8 +87,9 @@ class CustomNavbar extends StatelessWidget {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index) {
+  Widget _buildNavItem(IconData icon, String label, int index, context) {
     final isSelected = selectedIndex == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: () => onItemTapped(index),
@@ -97,19 +99,19 @@ class CustomNavbar extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: isSelected ? AppColors.purpleBack : AppColors.blackFont,
+            color: isDark ? (isSelected ? AppColors.purpleBack : AppColors.whiteBack) : (isSelected ? AppColors.purpleBack : AppColors.blackFont),
           ),
           Text(
             label,
             style: TextStyle(
               fontSize: 12,
-              color: isSelected ? AppColors.purpleBack : AppColors.blackFont,
+              color: isDark ? (isSelected ? AppColors.purpleBack : AppColors.whiteBack) : (isSelected ? AppColors.purpleBack : AppColors.blackFont),
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
           Container(
             height: 1,
-            color: isSelected ? AppColors.purpleBack : AppColors.whiteBack,
+            color: isDark ? (isSelected ? AppColors.purpleBack : AppColors.whiteBack) : (isSelected ? AppColors.purpleBack : AppColors.blackFont),
           ),
         ],
       ),

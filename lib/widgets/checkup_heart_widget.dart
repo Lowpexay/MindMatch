@@ -9,6 +9,7 @@ class CheckupHeartWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Consumer<CheckupStreakService>(
       builder: (context, streakService, child) {
         return GestureDetector(
@@ -16,11 +17,11 @@ class CheckupHeartWidget extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? AppColors.blackFont : AppColors.whiteBack,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withOpacity(0.5),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -41,17 +42,17 @@ class CheckupHeartWidget extends StatelessWidget {
                   children: [
                     Text(
                       '${streakService.currentStreak}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: isDark ? AppColors.whiteBack : AppColors.blackFont,
                       ),
                     ),
                     Text(
                       streakService.currentStreak == 1 ? 'dia' : 'dias',
                       style: TextStyle(
                         fontSize: 10,
-                        color: AppColors.textSecondary,
+                        color: isDark ? AppColors.whiteBack : AppColors.textSecondary,
                       ),
                     ),
                   ],

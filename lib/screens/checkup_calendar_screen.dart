@@ -261,6 +261,7 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
   }
 
   Widget _buildDayCell(CheckupStreak dayData, bool isToday) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     Color backgroundColor;
     Color textColor;
     
@@ -271,8 +272,8 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
       backgroundColor = Colors.orange.shade300;
       textColor = Colors.white;
     } else {
-      backgroundColor = Colors.grey.shade200;
-      textColor = AppColors.textSecondary;
+      backgroundColor = isDark ? AppColors.blackFont : AppColors.whiteBack;
+      textColor =  isDark ? AppColors.whiteBack : AppColors.blackFont;
     }
     
     return Container(

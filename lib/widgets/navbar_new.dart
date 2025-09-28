@@ -4,11 +4,13 @@ import 'package:mindmatch/utils/app_colors.dart';
 class CustomNavbar extends StatelessWidget {
   final int selectedIndex;
   final Function(int) onItemTapped;
+  final VoidCallback? onCenterAvatarTap; // novo callback para avatar central (AI Chat)
 
   const CustomNavbar({
     super.key,
     required this.selectedIndex,
     required this.onItemTapped,
+    this.onCenterAvatarTap,
   });
 
   @override
@@ -44,36 +46,40 @@ class CustomNavbar extends StatelessWidget {
         Positioned(
           top: -25,
           left: MediaQuery.of(context).size.width / 2 - 30,
-          child: Column(
-            children: [
-              Container(
-                height: 60,
-                width: 60,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 4),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.deepPurple.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
+          child: GestureDetector(
+            // Se callback custom foi passado, usamos para abrir AI Chat; senão fallback para chats (índice 2)
+            onTap: onCenterAvatarTap ?? () => onItemTapped(2),
+            child: Column(
+              children: [
+                Container(
+                  height: 60,
+                  width: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.deepPurple.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const CircleAvatar(
+                    backgroundImage: AssetImage('assets/images/foto_da_luma.png'),
+                  ),
                 ),
-                child: const CircleAvatar(
-                  backgroundImage: AssetImage('assets/images/foto_da_luma.png'),
+                const SizedBox(height: 4),
+                Container(
+                  height: 4,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.deepPurple,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                height: 4,
-                width: 40,
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],

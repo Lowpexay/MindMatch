@@ -14,6 +14,8 @@ import '../widgets/audio_record_button.dart';
 import 'dart:typed_data';
 import 'dart:convert';
 import '../widgets/user_avatar.dart';
+import 'main_navigation.dart';
+import '../widgets/navbar_new.dart';
 
 class AiChatScreen extends StatefulWidget {
   final MoodData? userMood;
@@ -104,8 +106,11 @@ class AiChatScreenState extends State<AiChatScreen> {
     
     // Inicializar Speech Recognition
     _initializeSpeechRecognition();
-    
-    // NÃO inicializar automaticamente - aguardar o usuário acessar a tela
+    // Restaurar comportamento anterior: inicializar imediatamente ao abrir a tela
+    // para garantir mensagem de boas-vindas visível.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _checkAndInitializeLuma();
+    });
   }
 
   @override
@@ -551,15 +556,22 @@ class AiChatScreenState extends State<AiChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // REMOVIDO: Inicialização automática quando a tela é construída
-    // Agora só inicializa quando o usuário realmente acessa a aba
+  // Inicialização automática restaurada (mensagem de boas-vindas deve aparecer sem ação extra)
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Detectar se devemos mostrar a navbar: se MainNavigation está montado e queremos experiência contínua
+  // Exibir navbar dentro do chatbot conforme solicitado
+  // Navbar sempre visível nesta tela conforme pedido
+  const bool showPersistentNavbar = true;
+  const double navBarReservedHeight = 70; // altura da navbar para padding inferior
     
     // Se estiver no modo visual de voz, mostrar a interface da Luma
     if (_isVisualVoiceMode) {
       return Scaffold(
-  backgroundColor: isDark ? AppColors.darkSurface : AppColors.gray50,
-        body: Column(
+        backgroundColor: isDark ? AppColors.darkSurface : AppColors.gray50,
+        appBar: _buildChatAppBar(isDark, showPersistentNavbar: showPersistentNavbar),
+        body: Padding(
+          padding: const EdgeInsets.only(bottom: navBarReservedHeight),
+          child: Column(
           children: [
             // Interface visual da Luma
             Expanded(
@@ -657,13 +669,18 @@ class AiChatScreenState extends State<AiChatScreen> {
             ),
           ],
         ),
+        ),
+  bottomNavigationBar: _buildEmbeddedNavbar(),
       );
     }
     
     // Modo texto normal
     return Scaffold(
-  backgroundColor: isDark ? AppColors.darkSurface : AppColors.gray50,
-      body: Column(
+      backgroundColor: isDark ? AppColors.darkSurface : AppColors.gray50,
+      appBar: _buildChatAppBar(isDark, showPersistentNavbar: showPersistentNavbar),
+      body: Padding(
+  padding: const EdgeInsets.only(bottom: navBarReservedHeight),
+        child: Column(
         children: [
           // Status do humor do usuário (se disponível)
           if (widget.userMood != null) _buildMoodStatusBar(),
@@ -733,6 +750,138 @@ class AiChatScreenState extends State<AiChatScreen> {
           _buildMessageInput(),
         ],
       ),
+      ),
+  bottomNavigationBar: _buildEmbeddedNavbar(),
+    );
+  }
+
+  PreferredSizeWidget _buildChatAppBar(bool isDark, {bool showPersistentNavbar = false}) {
+    final modeLabel = _interactionMode == 'voice'
+        ? 'Voz'
+        : 'Texto';
+
+    return AppBar(
+      elevation: 0,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      leading: IconButton(
+        icon: Icon(showPersistentNavbar ? Icons.arrow_back : Icons.close, color: isDark ? Colors.white : AppColors.textPrimary),
+        onPressed: () => Navigator.of(context).maybePop(),
+      ),
+      titleSpacing: 0,
+      title: Row(
+        children: [
+          // Avatar da Luma
+          Container(
+            width: 40,
+            height: 40,
+            margin: const EdgeInsets.only(right: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.asset(
+                'assets/images/oiLuma.png',
+                fit: BoxFit.cover,
+                errorBuilder: (c, e, s) => Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [
+                      AppColors.primary,
+                      AppColors.primary.withOpacity(0.7),
+                    ]),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+                ),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Luma',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                ),
+              ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: Container(
+                  key: ValueKey(modeLabel),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: (_interactionMode == 'voice'
+                            ? AppColors.primary
+                            : AppColors.primary.withOpacity(0.15))
+                        .withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    modeLabel,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _interactionMode == 'voice'
+                          ? AppColors.primary
+                          : (isDark ? Colors.white70 : AppColors.textSecondary),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        if (_interactionMode == 'voice')
+          IconButton(
+            tooltip: 'Trocar para texto',
+            icon: Icon(Icons.chat_bubble_outline, color: isDark ? Colors.white70 : AppColors.textSecondary),
+            onPressed: _switchToTextMode,
+          )
+        else
+          IconButton(
+            tooltip: 'Modo voz',
+            icon: Icon(Icons.record_voice_over, color: isDark ? Colors.white70 : AppColors.textSecondary),
+            onPressed: _switchToVoiceMode,
+          ),
+        IconButton(
+          tooltip: 'Opções',
+          icon: Icon(Icons.more_vert, color: isDark ? Colors.white : AppColors.textPrimary),
+          onPressed: showChatOptions,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmbeddedNavbar() {
+    final currentIndex = MainNavigation.lastTabIndex;
+    return CustomNavbar(
+      selectedIndex: currentIndex,
+      onItemTapped: (index) {
+        // Se escolher a mesma aba que estava, apenas fechar o chat
+        if (index == currentIndex) {
+          Navigator.of(context).maybePop();
+          return;
+        }
+        // Fechar e trocar aba
+        Navigator.of(context).pop();
+        MainNavigation.mainNavigationKey.currentState?.switchToTab(index);
+      },
+      onCenterAvatarTap: () {
+        // Tocar no avatar central dentro do chat fecha o chat (efeito de toggle)
+        Navigator.of(context).maybePop();
+      },
     );
   }
 

@@ -99,10 +99,12 @@ class _HomeScreenState extends State<HomeScreen> {
       // Como só temos método deleteBefore, usamos cutoff = tomorrow e esperamos que histórico anterior fique intacto.
       await _firebaseService?.deleteQuestionsBefore(tomorrow.millisecondsSinceEpoch);
       await _firebaseService?.deleteResponsesBefore(tomorrow.millisecondsSinceEpoch);
-      setState(() {
-        _dailyQuestions = [];
-        _questionAnswers.clear();
-      });
+      if (mounted) {
+        setState(() {
+          _dailyQuestions = [];
+          _questionAnswers.clear();
+        });
+      }
       print('🔄 Reset de perguntas de hoje concluído. Será gerado novamente no próximo load.');
       await _loadDailyQuestions();
     } catch (e) {
@@ -281,10 +283,8 @@ class _HomeScreenState extends State<HomeScreen> {
       // Limitando para 6 usuários compatíveis
       final users = await _firebaseService?.getCompatibleUsers(userId, limit: 6) ?? [];
       print('👥 Found ${users.length} compatible users (limited to 6)');
-      
-      setState(() {
-        _compatibleUsers = users;
-      });
+      if (!mounted) return; // prevenir setState após dispose
+      setState(() { _compatibleUsers = users; });
     } catch (e) {
       print('❌ Error loading compatible users: $e');
     }
@@ -295,9 +295,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final service = Provider.of<CourseService>(context, listen: false);
       await service.seedAllIfEmpty();
       await service.loadFavorites();
-      setState(() {
-        _courses = service.courses; // espelhar
-      });
+      if (mounted) {
+        setState(() { _courses = service.courses; });
+      }
     } catch (e) {
       print('❌ Error loading courses (service): $e');
     }
@@ -372,10 +372,11 @@ class _HomeScreenState extends State<HomeScreen> {
         print('⚠️ Failed to persist daily checkup (mark): $e');
       }
     }
+    if (!mounted) return;
     setState(() {
-      _dailyCheckupDate = startOfDay;
-      _dailyCheckupCompleted = true;
-      _editingDailyCheckup = false;
+        _dailyCheckupDate = startOfDay;
+        _dailyCheckupCompleted = true;
+        _editingDailyCheckup = false;
     });
   }
 

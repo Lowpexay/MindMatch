@@ -40,7 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _compatibleUsers = [];
   Map<String, bool> _questionAnswers = {};
   String _userName = ''; // Nome do usuário
-  List<Course> _courses = []; // Lista de cursos
+  List<Course> _courses = []; // Cache local (espelho do CourseService)
   // Removido: _supportMessage - mensagens da Luma agora só aparecem na aba dela
   bool _dailyCheckupCompleted = false;
   bool _editingDailyCheckup = false;
@@ -332,88 +332,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadSampleCourses() async {
     try {
-      // Cursos completos com conteúdo real
+      final service = Provider.of<CourseService>(context, listen: false);
+      await service.seedAllIfEmpty();
+      await service.loadFavorites();
       setState(() {
-        _courses = [
-          Course(
-            id: 'respiracao',
-            title: 'Técnicas de Respiração para Ansiedade',
-            description: 'Aprenda técnicas científicas de respiração para controlar a ansiedade e o estresse no dia a dia',
-            imageUrl: 'https://img.youtube.com/vi/YRPh_GaiL8s/maxresdefault.jpg',
-            category: 'Ansiedade',
-            level: CourseLevel.beginner,
-            duration: 240, // 4 horas
-            lessonsCount: 5,
-            exercisesCount: 3,
-            tags: ['respiração', 'ansiedade', 'relaxamento', 'meditação'],
-            createdAt: DateTime.now().subtract(const Duration(days: 10)),
-            isPopular: true,
-            isFree: true,
-          ),
-          Course(
-            id: 'mindfulness',
-            title: 'Mindfulness e Meditação Diária',
-            description: 'Desenvolva a prática da atenção plena com exercícios guiados e técnicas comprovadas cientificamente',
-            imageUrl: 'https://img.youtube.com/vi/ZToicYcHIOU/maxresdefault.jpg',
-            category: 'Mindfulness',
-            level: CourseLevel.beginner,
-            duration: 300, // 5 horas
-            lessonsCount: 5,
-            exercisesCount: 2,
-            tags: ['mindfulness', 'meditação', 'atenção plena', 'foco'],
-            createdAt: DateTime.now().subtract(const Duration(days: 15)),
-            isPopular: true,
-            isFree: true,
-          ),
-          Course(
-            id: 'emocoes',
-            title: 'Inteligência Emocional na Prática',
-            description: 'Aprenda a identificar, compreender e gerenciar suas emoções de forma saudável e produtiva',
-            imageUrl: 'https://img.youtube.com/vi/R1vskiVDwl4/maxresdefault.jpg',
-            category: 'Autoconhecimento',
-            level: CourseLevel.intermediate,
-            duration: 360, // 6 horas
-            lessonsCount: 5,
-            exercisesCount: 1,
-            tags: ['emoções', 'autoconhecimento', 'inteligência emocional', 'relacionamentos'],
-            createdAt: DateTime.now().subtract(const Duration(days: 8)),
-            isPopular: false,
-            isFree: true,
-          ),
-          Course(
-            id: 'autoestima',
-            title: 'Construindo Autoestima Saudável',
-            description: 'Desenvolva uma autoestima equilibrada através de exercícios práticos e mudança de perspectiva',
-            imageUrl: 'https://img.youtube.com/vi/f-m2YcdMdFw/maxresdefault.jpg',
-            category: 'Autoestima',
-            level: CourseLevel.beginner,
-            duration: 240, // 4 horas
-            lessonsCount: 5,
-            exercisesCount: 2,
-            tags: ['autoestima', 'autoconfiança', 'autocuidado', 'desenvolvimento pessoal'],
-            createdAt: DateTime.now().subtract(const Duration(days: 5)),
-            isPopular: true,
-            isFree: true,
-          ),
-          Course(
-            id: 'estresse',
-            title: 'Gestão de Estresse no Trabalho',
-            description: 'Estratégias práticas para lidar com pressão, deadlines e demandas do ambiente profissional',
-            imageUrl: 'https://img.youtube.com/vi/hnpQrMqDoqE/maxresdefault.jpg',
-            category: 'Estresse',
-            level: CourseLevel.intermediate,
-            duration: 270, // 4.5 horas
-            lessonsCount: 5,
-            exercisesCount: 2,
-            tags: ['estresse', 'trabalho', 'produtividade', 'equilíbrio'],
-            createdAt: DateTime.now().subtract(const Duration(days: 12)),
-            isPopular: false,
-            isFree: true,
-          ),
-        ];
+        _courses = service.courses; // espelhar
       });
     } catch (e) {
-      print('❌ Error loading courses: $e');
+      print('❌ Error loading courses (service): $e');
     }
   }
 
@@ -575,10 +501,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: CoursesWidget(
                       courses: _courses,
                       onViewAll: () {
-                        // Navegar para aba de Cursos (índice 1)
-                        final navState = MainNavigation.mainNavigationKey.currentState;
-                        if (navState != null) {
-                          navState.switchToTab(1);
+                        // Redireciona para tela completa de cursos mantendo navbar
+                        if (mounted) {
+                          context.go('/courses');
                         }
                       },
                     ),
@@ -1508,24 +1433,30 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 20),
                   
                   // Name and age
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
+                  Builder(builder: (context){
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+                    return Text(
+                      name,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
+                      ),
+                    );
+                  }),
                   
                   if (age != null) ...[
                     const SizedBox(height: 4),
-                    Text(
-                      '$age anos',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
+                    Builder(builder: (context){
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      return Text(
+                        '$age anos',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isDark ? Colors.white70 : AppColors.textSecondary,
+                        ),
+                      );
+                    }),
                   ],
                   
                   // City
@@ -1534,19 +1465,25 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.location_on_outlined,
-                          size: 16,
-                          color: AppColors.textSecondary,
-                        ),
+                        Builder(builder: (context){
+                          final isDark = Theme.of(context).brightness == Brightness.dark;
+                          return Icon(
+                            Icons.location_on_outlined,
+                            size: 16,
+                            color: isDark ? Colors.white54 : AppColors.textSecondary,
+                          );
+                        }),
                         const SizedBox(width: 4),
-                        Text(
-                          city,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
+                        Builder(builder: (context){
+                          final isDark = Theme.of(context).brightness == Brightness.dark;
+                          return Text(
+                            city,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDark ? Colors.white70 : AppColors.textSecondary,
+                            ),
+                          );
+                        }),
                       ],
                     ),
                   ],
@@ -1555,121 +1492,130 @@ class _HomeScreenState extends State<HomeScreen> {
                   
                   // Bio
                   if (bio != null && bio.isNotEmpty) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.gray50,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Sobre',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
+                    Builder(builder: (context){
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white10 : AppColors.gray50,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Sobre',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : AppColors.textPrimary,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            bio,
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 1.5,
-                              color: AppColors.textPrimary,
+                            const SizedBox(height: 8),
+                            Text(
+                              bio,
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.5,
+                                color: isDark ? Colors.white70 : AppColors.textPrimary,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
+                          ],
+                        ),
+                      );
+                    }),
                     const SizedBox(height: 16),
                   ],
                   
                   // Goal
                   if (goal != null && goal.isNotEmpty) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Objetivo no app',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
+                    Builder(builder: (context){
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.primary.withOpacity(0.15) : AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Objetivo no app',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : AppColors.textPrimary,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            goal,
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 1.5,
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w500,
+                            const SizedBox(height: 8),
+                            Text(
+                              goal,
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.5,
+                                color: isDark ? Colors.white70 : AppColors.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
+                          ],
+                        ),
+                      );
+                    }),
                     const SizedBox(height: 16),
                   ],
                   
                   // Tags
                   if (tags.isNotEmpty) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.gray50,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Interesses',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
+                    Builder(builder: (context){
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white10 : AppColors.gray50,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Interesses',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : AppColors.textPrimary,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: tags.map((tag) => Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: AppColors.primary.withOpacity(0.3),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: tags.map((tag) => Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isDark ? AppColors.primary.withOpacity(0.15) : AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isDark ? AppColors.primary.withOpacity(0.4) : AppColors.primary.withOpacity(0.3),
+                                  ),
                                 ),
-                              ),
-                              child: Text(
-                                tag,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w500,
+                                child: Text(
+                                  tag,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? Colors.white : AppColors.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
-                              ),
-                            )).toList(),
-                          ),
-                        ],
-                      ),
-                    ),
+                              )).toList(),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                     const SizedBox(height: 24),
                   ],
                   

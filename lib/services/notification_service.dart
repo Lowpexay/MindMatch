@@ -1,5 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import '../main.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -55,8 +57,20 @@ class NotificationService {
   }
 
   static void _onNotificationTapped(NotificationResponse response) {
-    print('🔔 Notification tapped: ${response.payload}');
-    // TODO: Navigate to specific chat when notification is tapped
+    final payload = response.payload;
+    print('🔔 Notification tapped: $payload');
+    if (payload != null && appNavigatorKey.currentState != null) {
+      // Navegar usando GoRouter se disponível ou direto para rota básica
+      try {
+        // Usando pushNamed se estivesse configurado; aqui, fallback simples
+        // Se já estivermos no app, podemos direcionar para /home e depois abrir a conversa
+        // Simplesmente empurrar home primeiro para garantir stack
+        appNavigatorKey.currentState!.pushNamed('/home');
+        // Poderíamos armazenar payload globalmente para a tela de conversas abrir direto
+      } catch (e) {
+        debugPrint('⚠️ Falha ao navegar a partir de notificação: $e');
+      }
+    }
   }
 
   Future<void> showChatNotification({

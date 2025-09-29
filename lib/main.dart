@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,6 +19,7 @@ import 'services/course_service.dart';
 import 'services/course_progress_service.dart';
 import 'services/daily_checkup_history_service.dart';
 import 'services/theme_service.dart';
+import 'services/fcm_service.dart';
 import 'providers/conversations_provider.dart';
 import 'screens/profile_edit_screen.dart';
 import 'screens/profile_screen.dart';
@@ -31,6 +35,29 @@ import 'screens/signup/signup_bio_screen.dart';
 import 'screens/signup/signup_interests_screen.dart';
 import 'screens/signup/signup_goal_screen.dart';
 import 'screens/signup/signup_photo_screen.dart';
+
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  print('🔙 (BG) Mensagem recebida: ${message.messageId}');
+  try {
+    // Se for mensagem apenas de dados, criar notificação local manualmente
+    if (message.notification == null && message.data.isNotEmpty) {
+      final title = message.data['title'] ?? 'MindMatch';
+      final body = message.data['body'] ?? 'Nova mensagem';
+      final conversationId = message.data['conversationId'] ?? 'generic';
+      await NotificationService().initialize(); // garante inicialização no isolate
+      await NotificationService().showChatNotification(
+        senderName: title,
+        message: body,
+        conversationId: conversationId,
+      );
+    }
+  } catch (e) {
+    print('❌ Erro ao mostrar notificação em background: $e');
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,15 +89,88 @@ void main() async {
     );
     print('✅ Firebase initialized successfully with proper options');
     
-    // Inicializar o serviço de notificações
+    // Inicializar o serviço de notificações locais
     await NotificationService().initialize();
     print('✅ Notification service initialized');
+
+    // Configurar Firebase Messaging (push remoto)
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    await _initPushMessaging();
   } catch (e) {
     print('❌ Error initializing Firebase: $e');
   }
   
   runApp(const MindMatchApp());
 }
+
+Future<void> _initPushMessaging() async {
+  try {
+    final messaging = FirebaseMessaging.instance;
+
+    // Solicitar permissões (iOS / Android 13+ handled by local notifications)
+    final settings = await messaging.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
+    print('🔐 Push permission status: ${settings.authorizationStatus}');
+
+    // Obter token FCM
+    final token = await messaging.getToken();
+    print('🔑 FCM Token: $token');
+  // Salva usando serviço central (tenta se usuário já estiver logado)
+  await FcmService.instance.saveCurrentToken();
+
+    // Atualizar token em mudanças
+    FcmService.instance.attachTokenRefreshListener();
+
+    // (Opcional) Inscrever em tópico padrão para campanhas diárias
+    try {
+      await messaging.subscribeToTopic('daily_checkup');
+      print('📌 Subscribed to topic: daily_checkup');
+    } catch (e) {
+      print('⚠️ Falha ao inscrever em tópico daily_checkup: $e');
+    }
+
+    // Listener de mensagens foreground
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print('📩 (FG) Push recebido: ${message.messageId}');
+      final notification = message.notification;
+      if (notification != null) {
+        NotificationService().showChatNotification(
+          senderName: notification.title ?? 'MindMatch',
+          message: notification.body ?? 'Nova mensagem',
+          conversationId: message.data['conversationId'] ?? 'generic',
+        );
+      } else if (message.data.isNotEmpty) {
+        // Data-only em foreground
+        NotificationService().showChatNotification(
+          senderName: message.data['title'] ?? 'MindMatch',
+          message: message.data['body'] ?? 'Nova mensagem',
+          conversationId: message.data['conversationId'] ?? 'generic',
+        );
+      }
+    });
+
+    // Clique em notificação que abriu o app (terminado ou background)
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      print('🟢 Notificação aberta pelo usuário: ${message.messageId}');
+      final convoId = message.data['conversationId'];
+      if (convoId != null) {
+        // Poderíamos armazenar em algum singleton para abrir conversa após home
+        print('➡️ Abrir conversa: $convoId (implementar deep link)');
+      }
+    });
+  } catch (e) {
+    print('❌ Erro ao inicializar push messaging: $e');
+  }
+}
+
+// _storeFcmToken removido – lógica movida para FcmService
 
 class MindMatchApp extends StatelessWidget {
   const MindMatchApp({super.key});
@@ -278,6 +378,13 @@ class _SplashScreenState extends State<SplashScreen> {
     } else {
       final authService = Provider.of<AuthService>(context, listen: false);
       if (authService.currentUser != null) {
+        // Inicializar notificações globais cedo
+        try {
+          final globalNotification = Provider.of<GlobalNotificationService>(context, listen: false);
+          await globalNotification.initialize(authService);
+        } catch (e) {
+          print('⚠️ Falha ao inicializar notificações globais no Splash: $e');
+        }
         context.go('/home');
       } else {
         context.go('/login');

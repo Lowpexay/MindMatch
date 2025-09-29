@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'fcm_service.dart';
 import '../security/eventlog_service.dart';
 
 class AuthService extends ChangeNotifier {
@@ -14,8 +15,12 @@ class AuthService extends ChangeNotifier {
   bool get isAuthenticated => currentUser != null;
 
   AuthService() {
-    _auth.authStateChanges().listen((user) {
+    _auth.authStateChanges().listen((user) async {
       notifyListeners();
+      // Sempre que autenticar, tentar salvar token FCM automaticamente
+      if (user != null) {
+        await FcmService.instance.saveCurrentToken();
+      }
     });
   }
 
@@ -137,8 +142,12 @@ class AuthService extends ChangeNotifier {
 
   // Sign Out
   Future<void> signOut() async {
+    final uid = _auth.currentUser?.uid;
     await _googleSignIn.signOut();
     await _auth.signOut();
+    if (uid != null) {
+      await FcmService.instance.clearTokenOnSignOut(uid);
+    }
   }
 
   // Reset Password

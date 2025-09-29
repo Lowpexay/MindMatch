@@ -36,7 +36,7 @@ class CustomNavbar extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(Icons.home, 'Home', 0, context),
-              _buildNavItem(Icons.video_library, 'Videos', 1, context),
+              _buildNavItem(Icons.video_library, 'Cursos', 1, context),
               SizedBox(width: 60), // espaço para o avatar
               _buildNavItem(Icons.chat_bubble_outline, 'Chats', 2, context),
               _buildNavItem(Icons.person_outline, 'Perfil', 3, context),

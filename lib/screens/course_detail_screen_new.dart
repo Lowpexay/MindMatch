@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
-import '../models/course_models.dart';
+import '../models/course_models.dart' as models;
 import '../utils/app_colors.dart';
 import '../services/course_service.dart';
 import '../widgets/exercise_quiz_widget.dart';
@@ -40,7 +40,7 @@ class Question {
 }
 
 class CourseDetailScreen extends StatefulWidget {
-  final Course course;
+  final models.Course course;
 
   const CourseDetailScreen({
     Key? key,
@@ -52,7 +52,7 @@ class CourseDetailScreen extends StatefulWidget {
 }
 
 class _CourseDetailScreenState extends State<CourseDetailScreen> {
-  List<Lesson> _lessons = [];
+  List<models.Lesson> _lessons = [];
   List<CourseExercise> _exercises = [];
   bool _isLoading = true;
   int _selectedTab = 0;
@@ -65,14 +65,32 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
   Future<void> _loadCourseData() async {
     try {
-      // Carregar dados reais do curso
-      final lessons = _getLessonsForCourse(widget.course.id);
-      final exercises = _getExercisesForCourse(widget.course.id);
+      // Carregar dados reais do curso usando CourseService
+      final courseService = Provider.of<CourseService>(context, listen: false);
+      final lessons = courseService.getLessonsForCourse(widget.course.id);
+      final exercises = courseService.getExercisesForCourse(widget.course.id);
+      
+      // Converter para CourseExercise local
+      final convertedExercises = exercises.map((exercise) => CourseExercise(
+        id: exercise.id,
+        courseId: widget.course.id,
+        title: 'Quiz: ${exercise.question}',
+        description: 'Teste seus conhecimentos',
+        questions: [
+          Question(
+            id: exercise.id + '_q1',
+            text: exercise.question,
+            options: exercise.options,
+            correctAnswer: exercise.correctAnswer,
+            explanation: exercise.explanation,
+          )
+        ],
+      )).toList();
       
       if (mounted) {
         setState(() {
           _lessons = lessons;
-          _exercises = exercises;
+          _exercises = convertedExercises;
           _isLoading = false;
         });
       }
@@ -322,7 +340,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     );
   }
 
-  Widget _buildLessonCard(Lesson lesson, int order) {
+  Widget _buildLessonCard(models.Lesson lesson, int order) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -398,7 +416,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                     Row(
                       children: [
                         Icon(
-                          lesson.type == LessonType.video
+                          lesson.type == models.LessonType.video
                               ? Icons.play_circle_outline
                               : Icons.article_outlined,
                           size: 16,
@@ -885,7 +903,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     }
   }
 
-  List<Lesson> _getLessonsForCourse(String courseId) {
+  // MÉTODO REMOVIDO - Agora usa CourseService
+  /*List<Lesson> _getLessonsForCourse(String courseId) {
     switch (courseId) {
       case 'respiracao':
         return [
@@ -1052,7 +1071,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
       default:
         return [];
     }
-  }
+  }*/
 
   List<CourseExercise> _getExercisesForCourse(String courseId) {
     switch (courseId) {
@@ -1208,8 +1227,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
 // Classe LessonScreen para visualizar vídeos
 class LessonScreen extends StatefulWidget {
-  final Lesson lesson;
-  final Course course;
+  final models.Lesson lesson;
+  final models.Course course;
 
   const LessonScreen({
     Key? key,
@@ -1227,7 +1246,7 @@ class _LessonScreenState extends State<LessonScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.lesson.type == LessonType.video && widget.lesson.videoUrl.isNotEmpty) {
+    if (widget.lesson.type == models.LessonType.video && widget.lesson.videoUrl.isNotEmpty) {
       final videoId = _getYouTubeVideoId(widget.lesson.videoUrl);
       if (videoId.isNotEmpty) {
         _youtubeController = YoutubePlayerController(
@@ -1266,7 +1285,7 @@ class _LessonScreenState extends State<LessonScreen> {
       body: Column(
         children: [
           // Player de vídeo
-          if (widget.lesson.type == LessonType.video && 
+          if (widget.lesson.type == models.LessonType.video && 
               widget.lesson.videoUrl.isNotEmpty && 
               _youtubeController != null)
             YoutubePlayer(
@@ -1278,7 +1297,7 @@ class _LessonScreenState extends State<LessonScreen> {
                 handleColor: AppColors.primary,
               ),
             )
-          else if (widget.lesson.type == LessonType.video)
+          else if (widget.lesson.type == models.LessonType.video)
             Container(
               width: double.infinity,
               height: 220,

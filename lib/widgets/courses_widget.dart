@@ -3,8 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../models/course_models.dart';
 import '../utils/app_colors.dart';
+import '../services/course_service.dart';
 import '../screens/course_detail_screen.dart';
 import '../services/course_progress_service.dart';
+import '../screens/main_navigation.dart';
 
 class CoursesWidget extends StatelessWidget {
   final List<Course> courses;
@@ -64,8 +66,18 @@ class CoursesWidget extends StatelessWidget {
                     flex: 1,
                     child: TextButton(
                       onPressed: () {
-                        // TODO: Navegar para tela de todos os cursos
-                        context.go("/courses");
+                        if (onViewAll != null) {
+                          onViewAll!();
+                        } else {
+                          // fallback: tentar trocar aba principal
+                          try {
+                            // MainNavigation expõe chave estática
+                            // ignore: avoid_dynamic_calls
+                            MainNavigation.mainNavigationKey.currentState?.switchToTab(1);
+                          } catch (_) {
+                            context.go('/courses');
+                          }
+                        }
                       },
                       child: Text(
                         'Ver todos',
@@ -112,11 +124,12 @@ class CoursesWidget extends StatelessWidget {
   }
 
   Widget _buildCourseCard(BuildContext context, Course course, {bool isGrid = false}) {
-    return Consumer<CourseProgressService>(
-      builder: (context, progressService, child) {
+    return Consumer2<CourseProgressService, CourseService>(
+      builder: (context, progressService, courseService, child) {
         final isCompleted = progressService.isCourseCompletedById(course.id);
         final completionPercentage = progressService.getCourseCompletionPercentage(course.id);
         final isDark = Theme.of(context).brightness == Brightness.dark;
+        final isFavorite = courseService.isFavorite(course.id);
         
         return Container(
           width: isGrid ? null : 220,
@@ -159,10 +172,39 @@ class CoursesWidget extends StatelessWidget {
                       child: Stack(
                         children: [
                           Center(
-                            child: Icon(
-                              _getCourseIcon(course.category),
-                              size: 40,
-                              color: Colors.white,
+                            child: Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: Align(
+                                    alignment: Alignment.center,
+                                    child: Icon(
+                                      _getCourseIcon(course.category),
+                                      size: 40,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 6,
+                                  right: 6,
+                                  child: InkWell(
+                                    onTap: () => courseService.toggleFavorite(course.id),
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black26,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Icon(
+                                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                                        size: 18,
+                                        color: isFavorite ? Colors.pinkAccent : Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           // ✅ Indicador de curso concluído
@@ -267,102 +309,24 @@ class CoursesWidget extends StatelessWidget {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 6),
                             Text(
                               course.description,
                               style: TextStyle(
                                 fontSize: 12,
+                                height: 1.25,
                                 color: isDark ? Colors.white70 : AppColors.textSecondary,
                               ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const Spacer(),
-                            // Status do curso
-                            if (isCompleted)
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.check_circle,
-                                    color: Colors.green,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Concluído',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.green,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            else if (completionPercentage > 0)
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.play_circle_outline,
-                                    color: Colors.orange,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${completionPercentage.toInt()}% concluído',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.orange,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            else
-                              // Informações do curso
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: [
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.play_circle_outline,
-                                          size: 16,
-                                          color: isDark ? Colors.white70 : AppColors.textSecondary,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${course.lessonsCount} aulas',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: isDark ? Colors.white70 : AppColors.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.quiz_outlined,
-                                          size: 16,
-                                          color: isDark ? Colors.white70 : AppColors.textSecondary,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${course.exercisesCount} exercícios',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: isDark ? Colors.white70 : AppColors.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                            const SizedBox(height: 10),
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.bottomLeft,
+                                child: _buildBottomSection(isDark, isCompleted, completionPercentage, course, progressService),
                               ),
+                            ),
                           ],
                         ),
                       ),
@@ -376,6 +340,70 @@ class CoursesWidget extends StatelessWidget {
       },
     );
   }
+
+  Widget _buildBottomSection(bool isDark, bool isCompleted, double completionPercentage, Course course, CourseProgressService progressService) {
+    if (isCompleted) {
+      return Row(
+        children: const [
+          Icon(
+            Icons.check_circle,
+            color: Colors.green,
+            size: 16,
+          ),
+          SizedBox(width: 4),
+          Text(
+            'Concluído',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.green,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      );
+    } else if (completionPercentage > 0) {
+      return Row(
+        children: [
+          const Icon(
+            Icons.play_circle_outline,
+            color: Colors.orange,
+            size: 16,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '${completionPercentage.toInt()}% concluído',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.orange,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      );
+    } else {
+      return Row(
+        children: [
+          Icon(
+            Icons.play_circle_outline,
+            size: 18,
+            color: isDark ? Colors.white : AppColors.textSecondary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'Comece agora',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
+              color: isDark ? Colors.white : AppColors.textPrimary,
+            ),
+          ),
+        ],
+      );
+    }
+  }
+
+  // (fim da seção de construção de cards)
 
   LinearGradient _getCourseGradient(String category) {
     switch (category.toLowerCase()) {

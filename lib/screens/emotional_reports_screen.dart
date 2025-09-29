@@ -5,6 +5,7 @@ import '../services/checkup_streak_service.dart';
 import '../services/achievement_service.dart';
 import '../services/course_progress_service.dart';
 import '../services/luma_ai_service.dart';
+import '../services/daily_checkup_history_service.dart';
 import '../models/achievement.dart';
 import '../models/daily_checkup.dart';
 import '../utils/app_colors.dart';
@@ -94,8 +95,8 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
   }
 
   Widget _buildOverviewTab() {
-    return Consumer2<CheckupStreakService, CourseProgressService>(
-      builder: (context, streakService, courseProgressService, child) {
+    return Consumer3<CheckupStreakService, CourseProgressService, DailyCheckupHistoryService>(
+      builder: (context, streakService, courseProgressService, historyService, child) {
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -109,7 +110,7 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
               const SizedBox(height: 24),
               _buildWeeklyChart(streakService),
               const SizedBox(height: 24),
-              _buildMonthlyProgress(streakService),
+              _buildMonthlyProgress(streakService, historyService),
             ],
           ),
         );
@@ -552,18 +553,18 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
   }
 
   Widget _buildHistoryTab() {
-    return Consumer2<CheckupStreakService, AchievementService>(
-      builder: (context, streakService, achievementService, child) {
+    return Consumer3<CheckupStreakService, AchievementService, DailyCheckupHistoryService>(
+      builder: (context, streakService, achievementService, historyService, child) {
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildMonthlyProgress(streakService),
+              _buildMonthlyProgress(streakService, historyService),
               const SizedBox(height: 24),
               _buildRecentAchievements(achievementService),
               const SizedBox(height: 24),
-              _buildHistoryList(streakService),
+              _buildHistoryList(streakService, historyService),
             ],
           ),
         );
@@ -571,8 +572,30 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
     );
   }
 
-  Widget _buildMonthlyProgress(CheckupStreakService streakService) {
+  Widget _buildMonthlyProgress(CheckupStreakService streakService, DailyCheckupHistoryService historyService) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final now = DateTime.now();
+    final endOfMonth = DateTime(now.year, now.month + 1, 0);
+    final daysInMonth = endOfMonth.day;
+
+    // Usar SOMENTE dados reais salvos no DailyCheckupHistoryService e apenas checkups concluídos
+    final monthCompleted = historyService.checkupHistory
+        .where((c) => c.isCompleted && c.date.year == now.year && c.date.month == now.month)
+        .map((c) => DateTime(c.date.year, c.date.month, c.date.day))
+        .toSet();
+
+    // Contar somente até o dia atual (não o mês inteiro ainda não passado)
+    final daysElapsed = now.day; // quantos dias já se passaram no mês (1..day)
+    final daysWithCheckupToToday = monthCompleted.where((d) => d.day <= now.day).length;
+    final progress = daysElapsed == 0 ? 0.0 : daysWithCheckupToToday / daysElapsed;
+
+    debugPrint('📊 MonthlyProgress REAL -> elapsed=$daysElapsed completed=$daysWithCheckupToToday totalMonthDays=$daysInMonth allMonthCompleted=${monthCompleted.length}');
+    if (monthCompleted.length <= 40) {
+      final ord = monthCompleted.toList()..sort((a,b)=>a.compareTo(b));
+      debugPrint('📊 Completed days: ${ord.map((d)=>d.day).join(',')}');
+    }
+
+    final monthCheckups = monthCompleted.length; // total concluído no mês inteiro (informativo)
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -606,16 +629,16 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${DateTime.now().day}/30 dias',
+                      '$daysWithCheckupToToday/$daysElapsed dias (até hoje)',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color:  isDark ? AppColors.whiteBack : AppColors.blackFont,
                       ),
                     ),
-                    const Text(
-                      'Checkups realizados',
-                      style: TextStyle(
+                    Text(
+                      'Dias concluídos em ${_monthName(now.month)} (mês: $monthCheckups/$daysInMonth)',
+                      style: const TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
                       ),
@@ -623,11 +646,21 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
                   ],
                 ),
               ),
-              CircularProgressIndicator(
-                value: DateTime.now().day / 30,
-                backgroundColor: Colors.grey.withOpacity(0.2),
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                strokeWidth: 6,
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    width: 60,
+                    height: 60,
+                    child: CircularProgressIndicator(
+                      value: progress.clamp(0.0, 1.0),
+                      backgroundColor: Colors.grey.withOpacity(0.15),
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      strokeWidth: 6,
+                    ),
+                  ),
+                  Text('${(progress * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                ],
               ),
             ],
           ),
@@ -636,8 +669,10 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
     );
   }
 
-  Widget _buildHistoryList(CheckupStreakService streakService) {
-    final recentCheckups = streakService.getRecentCheckups(days: 30);
+  Widget _buildHistoryList(CheckupStreakService streakService, DailyCheckupHistoryService historyService) {
+    // Preferir fonte unificada do histórico detalhado
+    final recentCheckups = historyService.getLastNDaysCheckups(30)
+      ..sort((a,b) => b.date.compareTo(a.date));
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
@@ -699,11 +734,19 @@ class _EmotionalReportsScreenState extends State<EmotionalReportsScreen>
               ),
             )
           else
-            ...recentCheckups.take(10).map((checkup) => 
-              _buildHistoryItem(checkup)).toList(),
+            ...recentCheckups.take(30).map(_buildHistoryItem).toList(),
         ],
       ),
     );
+  }
+
+  String _monthName(int m) {
+    const months = [
+      'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+      'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
+    ];
+    if (m < 1 || m > 12) return '';
+    return months[m-1];
   }
 
   Widget _buildHistoryItem(DailyCheckup checkup) {

@@ -12,6 +12,7 @@ import '../screens/emotional_reports_screen.dart';
 import '../screens/eventlog_report_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/main_navigation.dart';
+import '../screens/ai_chat_screen.dart';
 
 class GlobalDrawer extends StatelessWidget {
   const GlobalDrawer({super.key});
@@ -360,13 +361,12 @@ class GlobalDrawer extends StatelessWidget {
   void _openAiChat(BuildContext context) {
     final state = MainNavigation.mainNavigationKey.currentState;
     if (state != null) {
-      Navigator.pop(context);
-      // Usa método exposto para abrir overlay do AI Chat
+      // Abrir AI Chat como rota sem tentar fechar a MainNavigation (evita comportamento de "fechar app")
       MainNavigation.openAIChat();
     } else {
-      // Fallback se por algum motivo não estamos dentro da MainNavigation
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Não foi possível abrir o Chat da Luma agora.')),
+      // Fallback se não estiver na estrutura principal
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => AiChatScreen(key: MainNavigation.aiChatKey)),
       );
     }
   }

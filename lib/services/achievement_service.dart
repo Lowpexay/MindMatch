@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/achievement.dart';
 
 class AchievementService extends ChangeNotifier {
-  static const String _achievementsKeyPrefix = 'user_achievements_';
   static const String _unlockedAchievementsKeyPrefix = 'unlocked_achievements_';
   static const String _statsKeyPrefix = 'user_stats_';
 
@@ -325,6 +324,28 @@ class AchievementService extends ChangeNotifier {
             break;
           case 'weekend_warrior':
             shouldUnlock = (_userStats['weekend_streaks'] ?? 0) >= 2;
+            break;
+          // --- Course related achievements (previously missing unlock logic) ---
+          case 'first_lesson':
+            shouldUnlock = (_userStats['lessons_completed'] ?? 0) >= 1;
+            break;
+          case 'lesson_streak_5':
+            shouldUnlock = (_userStats['lessons_completed'] ?? 0) >= 5;
+            break;
+          case 'lesson_streak_20':
+            shouldUnlock = (_userStats['lessons_completed'] ?? 0) >= 20;
+            break;
+          case 'first_course':
+            shouldUnlock = (_userStats['courses_completed'] ?? 0) >= 1;
+            break;
+          case 'course_master':
+            shouldUnlock = (_userStats['courses_completed'] ?? 0) >= 5;
+            break;
+          case 'exercise_starter':
+            shouldUnlock = (_userStats['exercises_completed'] ?? 0) >= 10;
+            break;
+          case 'exercise_master':
+            shouldUnlock = (_userStats['exercises_completed'] ?? 0) >= 50;
             break;
         }
         

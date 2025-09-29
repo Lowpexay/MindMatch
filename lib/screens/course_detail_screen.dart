@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:provider/provider.dart';
-import '../models/course_models.dart';
+import '../models/course_models.dart' as models;
 import '../models/course_exercise.dart';
 import '../models/question.dart';
 import '../utils/app_colors.dart';
 import '../services/achievement_service.dart';
 import '../services/course_progress_service.dart';
+import '../services/course_service.dart';
 
 class CourseDetailScreen extends StatefulWidget {
-  final Course course;
+  final models.Course course;
 
   const CourseDetailScreen({
     super.key,
@@ -35,8 +36,37 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   Future<void> _loadCourseData() async {
     await Future.delayed(const Duration(milliseconds: 500));
     
-    final lessons = _getLessonsForCourse(widget.course.id);
-    final exercises = _getExercisesForCourse(widget.course.id);
+    final courseService = Provider.of<CourseService>(context, listen: false);
+    final modelLessons = courseService.getLessonsForCourse(widget.course.id);
+    final modelExercises = courseService.getExercisesForCourse(widget.course.id);
+    
+    // Converter para tipos locais da tela
+    final lessons = modelLessons.map((lesson) => Lesson(
+      id: lesson.id,
+      courseId: lesson.courseId,
+      title: lesson.title,
+      description: lesson.description,
+      type: lesson.type == models.LessonType.video ? LessonType.video : LessonType.text,
+      videoUrl: lesson.videoUrl,
+      duration: lesson.duration,
+      order: lesson.order,
+    )).toList();
+    
+    final exercises = modelExercises.map((exercise) => CourseExercise(
+      id: exercise.id,
+      courseId: widget.course.id,
+      title: 'Quiz: ${exercise.question}',
+      description: 'Teste seus conhecimentos',
+      questions: [
+        Question(
+          id: exercise.id + '_q1',
+          text: exercise.question,
+          options: exercise.options,
+          correctAnswer: exercise.correctAnswer,
+          explanation: exercise.explanation,
+        )
+      ],
+    )).toList();
     
     if (mounted) {
       setState(() {
@@ -193,7 +223,10 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.course.title),
+        title: Text(
+          widget.course.title,
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -273,23 +306,29 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          Text(
-            widget.course.title,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
+          Builder(builder: (context){
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return Text(
+              widget.course.title,
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : AppColors.textPrimary,
+              ),
+            );
+          }),
           const SizedBox(height: 8),
-          Text(
-            widget.course.description,
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.textSecondary,
-              height: 1.5,
-            ),
-          ),
+          Builder(builder: (context){
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return Text(
+              widget.course.description,
+              style: TextStyle(
+                fontSize: 16,
+                color: isDark ? Colors.white70 : AppColors.textSecondary,
+                height: 1.5,
+              ),
+            );
+          }),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -306,10 +345,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Widget _buildStatChip(IconData icon, String text) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.gray50,
+        color: isDark ? Colors.white10 : AppColors.gray50,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -321,8 +361,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
             text,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : AppColors.textPrimary,
             ),
           ),
         ],
@@ -343,7 +383,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 20),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.gray50,
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : AppColors.gray50,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -409,28 +449,33 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
   Widget _buildTabButton(String text, int index) {
     final isSelected = _selectedTab == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _selectedTab = index;
-        });
+        setState(() => _selectedTab = index);
       },
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.gray300,
+            color: isSelected
+                ? AppColors.primary
+                : (isDark ? Colors.white30 : AppColors.gray300),
           ),
         ),
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : AppColors.textSecondary,
+        child: Center(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? Colors.white70 : AppColors.textPrimary),
+            ),
           ),
         ),
       ),
@@ -1389,7 +1434,7 @@ enum LessonType { video, text }
 
 class LessonScreen extends StatefulWidget {
   final Lesson lesson;
-  final Course course;
+  final models.Course course;
   final VoidCallback onLessonCompleted;
 
   const LessonScreen({

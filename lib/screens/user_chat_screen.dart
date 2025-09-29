@@ -11,6 +11,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import '../widgets/user_avatar.dart';
+import 'user_public_profile_screen.dart';
 
 class UserChatScreen extends StatefulWidget {
   final ChatUser otherUser;
@@ -767,11 +768,10 @@ class _UserChatScreenState extends State<UserChatScreen> {
   }
 
   void _showUserProfile() {
-    // TODO: Mostrar perfil completo do usuário
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Funcionalidade em desenvolvimento'),
-        backgroundColor: AppColors.primary,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UserPublicProfileScreen(userId: widget.otherUser.id),
       ),
     );
   }

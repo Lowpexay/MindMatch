@@ -25,7 +25,27 @@ class ApiKeys {
     'AIzaSyDAEcBUmI4KOoxNxkaaXxeqWe3UkJoPmj8',
     // Chave secundária fornecida pelo usuário para fallback
     'AIzaSyCvtiI4SmV4UHtfPRTAnwZsv0fqQWNFNPs',
+    // Novas chaves adicionais para rotação (solicitadas pelo usuário)
+    'AIzaSyCDVVD32G5KAjJSAldZcfE9SE1HwHwgZYo',
+    'AIzaSyAScNaquPWcteRtM23gguuw3_u6lb8zSjo',
   ];
 
   static bool get isGeminiConfigured => geminiApiKeys.isNotEmpty && geminiApiKeys.first.isNotEmpty;
+
+  // --- Controle simples de rotação ---
+  static int _geminiKeyIndex = 0;
+
+  static String get currentGeminiKey => geminiApiKeys[_geminiKeyIndex % geminiApiKeys.length];
+
+  // Chamar quando receber 429 / 403 / 401 para tentar próximo fallback
+  static String rotateGeminiKey() {
+    _geminiKeyIndex = (_geminiKeyIndex + 1) % geminiApiKeys.length;
+    return currentGeminiKey;
+  }
+
+  // Helper para header padrão
+  static Map<String, String> geminiHeaders({String? apiKey}) => {
+    'Content-Type': 'application/json',
+    'x-goog-api-key': apiKey ?? currentGeminiKey,
+  };
 }

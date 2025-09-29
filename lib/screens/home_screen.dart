@@ -75,6 +75,8 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final userId = _authService?.currentUser?.uid;
       if (userId == null) return;
+      // Carregar estado persistido do checkup diário antes de avaliar
+      await _loadPersistedDailyCheckup(userId);
       await Future.wait([
         _loadDailyQuestions(),
         _loadCompatibleUsers(userId),
@@ -87,6 +89,34 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() { _isLoading = false; });
       }
+    }
+  }
+
+  Future<void> _loadPersistedDailyCheckup(String userId) async {
+    try {
+      final extra = await _firebaseService?.getUserExtraData(userId);
+      if (extra != null) {
+        final ts = extra['dailyCheckupDate'];
+        if (ts is int) {
+          final date = DateTime.fromMillisecondsSinceEpoch(ts);
+          final today = DateTime.now();
+          final startToday = DateTime(today.year, today.month, today.day);
+          if (DateTime(date.year, date.month, date.day) == startToday) {
+            _dailyCheckupDate = startToday;
+            _dailyCheckupCompleted = true;
+            _editingDailyCheckup = false;
+            // Restaurar humor salvo, se existir
+            final moodMap = extra['dailyCheckupMood'];
+            if (moodMap is Map<String, dynamic>) {
+              try {
+                _todayMood = MoodData.fromMap(moodMap);
+              } catch (_) {}
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('⚠️ Failed loading persisted daily checkup: $e');
     }
   }
 
@@ -366,6 +396,7 @@ class _HomeScreenState extends State<HomeScreen> {
           await _firebaseService?.updateUserExtraData(userId, {
             'dailyCheckupDate': startOfDay.millisecondsSinceEpoch,
             'dailyCheckupMood': mood.toMap(),
+            'dailyCheckupCompleted': true,
           });
         }
       } catch (e) {

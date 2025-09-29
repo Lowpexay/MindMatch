@@ -186,38 +186,48 @@ Usuário: ${seed.substring(0, (seed.length / 2).round())}
 ''';
 
     return '''
-Você é um assistente que gera perguntas reflexivas para um app de conexões humanas.
+Você é um gerador de PERGUNTAS FECHADAS (apenas SIM ou NÃO) para um app de conexões humanas.
 
 $moodContext
-
 $uniqueContext
 
-Gere exatamente $count perguntas reflexivas de SIM ou NÃO diferentes e únicas para este usuário.
+GERAR: exatamente $count perguntas refletindo valores / preferências / visão de mundo.
 
-Critérios:
-- Cada pergunta deve ter APENAS duas opções: SIM ou NÃO
-- Misture diferentes tipos: filosóficas, pessoais, divertidas, hipotéticas, sobre valores, estilo de vida
-- Varie entre temas como: relacionamentos, carreira, hobbies, sonhos, medos, preferências, viagens, tecnologia, natureza
-- Evite temas muito pesados ou polêmicos
-- Foque em valores, preferências e visão de mundo
-- Seja criativo, interessante e surpreendente
-- Torne cada pergunta única para hoje e para este usuário específico
+REGRAS OBRIGATÓRIAS (NÃO QUEBRAR):
+1. Cada pergunta DEVE ser respondível claramente com apenas "Sim" ou "Não".
+2. NÃO use estruturas abertas (ex.: "Por que", "Como", "Explique", "Descreva", "Qual é", "O que", "Liste").
+3. Pergunta deve terminar com '?'.
+4. Evite duplas negativas ou construções confusas.
+5. Evite perguntas que pedem justificativa implícita (ex.: "... e por quê?").
+6. Não use perguntas redundantes ou quase idênticas.
+7. Português simples, direto, sem gírias forçadas.
+8. Equilíbrio de temas: filosófico, pessoal, valores, estilo de vida, social, hipotético leve, tecnologia, futuro.
+9. NÃO gerar conteúdo sensível (violência explícita, política partidária, assuntos médicos complexos, sexo explícito).
+10. Cada pergunta deve começar preferencialmente com um destes padrões (case-insensitive):
+   "Você", "Se ", "É ", "Está", "Tem ", "Pode", "Poderia", "Deveria", "Iria", "Acredita", "Prefere", "Gostaria", "Quer", "Já ", "Costuma".
 
-Formato de resposta (JSON):
+ATRIBUTOS JSON:
+- question: string (texto da pergunta completa com '?')
+- type: um de ["philosophical", "personal", "social", "funny", "hypothetical"] (escolher coerente)
+- category: palavra curta minúscula (ex: "moral", "lifestyle", "relationships", "technology", "values", "future")
+
+VALIDAÇÃO INTERNA (FAÇA ANTES DE RESPONDER):
+Para cada pergunta verifique programaticamente:
+- Termina com '?' => OK
+- NÃO contém nenhuma palavra inicial proibida => OK
+- NÃO contém 'por que', 'porque', 'explique', 'descreva', 'liste', 'como', 'qual', 'quais', 'o que', 'oque' => OK
+- Pode ser respondida apenas com sim/não sem pedir justificativa => OK
+Se alguma falhar, REESCREVA antes de emitir o JSON final.
+
+SAÍDA:
+Retorne SOMENTE um array JSON válido, sem comentários, sem texto extra, sem markdown.
+Exemplo de formato (exemplo ilustrativo, não repetir literalmente):
 [
-  {
-    "question": "Você acredita que é melhor perdoar do que buscar justiça?",
-    "type": "philosophical",
-    "category": "moral"
-  },
-  {
-    "question": "Você prefere viajar sozinho a viajar acompanhado?",
-    "type": "personal", 
-    "category": "lifestyle"
-  }
+  {"question":"Você acredita que perdão acelera a cura emocional?","type":"philosophical","category":"moral"},
+  {"question":"Você prefere aprender sozinho a estudar em grupo?","type":"personal","category":"learning"}
 ]
 
-Gere as $count perguntas agora:
+Agora gere exatamente $count itens.
 ''';
   }
 

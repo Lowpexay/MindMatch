@@ -167,18 +167,30 @@ class _UserChatScreenState extends State<UserChatScreen> {
       };
 
       // Add message to conversation's messages subcollection
-      await FirebaseFirestore.instance
+      final conversationRef = FirebaseFirestore.instance
           .collection('conversations')
-          .doc(_conversationId)
-          .collection('messages')
-          .add(messageData);
+          .doc(_conversationId);
 
-      // Update conversation's lastMessage info
-      await FirebaseFirestore.instance
-          .collection('conversations')
-          .doc(_conversationId)
-          .update({
-        'lastMessage': messageText,
+      // Garantir que campo updatedAt existe para ordenar corretamente na lista principal
+      await conversationRef.collection('messages').add(messageData);
+
+      await conversationRef.update({
+        // Estrutura completa usada pelo ConversationsProvider (mantém consistência com firebase_service)
+        'lastMessage': {
+          'id': messageData['id'],
+          'content': messageText,
+          'senderId': currentUserId,
+          'receiverId': widget.otherUser.id,
+          'timestamp': FieldValue.serverTimestamp(),
+          'type': 'text',
+          'isRead': false,
+          'isDelivered': true,
+        },
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+        // Contadores de não lidas: incrementar para o destinatário
+        'unreadCount_${widget.otherUser.id}': FieldValue.increment(1),
+        // Garantir que meu contador fica zerado
+        'unreadCount_$currentUserId': 0,
         'lastMessageTime': FieldValue.serverTimestamp(),
         'lastMessageSenderId': currentUserId,
       });

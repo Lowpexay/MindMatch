@@ -71,19 +71,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() { _isLoading = true; });
     try {
       final userId = _authService?.currentUser?.uid;
       if (userId == null) return;
-
-      // Carregar dados em paralelo
       await Future.wait([
-        _loadUserName(userId),
-        _loadTodayMood(userId),
-        _loadPersistedDailyCheckup(userId),
         _loadDailyQuestions(),
         _loadCompatibleUsers(userId),
         _loadSampleCourses(),
@@ -92,66 +84,29 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       print('❌ Error loading initial data: $e');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _loadUserName(String userId) async {
-    try {
-      final userProfile = await _firebaseService?.getUserProfile(userId);
-      setState(() {
-        _userName = userProfile?['name'] ?? _authService?.currentUser?.displayName ?? 'Usuário';
-      });
-      print('👤 Nome do usuário carregado: $_userName');
-    } catch (e) {
-      print('❌ Error loading user name: $e');
-      setState(() {
-        _userName = _authService?.currentUser?.displayName ?? 'Usuário';
-      });
-    }
-  }
-
-  Future<void> _loadTodayMood(String userId) async {
-    try {
-      final mood = await _firebaseService?.getTodayMood(userId);
-      setState(() {
-        _todayMood = mood;
-      });
-
-      // Removido: geração automática de mensagem de apoio emocional
-      // As mensagens da Luma agora só aparecem quando o usuário vai para a aba dela
-    } catch (e) {
-      print('❌ Error loading mood: $e');
-    }
-  }
-
-  // Carrega do Firestore (user extra data) se o usuário já concluiu o checkup hoje
-  Future<void> _loadPersistedDailyCheckup(String userId) async {
-    try {
-      final extra = await _firebaseService?.getUserExtraData(userId);
-      if (extra != null) {
-        final ts = extra['dailyCheckupDate'];
-        if (ts is int) {
-          final date = DateTime.fromMillisecondsSinceEpoch(ts);
-          final start = DateTime(date.year, date.month, date.day);
-          final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-          if (start == today) {
-            _dailyCheckupDate = start;
-            // Se não carregou o mood (ex.: falhou _loadTodayMood) tentar reconstruir
-            if (_todayMood == null) {
-              final moodMap = extra['dailyCheckupMood'];
-              if (moodMap is Map<String, dynamic>) {
-                try { _todayMood = MoodData.fromMap(moodMap); } catch (_) {}
-              }
-            }
-            _dailyCheckupCompleted = true;
-          }
-        }
+      if (mounted) {
+        setState(() { _isLoading = false; });
       }
+    }
+  }
+
+  Future<void> _resetTodayQuestions() async {
+    try {
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final tomorrow = startOfDay.add(const Duration(days: 1));
+      // Estratégia: apagar tudo criado >= startOfDay e < tomorrow.
+      // Como só temos método deleteBefore, usamos cutoff = tomorrow e esperamos que histórico anterior fique intacto.
+      await _firebaseService?.deleteQuestionsBefore(tomorrow.millisecondsSinceEpoch);
+      await _firebaseService?.deleteResponsesBefore(tomorrow.millisecondsSinceEpoch);
+      setState(() {
+        _dailyQuestions = [];
+        _questionAnswers.clear();
+      });
+      print('🔄 Reset de perguntas de hoje concluído. Será gerado novamente no próximo load.');
+      await _loadDailyQuestions();
     } catch (e) {
-      print('⚠️ Error loading persisted daily checkup: $e');
+      print('❌ Falha ao resetar perguntas: $e');
     }
   }
 
@@ -275,8 +230,13 @@ class _HomeScreenState extends State<HomeScreen> {
           print('✅ After final fill we have ${questions.length} questions');
         }
 
+        // Validação de perguntas SIM/NÃO antes de setState
+        final validation = _validateYesNoQuestions(questions);
+        if (validation.replacedCount > 0) {
+          print('ℹ️ Validação: ${validation.replacedCount} perguntas substituídas por fallback SIM/NÃO');
+        }
         setState(() {
-          _dailyQuestions = questions;
+          _dailyQuestions = validation.questions;
           _questionAnswers = answersMap;
         });
 
@@ -1724,4 +1684,60 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  _ValidationResult _validateYesNoQuestions(List<ReflectiveQuestion> input) {
+    final now = DateTime.now();
+    final fallbackPool = _localFallbackQuestions();
+    int fallbackIndex = 0;
+    int replaced = 0;
+
+    bool isYesNo(String q) {
+      final qt = q.trim();
+      if (qt.length < 5) return false;
+      if (!qt.endsWith('?')) return false;
+      final lower = qt.toLowerCase();
+      const disallowedStarts = [
+        'por que', 'porque', 'como', 'quando', 'onde', 'qual', 'quais', 'o que', 'oque', 'que ', 'descreva', 'explique', 'liste', 'fale sobre', 'conte sobre'
+      ];
+      for (final w in disallowedStarts) {
+        if (lower.startsWith(w)) return false;
+      }
+      const preferredStarts = [
+        'você', 'se ', 'é ', 'está', 'tem ', 'pode', 'poderia', 'deveria', 'iria', 'aceita', 'acredita', 'prefere', 'gostaria', 'quer', 'já ', 'costuma', 'usaria', 'mudaria'
+      ];
+      bool startsOk = preferredStarts.any((p) => lower.startsWith(p));
+      if (!startsOk && lower.contains(' ou ')) startsOk = true;
+      return startsOk;
+    }
+
+    final validated = <ReflectiveQuestion>[];
+    for (final q in input) {
+      if (isYesNo(q.question)) {
+        validated.add(q);
+      } else {
+        replaced++;
+        print('⚠️ Removendo pergunta não SIM/NÃO: "${q.question}"');
+      }
+    }
+
+    final existing = validated.map((e) => e.question.trim().toLowerCase()).toSet();
+    while (validated.length < 10 && fallbackIndex < fallbackPool.length) {
+      final fb = fallbackPool[fallbackIndex++];
+      if (!isYesNo(fb.question)) continue;
+      if (existing.contains(fb.question.trim().toLowerCase())) continue;
+      validated.add(ReflectiveQuestion(
+        id: '${now.millisecondsSinceEpoch}_${validated.length}',
+        question: fb.question,
+        type: fb.type,
+        category: fb.category,
+        createdAt: now,
+      ));
+    }
+    return _ValidationResult(validated, replaced);
+  }
+}
+
+class _ValidationResult {
+  final List<ReflectiveQuestion> questions;
+  final int replacedCount;
+  _ValidationResult(this.questions, this.replacedCount);
 }

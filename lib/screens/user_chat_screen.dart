@@ -247,6 +247,17 @@ class _UserChatScreenState extends State<UserChatScreen> {
       // Enviar para o Firebase
       await _firebaseService?.sendChatMessage(message);
       print('✅ Message sent to Firebase successfully');
+      // Garantir que updatedAt refletiu (fallback se provider ordenar errado por não haver listener rápido)
+      try {
+        if (_conversationId != null) {
+          await FirebaseFirestore.instance
+              .collection('conversations')
+              .doc(_conversationId)
+              .update({'updatedAt': DateTime.now().millisecondsSinceEpoch});
+        }
+      } catch (e) {
+        print('⚠️ Falha ao aplicar fallback updatedAt: $e');
+      }
 
     } catch (e) {
       print('❌ Error sending message: $e');

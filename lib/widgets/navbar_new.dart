@@ -37,7 +37,7 @@ class CustomNavbar extends StatelessWidget {
             children: [
               _buildNavItem(Icons.home, 'Home', 0, context),
               _buildNavItem(Icons.video_library, 'Cursos', 1, context),
-              SizedBox(width: 60), // espaço para o avatar
+              SizedBox(width: 60), // espaço para o avatar central (Luma)
               _buildNavItem(Icons.chat_bubble_outline, 'Chats', 2, context),
               _buildNavItem(Icons.person_outline, 'Perfil', 3, context),
             ],
@@ -67,7 +67,7 @@ class CustomNavbar extends StatelessWidget {
                     ],
                   ),
                   child: const CircleAvatar(
-                    backgroundImage: AssetImage('assets/images/foto_da_luma.png'),
+                    backgroundImage: AssetImage('assets/images/cabecaLuma.png'),
                   ),
                 ),
                 const SizedBox(height: 4),

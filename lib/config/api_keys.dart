@@ -26,8 +26,8 @@ class ApiKeys {
     // Chave secundária fornecida pelo usuário para fallback
     'AIzaSyCvtiI4SmV4UHtfPRTAnwZsv0fqQWNFNPs',
     // Novas chaves adicionais para rotação (solicitadas pelo usuário)
-    'AIzaSyCDVVD32G5KAjJSAldZcfE9SE1HwHwgZYo',
-    'AIzaSyAScNaquPWcteRtM23gguuw3_u6lb8zSjo',
+    'AIzaSyDhX_hdzqkXzWITkePPBFbMW3ZAyzVBE_U', // substituída
+    'AIzaSyDQzYT7Gde4CqcyYc3DFhiDYFhqGj7dGCc', // substituída nova
   ];
 
   static bool get isGeminiConfigured => geminiApiKeys.isNotEmpty && geminiApiKeys.first.isNotEmpty;
@@ -41,6 +41,14 @@ class ApiKeys {
   static String rotateGeminiKey() {
     _geminiKeyIndex = (_geminiKeyIndex + 1) % geminiApiKeys.length;
     return currentGeminiKey;
+  }
+
+  // Novo: pegar uma chave aleatória (sem alterar índice global de rotação)
+  static String randomGeminiKey() {
+    if (geminiApiKeys.isEmpty) return '';
+    final now = DateTime.now().microsecondsSinceEpoch;
+    final idx = now % geminiApiKeys.length; // leve pseudo-aleatório sem importar dart:math aqui
+    return geminiApiKeys[idx];
   }
 
   // Helper para header padrão

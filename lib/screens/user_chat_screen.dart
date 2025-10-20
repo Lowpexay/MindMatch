@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import '../services/global_notification_service.dart';
@@ -46,8 +47,214 @@ class _UserChatScreenState extends State<UserChatScreen> {
     print('👤 Other user: ${widget.otherUser.name} (${widget.otherUser.id})');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       print('🚀 PostFrameCallback - About to initialize chat');
+      _checkAndShowSafetyWarning();
       _initializeChat();
     });
+  }
+
+  Future<void> _checkAndShowSafetyWarning() async {
+    try {
+      // Aguardar conversationId estar disponível
+      int attempts = 0;
+      while (_conversationId == null && attempts < 10) {
+        await Future.delayed(const Duration(milliseconds: 200));
+        attempts++;
+      }
+      
+      if (_conversationId == null) {
+        print('⚠️ ConversationId not available for safety warning');
+        return;
+      }
+      
+      final prefs = await SharedPreferences.getInstance();
+      final warningKey = 'user_chat_safety_warning_${_conversationId}';
+      final hasSeenWarning = prefs.getBool(warningKey) ?? false;
+      
+      if (!hasSeenWarning && mounted) {
+        // Aguardar frame para garantir que o contexto está pronto
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          _showSafetyWarningDialog();
+        }
+      }
+    } catch (e) {
+      print('❌ Error checking safety warning: $e');
+    }
+  }
+
+  void _showSafetyWarningDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: isDark ? AppColors.darkSurface : AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.shield_outlined,
+                color: AppColors.purpleBack,
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Proteção e Segurança',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? AppColors.whiteBack : AppColors.blackFont,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Antes de iniciar a conversa, lembre-se:',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? AppColors.whiteBack : AppColors.blackFont,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildWarningItem(
+                  icon: Icons.lock_outline,
+                  text: 'Nunca compartilhe sua senha ou dados de acesso',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 12),
+                _buildWarningItem(
+                  icon: Icons.credit_card_off,
+                  text: 'Não forneça informações financeiras ou bancárias',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 12),
+                _buildWarningItem(
+                  icon: Icons.person_off_outlined,
+                  text: 'Mantenha seus dados pessoais (CPF, RG, endereço) privados',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 12),
+                _buildWarningItem(
+                  icon: Icons.report_outlined,
+                  text: 'Denuncie qualquer comportamento inadequado ou suspeito',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 12),
+                _buildWarningItem(
+                  icon: Icons.people_outline,
+                  text: 'Encontros pessoais devem ser em locais públicos e seguros',
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.info.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: AppColors.info,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Sua segurança é nossa prioridade. Converse com respeito e responsabilidade.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? AppColors.whiteBack : AppColors.blackFont,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                if (_conversationId != null) {
+                  final prefs = await SharedPreferences.getInstance();
+                  final warningKey = 'user_chat_safety_warning_${_conversationId}';
+                  await prefs.setBool(warningKey, true);
+                  print('✅ Safety warning marked as seen for conversation: $_conversationId');
+                }
+                if (mounted) {
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primary, AppColors.secondary],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Entendi',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildWarningItem({
+    required IconData icon,
+    required String text,
+    required bool isDark,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          color: AppColors.warning,
+          size: 20,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? AppColors.whiteBack.withOpacity(0.9) : AppColors.blackFont,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import '../config/api_keys.dart';
 import '../models/question_models.dart';
@@ -8,13 +9,18 @@ import '../models/mood_data.dart';
 class GeminiService {
   static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
   final List<String> _keys = ApiKeys.geminiApiKeys;
-  int _keyIndex = 0;
 
-  String get _apiKey => _keys[_keyIndex];
+  // Gera uma ordem aleatória de tentativa para esta requisição
+  List<String> _shuffledKeys() {
+    final rng = math.Random(DateTime.now().microsecondsSinceEpoch);
+    final copy = List<String>.from(_keys);
+    copy.shuffle(rng);
+    return copy;
+  }
 
-  void _advanceKey() {
-    if (_keys.isEmpty) return;
-    _keyIndex = (_keyIndex + 1) % _keys.length;
+  String _maskKey(String key) {
+    if (key.length <= 10) return key; // chave curta improvável, retorna como está
+    return '${key.substring(0,6)}***${key.substring(key.length - 4)}';
   }
 
   bool _shouldRotateOn(http.Response response) {
@@ -28,23 +34,32 @@ class GeminiService {
 
   Future<http.Response> _postWithRotation(Map<String, dynamic> body) async {
     if (_keys.isEmpty) {
-      // Fall back to single attempt with empty key to surface meaningful error
       final uri = Uri.parse('$_baseUrl?key=');
       return http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
     }
 
-    int tries = 0;
+    final attemptOrder = _shuffledKeys();
     http.Response? last;
-    while (tries < _keys.length) {
-      final uri = Uri.parse('$_baseUrl?key=${_apiKey}');
+    int attempt = 0;
+    for (final key in attemptOrder) {
+      attempt++;
+      final masked = _maskKey(key);
+      final uri = Uri.parse('$_baseUrl?key=$key');
+      print('🔑 [Gemini] Tentativa $attempt/${attemptOrder.length} usando chave $masked');
       final resp = await http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
-      if (resp.statusCode == 200) return resp;
+      if (resp.statusCode == 200) {
+        return resp;
+      }
       last = resp;
       if (_shouldRotateOn(resp)) {
-        _advanceKey();
-        tries++;
-        continue;
+        print('↻ [Gemini] Falha (${resp.statusCode}) com chave $masked, avaliando rotação...');
+        if (attempt < attemptOrder.length) {
+          // Backoff leve para evitar bombardear endpoint em série
+          await Future.delayed(const Duration(milliseconds: 180));
+          continue; // tenta próxima
+        }
       } else {
+        // Erro não relacionado a quota/limite → retorna imediatamente
         return resp;
       }
     }

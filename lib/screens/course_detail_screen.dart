@@ -371,6 +371,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Widget _buildProgressBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Consumer<CourseProgressService>(
       builder: (context, progressService, child) {
         final totalItems = _lessons.length + _exercises.length;
@@ -392,12 +393,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Progresso do Curso',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: isDark ? AppColors.background : AppColors.textPrimary,
                 ),
               ),
               Text(
@@ -496,17 +497,18 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Widget _buildLessonsContent() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Aulas do Curso',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: isDark ? AppColors.background : AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
@@ -685,17 +687,18 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Widget _buildExercisesContent() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Exercícios do Curso',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: isDark ? AppColors.background : AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
@@ -836,17 +839,18 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Widget _buildAboutContent() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Sobre o Curso',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: isDark ? AppColors.background : AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
@@ -862,18 +866,18 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.gray50,
+              color:  isDark ? AppColors.blackFont : AppColors.background,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Detalhes do Curso',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: isDark ? AppColors.background : AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -891,6 +895,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Widget _buildDetailRow(String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -905,10 +910,10 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: isDark ? AppColors.background : AppColors.textPrimary,
             ),
           ),
         ],

@@ -866,21 +866,19 @@ class AiChatScreenState extends State<AiChatScreen> {
   }
 
   Widget _buildEmbeddedNavbar() {
-    final currentIndex = MainNavigation.lastTabIndex;
+    // Não marcar nenhuma aba como selecionada quando dentro da Luma
+    // Isso permite que o usuário clique em qualquer aba (incluindo a que estava antes) para voltar
     return CustomNavbar(
-      selectedIndex: currentIndex,
+      selectedIndex: -1, // -1 = nenhuma aba marcada
       onItemTapped: (index) {
-        // Novo comportamento: se tocar na mesma aba, não faz nada (permanece no chat)
-        if (index == currentIndex) {
-          return; // ignora toque redundante
-        }
-        // Trocar para outra aba: primeiro fecha o chat, depois muda a aba principal
+        // Sempre fecha o chat e navega para a aba clicada
         Navigator.of(context).pop();
         MainNavigation.mainNavigationKey.currentState?.switchToTab(index);
       },
       onCenterAvatarTap: () {
-        // Tocar no avatar central dentro do chat fecha o chat (efeito de toggle)
-        Navigator.of(context).maybePop();
+        // Não fechar o chat ao tocar novamente no avatar — evita efeito de toggle inesperado.
+        // Mantemos o chat aberto; o botão central pode ser usado futuramente para abrir opções.
+        return;
       },
     );
   }

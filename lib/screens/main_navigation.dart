@@ -167,6 +167,9 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
 
   // Abre o AI Chat como uma nova rota (não altera o índice das abas)
   void _openAiChat() {
+    // Registrar a aba atual como última aba ativa antes de abrir o chat
+    MainNavigation.lastTabIndex = _currentIndex;
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => AiChatScreen(key: MainNavigation.aiChatKey),

@@ -136,13 +136,16 @@ class CompatibleUsersWidget extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      content: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: compatibleUsers
-                              .skip(3)
-                              .map((user) => _buildUserCard(context, user))
-                              .toList(),
+                      content: SizedBox(
+                        width: double.maxFinite,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: compatibleUsers
+                                .skip(3)
+                                .map((user) => _buildUserCard(context, user))
+                                .toList(),
+                          ),
                         ),
                       ),
                       actions: [
@@ -341,7 +344,6 @@ class CompatibleUsersWidget extends StatelessWidget {
     final name = user['name'] ?? 'Usuário';
     final age = user['age'] as int?;
     final city = user['city'] as String?;
-    final bio = user['bio'] as String?;
     final profileImage = user['profileImageUrl'] as String?;
     final profileImageBase64 = user['profileImageBase64'] as String?;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -444,12 +446,15 @@ class CompatibleUsersWidget extends StatelessWidget {
                         // Nome e idade
                         Row(
                           children: [
-                            Text(
-                              name,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : AppColors.textPrimary,
+                            Flexible(
+                              child: Text(
+                                name,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : AppColors.textPrimary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (age != null) ...[

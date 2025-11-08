@@ -229,7 +229,7 @@ class CoursesWidget extends StatelessWidget {
                           if (course.isPopular)
                             Positioned(
                               top: 8,
-                              right: 8,
+                              right: 40,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(

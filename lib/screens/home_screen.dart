@@ -1035,7 +1035,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(24),
                     image: const DecorationImage(
-                      image: AssetImage('assets/images/oiLuma.png'),
+                      image: AssetImage('assets/images/cabecaLuma.png'),
                       fit: BoxFit.cover,
                     ),
                     boxShadow: [

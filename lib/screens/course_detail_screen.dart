@@ -1505,6 +1505,7 @@ class _LessonScreenState extends State<LessonScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.lesson.title),
@@ -1537,10 +1538,10 @@ class _LessonScreenState extends State<LessonScreen> {
                 children: [
                   Text(
                     widget.lesson.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: isDark ? AppColors.background : AppColors.blackFont,
                     ),
                   ),
                   const SizedBox(height: 12),

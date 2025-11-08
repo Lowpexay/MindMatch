@@ -45,6 +45,16 @@ class MainNavigation extends StatefulWidget {
   // Alias de compatibilidade (usado em chamadas antigas)
   static void navigateToAIChat() => openAIChat();
 
+  // Método para acessar o state e mudar de aba
+  static void switchTab(int index) {
+    final state = mainNavigationKey.currentState;
+    if (state != null) {
+      state.switchToTab(index);
+    } else {
+      print('❌ MainNavigation.switchTab: currentState is null');
+    }
+  }
+
   @override
   State<MainNavigation> createState() => _MainNavigationState();
 }
@@ -167,6 +177,9 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
 
   // Abre o AI Chat como uma nova rota (não altera o índice das abas)
   void _openAiChat() {
+    // Registrar a aba atual como última aba ativa antes de abrir o chat
+    MainNavigation.lastTabIndex = _currentIndex;
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => AiChatScreen(key: MainNavigation.aiChatKey),

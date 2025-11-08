@@ -172,12 +172,14 @@ class _LumaVoiceWidgetState extends State<LumaVoiceWidget>
               const SizedBox(height: 20),
               
               // Nome da Luma
-              const Text(
+              Text(
                 'Luma',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : AppColors.textPrimary,
                 ),
               ),
               

@@ -493,10 +493,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: CoursesWidget(
                       courses: _courses,
                       onViewAll: () {
-                        // Redireciona para tela completa de cursos mantendo navbar
-                        if (mounted) {
-                          context.go('/courses');
-                        }
+                        // Muda para a aba de cursos
+                        MainNavigation.switchTab(1);
                       },
                     ),
                   ),

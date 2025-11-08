@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../services/theme_service.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
-import 'package:go_router/go_router.dart';
+import 'main_navigation.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -15,6 +16,23 @@ class SettingsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Configurações'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // Voltar para a tela anterior usando Navigator ou MainNavigation
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              // Se não houver pilha, voltar para a aba de Perfil (índice 3)
+              final mainNav = MainNavigation.mainNavigationKey.currentState;
+              if (mainNav != null) {
+                mainNav.switchToTab(3); // Aba do Perfil
+              } else {
+                context.go('/');
+              }
+            }
+          },
+        ),
       ),
       body: ListView(
         children: [

@@ -5,6 +5,7 @@ import '../services/course_service.dart';
 import '../services/course_progress_service.dart';
 import '../utils/app_colors.dart';
 import 'course_detail_screen.dart';
+import 'main_navigation.dart';
 
 class CoursesScreen extends StatefulWidget {
   const CoursesScreen({Key? key}) : super(key: key);
@@ -93,11 +94,22 @@ class _CoursesScreenState extends State<CoursesScreen>
     }
 
     return Scaffold(
-      // Mantemos sem AppBar para reutilizar o header/navbar existente na tela principal
-      body: Column(
-        children: [
-          // Tabs inline no corpo para não gerar um novo header
-          Material(
+      // Adicionar AppBar com botão de voltar quando vem da Home
+      appBar: AppBar(
+        title: const Text('Cursos'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            print('🔙 Botão de voltar clicado na tela de Cursos');
+            // Usar o método estático simplificado
+            MainNavigation.switchTab(0);
+          },
+        ),
+        backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Material(
             color: Colors.transparent,
             child: TabBar(
               controller: _tabController,
@@ -111,23 +123,21 @@ class _CoursesScreenState extends State<CoursesScreen>
               ],
             ),
           ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                await courseService.loadCourses();
-                await courseService.loadFavorites();
-              },
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildCourseList(context, allCourses, courseService, progressService, emptyMessage: 'Nenhum curso disponível.'),
-                  _buildCourseList(context, favoriteCourses, courseService, progressService, emptyMessage: 'Você ainda não favoritou cursos.'),
-                  _buildCourseList(context, completedCourses, courseService, progressService, emptyMessage: 'Você ainda não concluiu cursos.'),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await courseService.loadCourses();
+          await courseService.loadFavorites();
+        },
+        child: TabBarView(
+          controller: _tabController,
+          children: [
+            _buildCourseList(context, allCourses, courseService, progressService, emptyMessage: 'Nenhum curso disponível.'),
+            _buildCourseList(context, favoriteCourses, courseService, progressService, emptyMessage: 'Você ainda não favoritou cursos.'),
+            _buildCourseList(context, completedCourses, courseService, progressService, emptyMessage: 'Você ainda não concluiu cursos.'),
+          ],
+        ),
       ),
     );
   }

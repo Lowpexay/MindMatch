@@ -45,6 +45,16 @@ class MainNavigation extends StatefulWidget {
   // Alias de compatibilidade (usado em chamadas antigas)
   static void navigateToAIChat() => openAIChat();
 
+  // Método para acessar o state e mudar de aba
+  static void switchTab(int index) {
+    final state = mainNavigationKey.currentState;
+    if (state != null) {
+      state.switchToTab(index);
+    } else {
+      print('❌ MainNavigation.switchTab: currentState is null');
+    }
+  }
+
   @override
   State<MainNavigation> createState() => _MainNavigationState();
 }

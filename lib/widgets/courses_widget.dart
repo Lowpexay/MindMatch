@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../models/course_models.dart';
 import '../utils/app_colors.dart';
@@ -69,14 +68,9 @@ class CoursesWidget extends StatelessWidget {
                         if (onViewAll != null) {
                           onViewAll!();
                         } else {
-                          // fallback: tentar trocar aba principal
-                          try {
-                            // MainNavigation expõe chave estática
-                            // ignore: avoid_dynamic_calls
-                            MainNavigation.mainNavigationKey.currentState?.switchToTab(1);
-                          } catch (_) {
-                            context.go('/courses');
-                          }
+                          // Usar o método estático simplificado
+                          print('🔍 Tentando mudar para aba de Cursos (1)');
+                          MainNavigation.switchTab(1);
                         }
                       },
                       child: Text(

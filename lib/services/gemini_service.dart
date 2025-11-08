@@ -7,8 +7,10 @@ import '../models/question_models.dart';
 import '../models/mood_data.dart';
 
 class GeminiService {
-  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent';
+  static const String _fallbackModelUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
   final List<String> _keys = ApiKeys.geminiApiKeys;
+  bool _useFallbackModel = false; // Flag para usar modelo alternativo se 2.0 falhar
 
   // Gera uma ordem aleatória de tentativa para esta requisição
   List<String> _shuffledKeys() {
@@ -24,6 +26,12 @@ class GeminiService {
   }
 
   bool _shouldRotateOn(http.Response response) {
+    // Erro 400 geralmente é problema na requisição/modelo, não quota - não rotacionar
+    if (response.statusCode == 400) {
+      print('⚠️ Erro 400 detectado - problema provável na requisição ou modelo indisponível');
+      return false; // não rotacionar em erro 400
+    }
+    // Rotar em erros de autenticação/quota
     if (response.statusCode == 429 || response.statusCode == 401 || response.statusCode == 403) {
       return true;
     }
@@ -34,23 +42,46 @@ class GeminiService {
 
   Future<http.Response> _postWithRotation(Map<String, dynamic> body) async {
     if (_keys.isEmpty) {
-      final uri = Uri.parse('$_baseUrl?key=');
+      final baseUrl = _useFallbackModel ? _fallbackModelUrl : _baseUrl;
+      final uri = Uri.parse('$baseUrl?key=');
       return http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
     }
 
     final attemptOrder = _shuffledKeys();
     http.Response? last;
     int attempt = 0;
+    
     for (final key in attemptOrder) {
       attempt++;
       final masked = _maskKey(key);
-      final uri = Uri.parse('$_baseUrl?key=$key');
-      print('🔑 [Gemini] Tentativa $attempt/${attemptOrder.length} usando chave $masked');
+      final baseUrl = _useFallbackModel ? _fallbackModelUrl : _baseUrl;
+      final uri = Uri.parse('$baseUrl?key=$key');
+      
+      final modelName = _useFallbackModel ? 'gemini-1.5-flash' : 'gemini-2.0-flash-exp';
+      print('🔑 [Gemini] Tentativa $attempt/${attemptOrder.length} modelo $modelName com chave $masked');
+      
       final resp = await http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
+      
       if (resp.statusCode == 200) {
         return resp;
       }
+      
       last = resp;
+      
+      // Se erro 400 e ainda não tentou modelo fallback, ativa flag e tenta novamente
+      if (resp.statusCode == 400 && !_useFallbackModel) {
+        print('⚠️ Erro 400 com modelo gemini-2.0-flash-exp, tentando gemini-1.5-flash...');
+        _useFallbackModel = true;
+        // Tenta novamente com a mesma chave mas modelo diferente
+        final fallbackUri = Uri.parse('$_fallbackModelUrl?key=$key');
+        final fallbackResp = await http.post(fallbackUri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
+        if (fallbackResp.statusCode == 200) {
+          print('✅ Sucesso com modelo fallback gemini-1.5-flash');
+          return fallbackResp;
+        }
+        last = fallbackResp;
+      }
+      
       if (_shouldRotateOn(resp)) {
         print('↻ [Gemini] Falha (${resp.statusCode}) com chave $masked, avaliando rotação...');
         if (attempt < attemptOrder.length) {
@@ -473,6 +504,12 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
         return data['candidates'][0]['content']['parts'][0]['text'];
       } else {
         print('❌ Gemini API error in chat: ${response.statusCode}');
+        print('❌ Response body: ${response.body}');
+        // Se erro 400, pode ser problema com o modelo ou formato da requisição
+        if (response.statusCode == 400) {
+          print('⚠️ Erro 400: Verifique se o modelo gemini-2.0-flash está disponível');
+          print('⚠️ Tentando com mensagem simplificada...');
+        }
         return _getFallbackChatResponse();
       }
     } catch (e) {

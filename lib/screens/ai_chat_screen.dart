@@ -789,7 +789,7 @@ class AiChatScreenState extends State<AiChatScreen> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
               child: Image.asset(
-                'assets/images/oiLuma.png',
+                'assets/images/cabecaLuma.png',
                 fit: BoxFit.cover,
                 errorBuilder: (c, e, s) => Container(
                   decoration: BoxDecoration(
@@ -964,7 +964,7 @@ class AiChatScreenState extends State<AiChatScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
                 child: Image.asset(
-                  'assets/images/oiLuma.png',
+                  'assets/images/cabecaLuma.png',
                   width: 36,
                   height: 36,
                   fit: BoxFit.cover,

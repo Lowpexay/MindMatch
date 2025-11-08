@@ -997,6 +997,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSupportMessageCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -1034,7 +1035,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(24),
                     image: const DecorationImage(
-                      image: AssetImage('assets/images/oiLuma.png'),
+                      image: AssetImage('assets/images/cabecaLuma.png'),
                       fit: BoxFit.cover,
                     ),
                     boxShadow: [
@@ -1051,12 +1052,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Mensagem da Luma',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ? AppColors.background : AppColors.textPrimary,
                         ),
                       ),
                       Text(

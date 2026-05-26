@@ -13,12 +13,11 @@ dependencies:
     sdk: flutter
   
   # Firebase
-  firebase_core: ^2.32.0
-  firebase_auth: ^4.15.3
-  cloud_firestore: ^4.13.6
-  firebase_storage: ^11.5.6
-  # Downgraded to match existing firebase_core 2.x and web dependency constraints
-  firebase_messaging: ^14.7.10
+  firebase_core: ^4.9.0
+  firebase_auth: ^6.5.1
+  cloud_firestore: ^6.4.1
+  firebase_storage: ^13.4.1
+  firebase_messaging: ^16.2.2
   
   # Authentication
   google_sign_in: ^6.1.6

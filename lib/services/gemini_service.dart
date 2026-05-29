@@ -7,15 +7,16 @@ import '../models/question_models.dart';
 import '../models/mood_data.dart';
 
 class GeminiService {
-  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent';
-  static const String _fallbackModelUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
   final List<String> _keys = ApiKeys.geminiApiKeys;
-  bool _useFallbackModel = false; // Flag para usar modelo alternativo se 2.0 falhar
+  // Forçar uso do modelo gemini-2.5-flash-lite (não usar fallback)
 
   // Gera uma ordem aleatória de tentativa para esta requisição
   List<String> _shuffledKeys() {
     final rng = math.Random(DateTime.now().microsecondsSinceEpoch);
-    final copy = List<String>.from(_keys);
+    // Gemini API keys from AI Studio typically start with "AIza".
+    final candidates = _keys.where((k) => k.startsWith('AIza')).toList();
+    final copy = List<String>.from(candidates.isNotEmpty ? candidates : _keys);
     copy.shuffle(rng);
     return copy;
   }
@@ -25,11 +26,25 @@ class GeminiService {
     return '${key.substring(0,6)}***${key.substring(key.length - 4)}';
   }
 
+  bool _isLikelyApiKeyIssue(http.Response response) {
+    final body = response.body.toLowerCase();
+    return body.contains('api key') ||
+        body.contains('api_key') ||
+        body.contains('consumer') ||
+        body.contains('permission_denied') ||
+        body.contains('request had invalid authentication credentials') ||
+        body.contains('consumer_suspended');
+  }
+
   bool _shouldRotateOn(http.Response response) {
     // Erro 400 geralmente é problema na requisição/modelo, não quota - não rotacionar
     if (response.statusCode == 400) {
+      if (_isLikelyApiKeyIssue(response)) {
+        print('⚠️ Erro 400 com indício de autenticação/chave inválida - rotacionando chave');
+        return true;
+      }
       print('⚠️ Erro 400 detectado - problema provável na requisição ou modelo indisponível');
-      return false; // não rotacionar em erro 400
+      return false;
     }
     // Rotar em erros de autenticação/quota
     if (response.statusCode == 429 || response.statusCode == 401 || response.statusCode == 403) {
@@ -42,8 +57,7 @@ class GeminiService {
 
   Future<http.Response> _postWithRotation(Map<String, dynamic> body) async {
     if (_keys.isEmpty) {
-      final baseUrl = _useFallbackModel ? _fallbackModelUrl : _baseUrl;
-      final uri = Uri.parse('$baseUrl?key=');
+      final uri = Uri.parse('$_baseUrl?key=');
       return http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
     }
 
@@ -54,12 +68,8 @@ class GeminiService {
     for (final key in attemptOrder) {
       attempt++;
       final masked = _maskKey(key);
-      final baseUrl = _useFallbackModel ? _fallbackModelUrl : _baseUrl;
-      final uri = Uri.parse('$baseUrl?key=$key');
-      
-      final modelName = _useFallbackModel ? 'gemini-1.5-flash' : 'gemini-2.0-flash-exp';
-      print('🔑 [Gemini] Tentativa $attempt/${attemptOrder.length} modelo $modelName com chave $masked');
-      
+      final uri = Uri.parse('$_baseUrl?key=$key');
+      print('🔑 [Gemini] Tentativa $attempt/${attemptOrder.length} modelo gemini-2.5-flash-lite com chave $masked');
       final resp = await http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
       
       if (resp.statusCode == 200) {
@@ -68,19 +78,7 @@ class GeminiService {
       
       last = resp;
       
-      // Se erro 400 e ainda não tentou modelo fallback, ativa flag e tenta novamente
-      if (resp.statusCode == 400 && !_useFallbackModel) {
-        print('⚠️ Erro 400 com modelo gemini-2.0-flash-exp, tentando gemini-1.5-flash...');
-        _useFallbackModel = true;
-        // Tenta novamente com a mesma chave mas modelo diferente
-        final fallbackUri = Uri.parse('$_fallbackModelUrl?key=$key');
-        final fallbackResp = await http.post(fallbackUri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
-        if (fallbackResp.statusCode == 200) {
-          print('✅ Sucesso com modelo fallback gemini-1.5-flash');
-          return fallbackResp;
-        }
-        last = fallbackResp;
-      }
+      // Não tentar modelo fallback automaticamente; retornar resposta para tratar no caller
       
       if (_shouldRotateOn(resp)) {
         print('↻ [Gemini] Falha (${resp.statusCode}) com chave $masked, avaliando rotação...');
@@ -115,7 +113,7 @@ class GeminiService {
           }],
           'generationConfig': {
             'temperature': 0.8,
-            'maxOutputTokens': 1000,
+            'maxOutputTokens': 700,
           },
         });
 
@@ -164,7 +162,7 @@ class GeminiService {
         ],
         'generationConfig': {
           'temperature': 0.1,
-          'maxOutputTokens': 256,
+          'maxOutputTokens': 192,
         },
         'safetySettings': [
           {
@@ -475,7 +473,7 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
           'contents': history,
           'generationConfig': {
             'temperature': 0.8,
-            'maxOutputTokens': 500,
+            'maxOutputTokens': 350,
             'topP': 0.95,
             'topK': 40,
           },
@@ -507,7 +505,7 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
         print('❌ Response body: ${response.body}');
         // Se erro 400, pode ser problema com o modelo ou formato da requisição
         if (response.statusCode == 400) {
-          print('⚠️ Erro 400: Verifique se o modelo gemini-2.0-flash está disponível');
+          print('⚠️ Erro 400: Verifique se o modelo gemini-2.5-flash-lite está disponível');
           print('⚠️ Tentando com mensagem simplificada...');
         }
         return _getFallbackChatResponse();
@@ -516,6 +514,147 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
       print('❌ Error generating chat response: $e');
       return _getFallbackChatResponse();
     }
+  }
+
+  Future<Map<String, dynamic>> generatePsychologistTriageResponse({
+    required String userMessage,
+    required String conversationContext,
+    required Map<String, String> collectedInfo,
+    List<Map<String, dynamic>> psychologistOptions = const [],
+    String? userName,
+  }) async {
+    final optionsJson = jsonEncode(psychologistOptions);
+    final contextJson = jsonEncode(collectedInfo);
+    final safeName = (userName != null && userName.trim().isNotEmpty) ? userName.trim() : 'Usuário';
+
+    final prompt = '''
+Você é a Luma, uma assistente de acolhimento emocional em português do Brasil.
+Seu objetivo é conduzir uma TRIAGEM CONVERSACIONAL natural para indicar um psicólogo.
+
+Nome do usuário: $safeName
+
+Informações já coletadas:
+$contextJson
+
+Histórico completo da conversa:
+$conversationContext
+
+Última mensagem do usuário:
+$userMessage
+
+Perfis de psicólogos disponíveis para recomendação:
+$optionsJson
+
+Regras:
+1) A conversa deve ser natural (sem perguntas de múltipla escolha).
+2) Extraia informações do texto do usuário (NLP) para os campos:
+   - motivo_principal
+   - modalidade_preferida
+   - disponibilidade
+   - objetivo_terapia
+   - observacoes_relevantes
+3) Se ainda faltar dados essenciais, faça apenas UMA pergunta de continuidade no campo assistant_reply.
+4) Considere pronto para recomendação quando existir pelo menos:
+   motivo_principal + modalidade_preferida + disponibilidade.
+5) Quando pronto, escolha UM perfil da lista disponível e retorne em recommended_psychologist.
+6) Não invente perfis fora da lista.
+7) Responda SOMENTE JSON válido, sem markdown.
+8) Mantenha assistant_reply curto, com no máximo 2 frases.
+9) Preencha only os campos necessários; não escreva textos longos nos campos do JSON.
+
+Formato obrigatório:
+{
+  "assistant_reply": "texto da Luma",
+  "extracted_info": {
+    "motivo_principal": "...",
+    "modalidade_preferida": "...",
+    "disponibilidade": "...",
+    "objetivo_terapia": "...",
+    "observacoes_relevantes": "..."
+  },
+  "missing_fields": ["campo1", "campo2"],
+  "ready_for_recommendation": true,
+  "recommended_psychologist": {
+    "name": "nome exato da lista",
+    "approach": "...",
+    "mode": "...",
+    "availability": "...",
+    "location": "...",
+    "summary": "...",
+    "rating": 4.9
+  }
+}
+''';
+
+    try {
+      final response = await _postWithRotation({
+        'contents': [
+          {
+            'parts': [
+              {'text': prompt}
+            ]
+          }
+        ],
+        'generationConfig': {
+          'temperature': 0.3,
+          'maxOutputTokens': 384,
+          'topP': 0.9,
+          'responseMimeType': 'application/json',
+        },
+      });
+
+      if (response.statusCode != 200) {
+        print('❌ Gemini triage API error: ${response.statusCode}');
+        print('❌ Gemini triage response body: ${response.body}');
+        return _fallbackTriageResponse();
+      }
+
+      final data = jsonDecode(response.body);
+      final text = data['candidates']?[0]?['content']?['parts']?[0]?['text']?.toString() ?? '';
+      final parsed = _extractTriageJson(text);
+      if (parsed == null) {
+        return _fallbackTriageResponse();
+      }
+
+      parsed['assistant_reply'] ??= 'Entendi. Pode me contar um pouco mais para eu encontrar o profissional ideal para você?';
+      parsed['extracted_info'] ??= <String, dynamic>{};
+      parsed['missing_fields'] ??= <dynamic>[];
+      parsed['ready_for_recommendation'] ??= false;
+      return parsed;
+    } catch (e) {
+      print('❌ Error generating psychologist triage response: $e');
+      return _fallbackTriageResponse();
+    }
+  }
+
+  Map<String, dynamic>? _extractTriageJson(String raw) {
+    try {
+      final trimmed = raw.trim();
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        return jsonDecode(trimmed) as Map<String, dynamic>;
+      }
+
+      final start = trimmed.indexOf('{');
+      final end = trimmed.lastIndexOf('}');
+      if (start == -1 || end == -1 || end <= start) {
+        return null;
+      }
+
+      final jsonString = trimmed.substring(start, end + 1);
+      return jsonDecode(jsonString) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Map<String, dynamic> _fallbackTriageResponse() {
+    return {
+      'assistant_reply': 'Entendi. Para eu te indicar o profissional ideal, me conta também se você prefere atendimento online, presencial ou ambos, e quais horários funcionam melhor para você.',
+      'extracted_info': <String, dynamic>{},
+      'missing_fields': ['modalidade_preferida', 'disponibilidade'],
+      'ready_for_recommendation': false,
+      'recommended_psychologist': null,
+    };
   }
 
   // Função para montar o histórico de mensagens usando padrão LangChain

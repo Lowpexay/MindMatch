@@ -21,7 +21,7 @@ import '../widgets/compatible_users_widget.dart';
 import '../widgets/courses_widget.dart';
 import '../widgets/user_avatar.dart';
 import '../screens/user_chat_screen.dart';
-import '../screens/ai_chat_screen.dart';
+import '../screens/luma_chat_screen.dart';
 import '../screens/main_navigation.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -1185,7 +1185,7 @@ class _HomeScreenState extends State<HomeScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => AiChatScreen(userMood: _todayMood),
+          builder: (context) => LumaChatScreen(),
         ),
       );
     }

@@ -14,7 +14,7 @@ import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import '../services/global_notification_service.dart';
 import 'home_screen.dart';
-import 'ai_chat_screen.dart';
+import 'luma_chat_screen.dart';
 import 'conversations_screen.dart';
 import 'profile_screen.dart';
 
@@ -32,7 +32,7 @@ class MainNavigation extends StatefulWidget {
   // Chave global para acessar métodos da ConversationsScreen
   static final GlobalKey<ConversationsScreenState> conversationsKey = GlobalKey<ConversationsScreenState>();
   // AI Chat não é mais uma aba fixa; abriremos como overlay / rota separada.
-  static final GlobalKey<AiChatScreenState> aiChatKey = GlobalKey<AiChatScreenState>();
+  static final GlobalKey aiChatKey = GlobalKey();
   // Última aba ativa (para exibir seleção quando abrirmos o AI Chat com navbar)
   static int lastTabIndex = 0;
 
@@ -182,7 +182,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => AiChatScreen(key: MainNavigation.aiChatKey),
+        builder: (_) => LumaChatScreen(key: MainNavigation.aiChatKey),
       ),
     );
   }

@@ -21,10 +21,7 @@ class ApiKeys {
   // Gemini API Keys (suporta rotação)
   // Adicione aqui suas chaves; serão usadas em fallback/rotação em caso de 429/403/401
   static const List<String> geminiApiKeys = [
-    'AIzaSyDTMequtzyC-3CkOOqT4wi-bbBYoyNqdp0',
-    'AIzaSyDmeG8jmplwPlyl7aWPK7q1VugwdkQv4V4',
-    'AIzaSyA0P1Y_u3rZjP-GSaOEUXtp1WimSx1G6nQ',
-    'AIzaSyCpb5Mn6Iw-CccEzT6hvk5yFMAqDNCxkko',
+    'AIzaSyCWau-HcYi8taHkns6V1mZwMuqvf3SytIY',
   ];
 
   static bool get isGeminiConfigured => geminiApiKeys.isNotEmpty && geminiApiKeys.first.isNotEmpty;

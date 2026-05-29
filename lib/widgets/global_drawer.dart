@@ -12,7 +12,7 @@ import '../screens/emotional_reports_screen.dart';
 import '../screens/eventlog_report_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/main_navigation.dart';
-import '../screens/ai_chat_screen.dart';
+import '../screens/luma_chat_screen.dart';
 
 class GlobalDrawer extends StatelessWidget {
   const GlobalDrawer({super.key});
@@ -364,26 +364,92 @@ class GlobalDrawer extends StatelessWidget {
       // Abrir AI Chat como rota sem tentar fechar a MainNavigation (evita comportamento de "fechar app")
       MainNavigation.openAIChat();
     } else {
-      // Fallback se não estiver na estrutura principal
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => AiChatScreen(key: MainNavigation.aiChatKey)),
-      );
+        // Fallback se não estiver na estrutura principal
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LumaChatScreen(),
+          ),
+        );
     }
   }
 
   void _navigateToProfile(BuildContext context) {
-    // Navega para a tela de perfil
-    final state = MainNavigation.mainNavigationKey.currentState;
-    if (state != null) {
-      state.switchToTab(3);
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const ProfileScreen(),
-        ),
-      );
-    }
+    Navigator.of(context).pop();
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      isScrollControlled: true,
+      builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 6),
+                Container(width: 40, height: 6, decoration: BoxDecoration(color: scheme.onSurface.withOpacity(0.12), borderRadius: BorderRadius.circular(4))),
+                const SizedBox(height: 14),
+                Row(children: [
+                  UserAvatar(radius: 28),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Meu Perfil', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: scheme.onSurface)), const SizedBox(height: 4), Text('Gerencie sua conta', style: TextStyle(color: scheme.onSurface.withOpacity(0.7)))])),
+                ]),
+                const SizedBox(height: 12),
+                const Divider(),
+                ListTile(
+                  leading: Container(width: 44, height: 44, decoration: BoxDecoration(color: scheme.primary.withOpacity(0.12), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.edit, color: scheme.primary)),
+                  title: const Text('Ver Perfil'),
+                  subtitle: const Text('Alterar informações pessoais'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen()));
+                  },
+                ),
+                ListTile(
+                  leading: Container(width: 44, height: 44, decoration: BoxDecoration(color: scheme.primary.withOpacity(0.12), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.settings, color: scheme.primary)),
+                  title: const Text('Configurações'),
+                  subtitle: const Text('Preferências do app'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    try {
+                      context.push('/settings');
+                    } catch (_) {
+                      Navigator.pushNamed(context, '/settings');
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: Container(width: 44, height: 44, decoration: BoxDecoration(color: scheme.primary.withOpacity(0.12), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.help_outline, color: scheme.primary)),
+                  title: const Text('Ajuda e Suporte'),
+                  subtitle: const Text('Central de ajuda'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _showHelp(context);
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.red.withOpacity(0.12), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.logout, color: Colors.red)),
+                  title: const Text('Sair', style: TextStyle(color: Colors.red)),
+                  subtitle: const Text('Fazer logout da conta'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _confirmLogout(context);
+                  },
+                ),
+                const SizedBox(height: 18),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _fallbackSnack(BuildContext context, String msg) {

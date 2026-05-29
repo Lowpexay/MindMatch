@@ -35,6 +35,9 @@ import 'screens/signup/signup_bio_screen.dart';
 import 'screens/signup/signup_interests_screen.dart';
 import 'screens/signup/signup_goal_screen.dart';
 import 'screens/signup/signup_photo_screen.dart';
+import 'screens/professional_detail_screen.dart';
+import 'screens/schedule_appointment_screen.dart';
+import 'screens/appointment_confirmation_screen.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -349,6 +352,20 @@ final GoRouter _router = GoRouter(
       builder: (context, state) => SignupPhotoScreen(
         data: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
       ),
+    ),
+
+    // Professional / appointment flow
+    GoRoute(
+      path: '/professional',
+      builder: (context, state) => const ProfessionalDetailScreen(),
+    ),
+    GoRoute(
+      path: '/scheduleAppointment',
+      builder: (context, state) => const ScheduleAppointmentScreen(),
+    ),
+    GoRoute(
+      path: '/appointmentConfirmation',
+      builder: (context, state) => const AppointmentConfirmationScreen(),
     ),
 
   ],

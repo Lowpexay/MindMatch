@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart' hide FirebaseService;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mindmatch/screens/signup/paciente/cadastro_paciente_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -350,6 +351,12 @@ final GoRouter _router = GoRouter(
     GoRoute(
       path: '/signupPhoto',
       builder: (context, state) => SignupPhotoScreen(
+        data: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+      ),
+    ),
+    GoRoute(
+      path: '/cadastroPaciente',
+      builder: (context, state) => CadastroPacienteScreen(
         data: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
       ),
     ),

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/app_colors.dart';
+import '../../widgets/app_button.dart';
+import '../../widgets/app_dropdown.dart';
+import '../../widgets/date_picker_field.dart';
+import '../../widgets/styled_text_field.dart';
 
 /// Etapa de bio (opcional). Agora recebe explicitamente o mapa acumulado via construtor
 /// para reduzir risco de perda de dados quando GoRouterState.extra não propaga.
@@ -15,134 +20,227 @@ class SignupBioScreen extends StatefulWidget {
 
 class _SignupBioScreenState extends State<SignupBioScreen> {
   final _controller = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _cpfFocusNode = FocusNode();
+  final _cpfController = TextEditingController();
+  final _telefoneFocusNode = FocusNode();
+  final _telefoneController = TextEditingController();
+  final _dobController = TextEditingController();
+  bool _isLoading = false;
+
+  String? _selectedGender;
+  DateTime? _selectedDate;
+  final List<Map<String, String>> _genderItems = [
+    {'value': 'M', 'text': 'Masculino'},
+    {'value': 'F', 'text': 'Feminino'},
+    {'value': 'P', 'text': 'Prefiro não identificar'},
+    {'value': 'O', 'text': 'Outros'},
+  ];
 
   Map<String, dynamic>? get _incomingData {
     // Prioriza widget.data; fallback para state.extra se disponível.
     final stateExtra = GoRouterState.of(context).extra;
-    return widget.data ?? (stateExtra is Map<String, dynamic> ? stateExtra : null);
+    return widget.data ??
+        (stateExtra is Map<String, dynamic> ? stateExtra : null);
   }
 
   @override
   void initState() {
     super.initState();
+    _cpfFocusNode.addListener(() {
+      if (!_cpfFocusNode.hasFocus) {
+        _formatCpf();
+      }
+    });
+    _telefoneFocusNode.addListener(() {
+      if (!_telefoneFocusNode.hasFocus) {
+        _formatPhone();
+      }
+    });
     // Logging inicial para diagnóstico de perda de dados.
     // (Não impacta produção significativamente; pode ser removido depois.)
-    debugPrint('[SignupBio] init data = ' + (widget.data?.toString() ?? 'null'));
+    debugPrint(
+        '[SignupBio] init data = ' + (widget.data?.toString() ?? 'null'));
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _cpfController.dispose();
+    _cpfFocusNode.dispose();
+    _telefoneController.dispose();
+    _telefoneFocusNode.dispose();
+    _dobController.dispose();
     super.dispose();
   }
 
-  void _next() {
-    // Bio é opcional: se vazio, simplesmente passa string vazia
-    final previous = _incomingData;
-    debugPrint('[SignupBio] forwarding with previous=$previous bio=${_controller.text.trim()}');
-    context.push('/signupInterests', extra: {
-      ...?previous,
-      'bio': _controller.text.trim(),
-    });
+  void _formatCpf() {
+    final digits = _cpfController.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return;
+
+    final truncated = digits.substring(0, digits.length.clamp(0, 11));
+    final buffer = StringBuffer();
+
+    for (var i = 0; i < truncated.length; i++) {
+      buffer.write(truncated[i]);
+      if (i == 2 || i == 5) buffer.write('.');
+      if (i == 8) buffer.write('-');
+    }
+
+    _cpfController.text = buffer.toString();
   }
-  
-  void _skip() {
+
+  void _formatPhone() {
+    final digits = _telefoneController.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return;
+
+    final truncated = digits.substring(0, digits.length.clamp(0, 11));
+    final buffer = StringBuffer();
+
+    for (var i = 0; i < truncated.length; i++) {
+      if (i == 0) buffer.write('(');
+      buffer.write(truncated[i]);
+      if (i == 1) buffer.write(') ');
+      if (i == 6 && truncated.length > 6) buffer.write('-');
+    }
+
+    _telefoneController.text = buffer.toString();
+  }
+
+  void _next() {
+    if (!_formKey.currentState!.validate()) return;
     final previous = _incomingData;
-    debugPrint('[SignupBio] skip pressed; previous=$previous');
-    context.push('/signupInterests', extra: {
+    debugPrint(
+        '[SignupBio] forwarding with previous=$previous bio=${_controller.text.trim()}');
+    context.push('/signupGoal', extra: {
       ...?previous,
-      'bio': '', // Skip bio input
+      'gender': _selectedGender,
+      'cpf': _cpfController,
+      'dob': _selectedDate?.millisecondsSinceEpoch,
+      'nTelefone': _telefoneController,
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        leading: BackButton(color: isDark? Colors.white: AppColors.textPrimary),
-        title: const Text('Sua bio'),
+        leading:
+            BackButton(color: AppColors.primary),
+        title: const Text('Dados Pessoais'),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: isDark? Colors.white: AppColors.textPrimary,
+        foregroundColor: AppColors.textPrimary,
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Fale um pouco sobre você (opcional):',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 120, maxHeight: 260),
-                child: Scrollbar(
-                  thumbVisibility: false,
-                  child: TextField(
-                    controller: _controller,
-                    maxLines: null,
-                    keyboardType: TextInputType.multiline,
-                    textInputAction: TextInputAction.newline,
-                    decoration: InputDecoration(
-                      hintText: 'Ex: Sou uma pessoa curiosa, gosto de aprender coisas novas... (deixe em branco se preferir)',
-                      helperText: 'Você pode preencher depois',
-                      helperStyle: TextStyle(
-                        color: isDark ? Colors.white54 : AppColors.textSecondary,
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                child: Form(
+                  key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppDropdown(
+                        value: _selectedGender,
+                        hint: 'Selecione seu gênero...',
+                        items: _genderItems.map((item) {
+                          return DropdownMenuItem<String>(
+                            value: item['value'],
+                            child: Text(item['text'] ?? ''),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedGender = value;
+                          });
+                        },
                       ),
-                      counterText: _controller.text.isEmpty ? '' : '${_controller.text.length}/400',
-                      filled: true,
-                      fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    onChanged: (v) {
-                      if (v.length > 400) {
-                        _controller.text = v.substring(0, 400);
-                        _controller.selection = TextSelection.fromPosition(
-                          TextPosition(offset: _controller.text.length),
-                        );
-                      }
-                      setState(() {}); // Atualiza counter
-                    },
+                      const SizedBox(height: 16),
+                      StyledTextField(
+                        controller: _cpfController,
+                        label: 'CPF',
+                        keyboardType: TextInputType.number,
+                        focusNode: _cpfFocusNode,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(11),
+                        ],
+                        validator: (v) {
+                          final digits = v?.replaceAll(RegExp(r'\D'), '') ?? '';
+                          if (digits.length != 11)
+                            return 'Informe um CPF válido';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      DatePickerField(
+                        controller: _dobController,
+                        label: 'Data de nascimento',
+                        selectedDate: _selectedDate,
+                        locale: const Locale('pt', 'BR'),
+                        helpText: 'Selecione sua data de nascimento',
+                        onDateSelected: (picked) {
+                          setState(() {
+                            _selectedDate = picked;
+                          });
+                        },
+                        validator: (_) {
+                          if (_selectedDate == null) return 'Selecione a data';
+                          final now = DateTime.now();
+                          int age = now.year - _selectedDate!.year;
+                          if (now.month < _selectedDate!.month ||
+                              (now.month == _selectedDate!.month &&
+                                  now.day < _selectedDate!.day)) {
+                            age--;
+                          }
+                          if (age < 18) return 'Você deve ter 18+';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      StyledTextField(
+                        controller: _telefoneController,
+                        label: 'Número de Telefone',
+                        keyboardType: TextInputType.phone,
+                        focusNode: _telefoneFocusNode,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(11),
+                        ],
+                        validator: (v) {
+                          final digits = v?.replaceAll(RegExp(r'\D'), '') ?? '';
+                          if (digits.length < 10)
+                            return 'Informe um telefone válido';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _next,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: const Text('Continuar'),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: _skip,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: isDark ? Colors.white70 : AppColors.textSecondary,
-                    side: BorderSide(color: isDark ? Colors.white24 : AppColors.gray300),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: const Text('Pular'),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: Padding(
+        padding: EdgeInsets.fromLTRB(
+            24, 16, 24, MediaQuery.of(context).viewInsets.bottom + 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppButton(
+              label: 'Continuar',
+              onPressed: _isLoading ? null : _next,
+              isLoading: _isLoading,
+              filled: true,
+            ),
+          ],
         ),
       ),
     );

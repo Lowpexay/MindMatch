@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
+import '../../widgets/app_button.dart';
+import '../../widgets/date_picker_field.dart';
+import '../../widgets/styled_text_field.dart';
 import 'package:go_router/go_router.dart';
 
 /// Tela inicial do fluxo de cadastro: nome, data de nascimento, email e senhas.
@@ -31,24 +34,6 @@ class _SignupBasicScreenState extends State<SignupBasicScreen> {
     super.dispose();
   }
 
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime(now.year - 18, now.month, now.day),
-      firstDate: DateTime(1900),
-      lastDate: now,
-      helpText: 'Selecione sua data de nascimento',
-      locale: const Locale('pt', 'BR'),
-    );
-    if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-        _dobController.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
-      });
-    }
-  }
-
   void _next() {
     if (!_formKey.currentState!.validate()) return;
     context.push('/signupBio', extra: {
@@ -61,13 +46,12 @@ class _SignupBasicScreenState extends State<SignupBasicScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Criar conta'),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: isDark ? Colors.white : AppColors.textPrimary,
+        foregroundColor: AppColors.textPrimary,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -82,37 +66,17 @@ class _SignupBasicScreenState extends State<SignupBasicScreen> {
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : AppColors.textPrimary,
+                      color:AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 24),
-                  _buildTextField(
+                  StyledTextField(
                     controller: _nameController,
-                    label: 'Nome',
+                    label: 'Nome Completo',
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe seu nome' : null,
                   ),
                   const SizedBox(height: 16),
-                  GestureDetector(
-                    onTap: _pickDate,
-                    child: AbsorbPointer(
-                      child: _buildTextField(
-                        controller: _dobController,
-                        label: 'Data de nascimento',
-                        validator: (_) {
-                          if (_selectedDate == null) return 'Selecione a data';
-                          final now = DateTime.now();
-                          int age = now.year - _selectedDate!.year;
-                          if (now.month < _selectedDate!.month || (now.month == _selectedDate!.month && now.day < _selectedDate!.day)) {
-                            age--;
-                          }
-                          if (age < 18) return 'Você deve ter 18+';
-                          return null;
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
+                  StyledTextField(
                     controller: _emailController,
                     label: 'Email',
                     keyboardType: TextInputType.emailAddress,
@@ -124,7 +88,7 @@ class _SignupBasicScreenState extends State<SignupBasicScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  _buildTextField(
+                  StyledTextField(
                     controller: _passwordController,
                     label: 'Senha',
                     obscure: true,
@@ -135,7 +99,8 @@ class _SignupBasicScreenState extends State<SignupBasicScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  _buildTextField(
+
+                  StyledTextField(
                     controller: _confirmPasswordController,
                     label: 'Confirmar Senha',
                     obscure: true,
@@ -145,61 +110,15 @@ class _SignupBasicScreenState extends State<SignupBasicScreen> {
                     },
                   ),
                   const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _next,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Continuar'),
-                    ),
+                  AppButton(
+                    label: 'Continuar',
+                    onPressed: _isLoading ? null : _next,
+                    isLoading: _isLoading,
+                    filled: true,
                   ),
                 ],
               ),
             ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    String? Function(String?)? validator,
-    bool obscure = false,
-    TextInputType? keyboardType,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return TextFormField(
-      controller: controller,
-      validator: validator,
-      obscureText: obscure,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.gray300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.gray300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
       ),
     );

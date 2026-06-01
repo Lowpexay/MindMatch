@@ -9,6 +9,7 @@ import '../models/mood_data.dart';
 import '../models/question_models.dart';
 import '../models/conversation_models.dart';
 import '../models/conversation_history.dart';
+import '../models/consultation_model.dart';
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -687,6 +688,73 @@ class FirebaseService {
       }
     } catch (e) {
       print('❌ Error creating consultation: $e');
+      throw e;
+    }
+  }
+
+  // Get all consultations for a user (patient or psychologist)
+  Future<List<Consultation>> getUserConsultations(
+    String userId,
+    String role,
+  ) async {
+    try {
+      if (role != 'PATIENT' && role != 'PSYCHOLOGIST') {
+        throw Exception('Invalid role: $role. Must be PATIENT or PSYCHOLOGIST');
+      }
+
+      Query<Map<String, dynamic>> query;
+
+      if (role == 'PATIENT') {
+        query = _firestore
+            .collection(consultationsCollection)
+            .where('idPatient', isEqualTo: userId);
+        print('🔍 Querying consultations for patient: $userId');
+      } else {
+        query = _firestore
+            .collection(consultationsCollection)
+            .where('idPsychologist', isEqualTo: userId);
+        print('🔍 Querying consultations for psychologist: $userId');
+      }
+
+      final snapshot = await query.get();
+      final consultations = snapshot.docs
+          .map((doc) => Consultation.fromFirestore(doc.data(), doc.id))
+          .toList();
+
+      print('✅ Found ${consultations.length} consultations for $role: $userId');
+      return consultations;
+    } catch (e) {
+      print('❌ Error fetching consultations: $e');
+      throw e;
+    }
+  }
+
+  // Get psychologist availability and modality
+  Future<Map<String, dynamic>> getPsychologistAvailability(
+    String psychologistId,
+  ) async {
+    try {
+      print('🔍 Fetching availability for psychologist: $psychologistId');
+
+      final doc = await _firestore
+          .collection(psychologistsCollection)
+          .doc(psychologistId)
+          .get();
+
+      if (!doc.exists) {
+        throw Exception('Psychologist not found: $psychologistId');
+      }
+
+      final data = doc.data()!;
+      final availabilityData = <String, dynamic>{
+        'availability': data['availability'],
+        'modality': data['modality'],
+      };
+
+      print('✅ Retrieved availability and modality for psychologist: $psychologistId');
+      return availabilityData;
+    } catch (e) {
+      print('❌ Error fetching psychologist availability: $e');
       throw e;
     }
   }

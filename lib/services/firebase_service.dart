@@ -54,6 +54,7 @@ class FirebaseService {
   static const String conversationsCollection = 'conversations';
   static const String patientsCollection = 'patients';
   static const String psychologistsCollection = 'psychologists';
+  static const String consultationsCollection = 'consultations';
 
   /// Delete basic user related data (best-effort) before account deletion.
   /// This avoids leaving orphaned profile docs or storage assets.
@@ -658,6 +659,34 @@ class FirebaseService {
       return id;
     } catch (e) {
       print('❌ Error creating user with role: $e');
+      throw e;
+    }
+  }
+
+  // Create Consultation
+  Future<DocumentReference> createConsultation(
+    Map<String, dynamic> consultationData, [
+    String? documentId,
+  ]) async {
+    try {
+      final safeData = <String, dynamic>{
+        ...consultationData,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      final docRef = _firestore.collection(consultationsCollection);
+      if (documentId != null) {
+        await docRef.doc(documentId).set(safeData);
+        print('✅ Consultation created with documentId: $documentId');
+        return docRef.doc(documentId);
+      } else {
+        final newDocRef = await docRef.add(safeData);
+        print('✅ Consultation created with auto-generated id: ${newDocRef.id}');
+        return newDocRef;
+      }
+    } catch (e) {
+      print('❌ Error creating consultation: $e');
       throw e;
     }
   }

@@ -12,8 +12,8 @@ class SignupGoalScreen extends StatefulWidget {
 
 class _SignupGoalScreenState extends State<SignupGoalScreen> {
   final List<Map<String, String>> _goals = const [
-    {'id': 'U', 'label': '🙋 Sou um paciente procurando por uma consulta'},
-    {'id': 'P', 'label': '👨‍⚕️ Sou um(a) psicologo(a) procurando por pacientes'},
+    {'id': 'PATIENT', 'label': '🙋 Sou um paciente procurando por uma consulta'},
+    {'id': 'PSYCHOLOGIST', 'label': '👨‍⚕️ Sou um(a) psicólogo(a) procurando por pacientes'},
   ];
   String _selectedGoalId = '';
   final TextEditingController _customGoalController = TextEditingController();
@@ -33,16 +33,21 @@ class _SignupGoalScreenState extends State<SignupGoalScreen> {
     final stateExtra = GoRouterState.of(context).extra;
     final previous = widget.data ?? (stateExtra is Map<String,dynamic> ? stateExtra : null);
     debugPrint('[SignupGoal] previous=$previous finalGoalId=$finalGoalId');
-    if(_selectedGoalId == "U"){
+    final selectedGoal = _goals.firstWhere((goal) => goal['id'] == finalGoalId);
+    final goalLabel = selectedGoal['label'] ?? finalGoalId;
+
+    if (finalGoalId == 'PATIENT') {
       context.push('/cadastroPaciente', extra: {
-      ...?previous,
-      'goal': finalGoalId,
-    });
-    }else{
-      context.push('/signupInterests', extra: {
-      ...?previous,
-      'goal': finalGoalId,
-    });
+        ...?previous,
+        'goal': goalLabel,
+        'role': finalGoalId,
+      });
+    } else {
+      context.push('/cadastroPsicologo', extra: {
+        ...?previous,
+        'goal': goalLabel,
+        'role': finalGoalId,
+      });
     }
   }
 

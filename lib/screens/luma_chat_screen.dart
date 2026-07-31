@@ -14,7 +14,9 @@ import '../widgets/user_avatar.dart';
 import 'profile_screen.dart';
 
 class LumaChatScreen extends StatefulWidget {
-  const LumaChatScreen({super.key});
+  final String mode;
+
+  const LumaChatScreen({super.key, this.mode = 'PATIENT'});
 
   @override
   State<LumaChatScreen> createState() => _LumaChatScreenState();
@@ -106,14 +108,20 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadUserName();
-      _loadHeaderImage();
-      _addLumaMessage(
-        'Olá! Eu sou a Luma. Vou conversar com você para entender seu momento e indicar o psicólogo ideal. '
-        'Pode me contar com suas palavras: o que mais está te incomodando hoje?',
-      );
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadUserName();
+      await _loadHeaderImage();
+      _addLumaMessage(_buildInitialGreeting());
     });
+  }
+
+  String _buildInitialGreeting() {
+    if (widget.mode == 'PSYCHOLOGIST') {
+      final displayName = _userName.isNotEmpty ? _userName : 'Dr. Gustavo';
+      return 'Olá, $displayName. Eu sou a Luma assistente e posso ajudar a organizar agenda, revisar pacientes do dia e preparar mensagens para consultas.';
+    }
+
+    return 'Olá! Eu sou a Luma. Vou conversar com você para entender seu momento e indicar o psicólogo ideal. Pode me contar com suas palavras: o que mais está te incomodando hoje?';
   }
 
   Future<void> _loadUserName() async {
@@ -201,43 +209,55 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
     });
 
     try {
-      final triageResult = await _geminiService.generatePsychologistTriageResponse(
-        userMessage: text,
-        conversationContext: _buildConversationContext(),
-        collectedInfo: _collectedInfo,
-        userName: _userName.isNotEmpty ? _userName : null,
-        psychologistOptions: _profiles.map((p) => p.toPromptMap()).toList(),
-      );
-
-      final extracted = triageResult['extracted_info'];
-      if (extracted is Map) {
-        extracted.forEach((key, value) {
-          final parsed = value?.toString().trim() ?? '';
-          if (parsed.isNotEmpty) {
-            _collectedInfo[key.toString()] = parsed;
-          }
-        });
-      }
-
-      final reply = (triageResult['assistant_reply']?.toString().trim().isNotEmpty ?? false)
-          ? triageResult['assistant_reply'].toString().trim()
-          : 'Entendi. Quero te ajudar com cuidado. Pode me contar um pouco mais sobre seu momento atual?';
-
-      _addLumaMessage(reply);
-
-      final ready = triageResult['ready_for_recommendation'] == true;
-      if (ready && !_hasRecommended) {
-        final recommended = _resolveRecommendedProfile(triageResult['recommended_psychologist']);
-        setState(() {
-          _hasRecommended = true;
-        });
-        _addLumaMessage(
-          'Com base no que você compartilhou, encontrei um profissional que combina com o seu momento:',
-          content: _buildProfessionalCard(recommended),
+      if (widget.mode == 'PSYCHOLOGIST') {
+        final reply = await _geminiService.generatePsychologistAssistantResponse(
+          userMessage: text,
+          conversationContext: _buildConversationContext(),
+          userName: _userName.isNotEmpty ? _userName : null,
+          contextData: _collectedInfo,
         );
+        _addLumaMessage(reply);
+      } else {
+        final triageResult = await _geminiService.generatePsychologistTriageResponse(
+          userMessage: text,
+          conversationContext: _buildConversationContext(),
+          collectedInfo: _collectedInfo,
+          userName: _userName.isNotEmpty ? _userName : null,
+          psychologistOptions: _profiles.map((p) => p.toPromptMap()).toList(),
+        );
+
+        final extracted = triageResult['extracted_info'];
+        if (extracted is Map) {
+          extracted.forEach((key, value) {
+            final parsed = value?.toString().trim() ?? '';
+            if (parsed.isNotEmpty) {
+              _collectedInfo[key.toString()] = parsed;
+            }
+          });
+        }
+
+        final reply = (triageResult['assistant_reply']?.toString().trim().isNotEmpty ?? false)
+            ? triageResult['assistant_reply'].toString().trim()
+            : 'Entendi. Quero te ajudar com cuidado. Pode me contar um pouco mais sobre seu momento atual?';
+
+        _addLumaMessage(reply);
+
+        final ready = triageResult['ready_for_recommendation'] == true;
+        if (ready && !_hasRecommended) {
+          final recommended = _resolveRecommendedProfile(triageResult['recommended_psychologist']);
+          setState(() {
+            _hasRecommended = true;
+          });
+          _addLumaMessage(
+            'Com base no que você compartilhou, encontrei um profissional que combina com o seu momento:',
+            content: _buildProfessionalCard(recommended),
+          );
+        }
       }
     } catch (e) {
-      _addLumaMessage('Desculpe, tive uma instabilidade agora. Podemos continuar? Me conta mais sobre como você está se sentindo.');
+      _addLumaMessage(widget.mode == 'PSYCHOLOGIST'
+          ? 'Posso ajudar com agenda, pacientes e mensagens. O que você quer organizar agora?'
+          : 'Desculpe, tive uma instabilidade agora. Podemos continuar? Me conta mais sobre como você está se sentindo.');
     } finally {
       if (mounted) {
         setState(() {
@@ -411,7 +431,7 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
               Text('MindMatch', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 20, fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
               Text(
-                _getGreeting(),
+                widget.mode == 'PSYCHOLOGIST' ? 'Assistente para sua agenda e pacientes' : _getGreeting(),
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: isDark ? Colors.white70 : Colors.black45, fontSize: 12),
               ),
@@ -441,7 +461,7 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                 child: _messages.isEmpty
-                    ? Center(child: Text('Converse com a Luma', style: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade600)))
+                ? Center(child: Text(widget.mode == 'PSYCHOLOGIST' ? 'Converse com a Luma assistente' : 'Converse com a Luma', style: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade600)))
                     : ListView.builder(
                         controller: _scroll,
                         reverse: true,

@@ -516,6 +516,90 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
     }
   }
 
+  Future<String> generatePsychologistAssistantResponse({
+    required String userMessage,
+    String? conversationContext,
+    String? userName,
+    Map<String, dynamic> contextData = const {},
+  }) async {
+    final safeName = (userName != null && userName.trim().isNotEmpty) ? userName.trim() : 'psicólogo';
+    final contextJson = jsonEncode(contextData);
+    final prompt = '''
+Você é a Luma, agora atuando como assistente operacional de um psicólogo.
+Sua função é ajudar com agenda, organização de consultas, mensagens para pacientes e lembretes de acompanhamento.
+
+Nome do profissional: $safeName
+Contexto disponível:
+$contextJson
+
+Histórico da conversa:
+${conversationContext ?? ''}
+
+Mensagem atual:
+$userMessage
+
+Regras:
+1) Responda em português do Brasil.
+2) Seja prática, objetiva e acolhedora.
+3) Não faça triagem emocional; foque em agenda, pacientes e organização.
+4) Se faltar informação, faça uma pergunta curta para destravar a ação.
+5) Se possível, já sugira o próximo passo.
+6) Máximo de 3 frases.
+7) Não use markdown.
+
+Responda somente com texto corrido.
+''';
+
+    try {
+      final response = await _postWithRotation({
+        'contents': [
+          {
+            'parts': [
+              {'text': prompt}
+            ]
+          }
+        ],
+        'generationConfig': {
+          'temperature': 0.5,
+          'maxOutputTokens': 220,
+          'topP': 0.9,
+          'topK': 40,
+        },
+        'safetySettings': [
+          {
+            'category': 'HARM_CATEGORY_HARASSMENT',
+            'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+          },
+          {
+            'category': 'HARM_CATEGORY_HATE_SPEECH',
+            'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+          },
+          {
+            'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+            'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+          },
+          {
+            'category': 'HARM_CATEGORY_DANGEROUS_CONTENT',
+            'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+          }
+        ],
+      });
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final text = data['candidates'][0]['content']['parts'][0]['text'];
+        return (text?.toString().trim().isNotEmpty ?? false)
+            ? text.toString().trim()
+            : _getFallbackPsychologistAssistantResponse();
+      }
+
+      return _getFallbackPsychologistAssistantResponse();
+    } catch (e) {
+      print('❌ Error generating psychologist assistant response: $e');
+      return _getFallbackPsychologistAssistantResponse();
+    }
+  }
+
   Future<Map<String, dynamic>> generatePsychologistTriageResponse({
     required String userMessage,
     required String conversationContext,
@@ -655,6 +739,10 @@ Formato obrigatório:
       'ready_for_recommendation': false,
       'recommended_psychologist': null,
     };
+  }
+
+  String _getFallbackPsychologistAssistantResponse() {
+    return 'Posso ajudar a organizar sua agenda, revisar pacientes do dia ou preparar uma mensagem para um atendimento. O que você quer fazer agora?';
   }
 
   // Função para montar o histórico de mensagens usando padrão LangChain

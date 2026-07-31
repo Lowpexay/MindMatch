@@ -25,7 +25,9 @@ import '../screens/luma_chat_screen.dart';
 import '../screens/main_navigation.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String userRole;
+
+  const HomeScreen({super.key, this.userRole = 'PATIENT'});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -51,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
   AuthService? _authService;
   // ignore: unused_field
   CourseService? _courseService;
+  bool _userNameLoaded = false;
 
   @override
   void initState() {
@@ -68,6 +71,39 @@ class _HomeScreenState extends State<HomeScreen> {
     _firebaseService = Provider.of<FirebaseService>(context);
     _authService = Provider.of<AuthService>(context);
     _courseService = Provider.of<CourseService>(context);
+
+    if (!_userNameLoaded) {
+      _userNameLoaded = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadUserName();
+      });
+    }
+  }
+
+  Future<void> _loadUserName() async {
+    try {
+      final userId = _authService?.currentUser?.uid;
+      if (userId == null) return;
+
+      final userProfile = await _firebaseService?.getUserProfile(userId);
+      final profileName = userProfile?['name']?.toString().trim() ?? '';
+      final profileFullName = userProfile?['fullname']?.toString().trim() ?? '';
+      final authName = _authService?.currentUser?.displayName?.trim() ?? '';
+
+      final resolvedName = profileName.isNotEmpty
+          ? profileName
+          : profileFullName.isNotEmpty
+              ? profileFullName
+              : authName;
+
+      if (!mounted || resolvedName.isEmpty || resolvedName == _userName) return;
+
+      setState(() {
+        _userName = resolvedName;
+      });
+    } catch (e) {
+      print('⚠️ Failed loading user name: $e');
+    }
   }
 
   Future<void> _loadInitialData() async {
@@ -413,6 +449,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.userRole == 'PSYCHOLOGIST') {
+      return _buildPsychologistHome(context);
+    }
+
     final theme = Theme.of(context);
     // scheme reserved for future use in additional refactors
   final scheme = theme.colorScheme; // ignore: unused_local_variable
@@ -1764,6 +1804,467 @@ class _HomeScreenState extends State<HomeScreen> {
       ));
     }
     return _ValidationResult(validated, replaced);
+  }
+
+  Widget _buildPsychologistHome(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final displayName = _userName.isNotEmpty ? _userName : 'Dr. Gustavo';
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionCard(
+            icon: Icons.medical_services_outlined,
+            title: 'Bem vindo, $displayName!',
+            subtitle: 'Sua agenda, seus pacientes e a Luma em um só lugar.',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Você ainda não possui nenhuma consulta hoje!',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'O próximo passo é organizar os horários, revisar os pacientes marcados ou falar com a Luma.',
+                        style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Quero Organizar'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildSectionCard(
+            icon: Icons.people,
+            title: 'Pacientes com consulta hoje',
+            subtitle: 'Acompanhe quem está agendado para agora.',
+            child: Column(
+              children: [
+                _psychPatientCard('Carlos Augusto', 'Online • 20:00 • Até a consulta doutor!'),
+                const SizedBox(height: 12),
+                _psychPatientCard('Maria Fernanda', 'Online • 21:00 • Até logo!'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildSectionCard(
+            icon: Icons.chat_bubble_outline,
+            title: 'Atalhos',
+            subtitle: 'Acesse rápido as áreas mais usadas.',
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: const [
+                _PsychShortcut(label: 'Chatbot', icon: Icons.smart_toy_outlined),
+                _PsychShortcut(label: 'Chats', icon: Icons.chat_bubble_outline),
+                _PsychShortcut(label: 'Agenda', icon: Icons.calendar_month_outlined),
+                _PsychShortcut(label: 'Perfil', icon: Icons.person_outline),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildPsychologistCoursesSection(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPsychologistCoursesSection(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final previewCourses = _courses.take(2).toList();
+
+    return _buildSectionCard(
+      icon: Icons.school_outlined,
+      title: 'Cursos de Psicoeducação',
+      subtitle: 'Recomende um curso para seus pacientes e acompanhe o uso.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (previewCourses.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : AppColors.gray50,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                'Nenhum curso carregado ainda. Assim que o catálogo estiver pronto, você poderá recomendar conteúdos aos pacientes.',
+                style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
+              ),
+            )
+          else
+            SizedBox(
+              height: 220,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: previewCourses.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final course = previewCourses[index];
+                  return Container(
+                    width: 190,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(isDark ? 0.18 : 0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          height: 80,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [AppColors.primary, AppColors.primary.withOpacity(0.75)],
+                            ),
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                          ),
+                          padding: const EdgeInsets.all(8),
+                          child: Stack(
+                            children: [
+                              Align(
+                                alignment: Alignment.center,
+                                child: Icon(Icons.school_outlined, color: Colors.white, size: 36),
+                              ),
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black26,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'Recomendado',
+                                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Icon(Icons.favorite_border, color: Colors.white.withOpacity(0.9), size: 18),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                          child: Text(
+                            course.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: isDark ? Colors.white : AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                          child: Text(
+                            course.description,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? Colors.white70 : AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () => _showRecommendCourseSheet(course),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                              child: const Text('Recomendar'),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _courses.isEmpty ? null : () => _showRecommendCourseSheet(_courses.first),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Ver cursos e recomendar'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRecommendCourseSheet(Course course) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final patients = [
+      {'id': 'carlos_augusto', 'name': 'Carlos Augusto', 'selected': false},
+      {'id': 'maria_fernanda', 'name': 'Maria Fernanda', 'selected': false},
+      {'id': 'victor_mathias', 'name': 'Victor Mathias', 'selected': true},
+      {'id': 'eduarda_bizarra', 'name': 'Eduarda Bizarra', 'selected': false},
+      {'id': 'arthur_medeiros', 'name': 'Arthur Medeiros', 'selected': true},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+              margin: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 16),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 42,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white24 : AppColors.gray300,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Recomende o curso: ${course.title}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Selecione os pacientes que devem receber esse conteúdo.',
+                        style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 16),
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: patients.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, index) {
+                          final patient = patients[index];
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: isDark ? Colors.white12 : AppColors.gray300),
+                            ),
+                            child: CheckboxListTile(
+                              value: patient['selected'] as bool,
+                              onChanged: (value) {
+                                setSheetState(() {
+                                  patient['selected'] = value ?? false;
+                                });
+                              },
+                              activeColor: AppColors.primary,
+                              controlAffinity: ListTileControlAffinity.trailing,
+                              secondary: CircleAvatar(
+                                backgroundColor: AppColors.primary.withOpacity(0.12),
+                                child: Text((patient['name'] as String)[0], style: const TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                              title: Text(
+                                patient['name'] as String,
+                                style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textPrimary),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final selectedPatients = patients
+                                .where((patient) => patient['selected'] == true)
+                                .map((patient) => {
+                                      'id': patient['id'] as String,
+                                      'name': patient['name'] as String,
+                                    })
+                                .toList();
+
+                            try {
+                              final userId = _authService?.currentUser?.uid;
+                              if (userId != null) {
+                                await _firebaseService?.updateUserExtraData(userId, {
+                                  'lastRecommendedCourse': {
+                                    'courseId': course.id,
+                                    'courseTitle': course.title,
+                                    'courseDescription': course.description,
+                                    'selectedPatients': selectedPatients,
+                                    'updatedAt': DateTime.now().millisecondsSinceEpoch,
+                                  },
+                                  'recommendedCourses': [
+                                    {
+                                      'courseId': course.id,
+                                      'courseTitle': course.title,
+                                      'selectedPatients': selectedPatients,
+                                      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+                                    }
+                                  ],
+                                });
+                              }
+
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Curso "${course.title}" recomendado e salvo no seu perfil.')),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Não foi possível salvar a recomendação: $e')),
+                                );
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text('Recomendar'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _psychPatientCard(String name, String subtitle) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.16 : 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: AppColors.primary.withOpacity(0.14),
+          child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: const TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        title: Text(name, style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textPrimary)),
+        subtitle: Text(subtitle, style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
+        trailing: const Icon(Icons.chevron_right),
+      ),
+    );
+  }
+}
+
+class _PsychShortcut extends StatelessWidget {
+  final String label;
+  final IconData icon;
+
+  const _PsychShortcut({required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.primary, size: 18),
+          const SizedBox(width: 8),
+          Text(label),
+        ],
+      ),
+    );
   }
 }
 

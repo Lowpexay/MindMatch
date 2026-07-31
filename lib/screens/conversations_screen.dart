@@ -11,7 +11,9 @@ import 'user_chat_screen.dart';
 import '../utils/scaffold_utils.dart';
 
 class ConversationsScreen extends StatefulWidget {
-  const ConversationsScreen({super.key});
+  final String userRole;
+
+  const ConversationsScreen({super.key, this.userRole = 'PATIENT'});
 
   @override
   State<ConversationsScreen> createState() => ConversationsScreenState();
@@ -43,6 +45,10 @@ class ConversationsScreenState extends State<ConversationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.userRole == 'PSYCHOLOGIST') {
+      return _buildPsychologistView(context);
+    }
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       color: isDark ? AppColors.darkSurface : AppColors.gray50,
@@ -51,6 +57,127 @@ class ConversationsScreenState extends State<ConversationsScreen> {
           : _conversations.isEmpty
               ? _buildEmptyState()
               : _buildConversationsList(),
+    );
+  }
+
+  Widget _buildPsychologistView(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final patientsToday = [
+      ChatUser(id: 'p1', name: 'Carlos Augusto', isOnline: true),
+      ChatUser(id: 'p2', name: 'Maria Fernanda', isOnline: true),
+      ChatUser(id: 'p3', name: 'Victor Mathias', isOnline: false),
+      ChatUser(id: 'p4', name: 'Eduarda Bizarra', isOnline: false),
+      ChatUser(id: 'p5', name: 'Arthur Medeiros', isOnline: false),
+    ];
+
+    return Container(
+      color: isDark ? AppColors.darkSurface : AppColors.gray50,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _psychologistConversationsHeader(context),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Pacientes com consulta hoje', style: TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 12),
+                ...patientsToday.map((patient) => _buildPsychologistChatTile(context, patient, patient.isOnline ? 'Online • 20:00 • Até a consulta doutor!' : 'Offline • Até logo!')).toList(),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Text(
+              'As conversas do psicólogo ficam centradas em confirmações, convites para consulta e acompanhamento dos pacientes.',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _psychologistConversationsHeader(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: AppColors.primary.withOpacity(0.14),
+            child: const Icon(Icons.chat_bubble_outline, color: AppColors.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Chat de pacientes', style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textPrimary)),
+                const SizedBox(height: 4),
+                Text('Abra uma conversa para enviar orientação, convite ou confirmação', style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPsychologistChatTile(BuildContext context, ChatUser user, String preview) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF262626) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.16 : 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: AppColors.primary.withOpacity(0.15),
+          child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?', style: const TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        title: Row(
+          children: [
+            Expanded(child: Text(user.name, style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textPrimary))),
+            if (user.isOnline)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text('Online', style: TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.w700)),
+              ),
+          ],
+        ),
+        subtitle: Text(preview, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => UserChatScreen(otherUser: user)));
+        },
+      ),
     );
   }
 

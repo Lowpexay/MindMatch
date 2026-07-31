@@ -9,6 +9,7 @@ import '../models/mood_data.dart';
 import '../models/question_models.dart';
 import '../models/conversation_models.dart';
 import '../models/conversation_history.dart';
+import '../models/consultation_model.dart';
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -52,6 +53,9 @@ class FirebaseService {
   static const String chatsCollection = 'chats';
   static const String messagesCollection = 'messages';
   static const String conversationsCollection = 'conversations';
+  static const String patientsCollection = 'patients';
+  static const String psychologistsCollection = 'psychologists';
+  static const String consultationsCollection = 'consultations';
 
   /// Delete basic user related data (best-effort) before account deletion.
   /// This avoids leaving orphaned profile docs or storage assets.
@@ -452,6 +456,309 @@ class FirebaseService {
       throw e;
     }
   }
+
+  /// Create a user document in the users collection
+  Future<DocumentReference> createUser(
+    Map<String, dynamic> userData, [
+    String? documentId,
+  ]) async {
+    try {
+      final safeData = <String, dynamic>{
+        ...userData,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      final docRef = _firestore.collection(usersCollection);
+      if (documentId != null) {
+        await docRef.doc(documentId).set(safeData);
+        return docRef.doc(documentId);
+      } else {
+        return await docRef.add(safeData);
+      }
+    } catch (e) {
+      print('Error creating user: $e');
+      throw e;
+    }
+  }
+
+  /// Create a patient document in the patients collection
+  Future<DocumentReference> createPatient(
+    Map<String, dynamic> patientData, [
+    String? documentId,
+  ]) async {
+    try {
+      final safeData = <String, dynamic>{
+        ...patientData,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      final docRef = _firestore.collection(patientsCollection);
+      if (documentId != null) {
+        await docRef.doc(documentId).set(safeData);
+        return docRef.doc(documentId);
+      } else {
+        return await docRef.add(safeData);
+      }
+    } catch (e) {
+      print('Error creating patient: $e');
+      throw e;
+    }
+  }
+
+  /// Create a psychologist document in the psychologists collection
+  Future<DocumentReference> createPsychologist(
+    Map<String, dynamic> psychologistData, [
+    String? documentId,
+  ]) async {
+    try {
+      final safeData = <String, dynamic>{
+        ...psychologistData,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      final docRef = _firestore.collection(psychologistsCollection);
+      if (documentId != null) {
+        await docRef.doc(documentId).set(safeData);
+        return docRef.doc(documentId);
+      } else {
+        return await docRef.add(safeData);
+      }
+    } catch (e) {
+      print('Error creating psychologist: $e');
+      throw e;
+    }
+  }
+
+  /// Create user with role-specific data using atomic batch operation
+  ///
+  /// Creates documents in three collections with the same documentId:
+  /// - users: Common data (birthDate, cpf, email, password, fullname, genre, phone, role)
+  /// - patients: Patient-specific data (healthPlan, documents)
+  /// - psychologists: Psychologist-specific data (crp, specialty, availability, etc)
+  ///
+  /// Example for PATIENT:
+  /// ```dart
+  /// await createUserWithRole(
+  ///   userData: {
+  ///     'fullname': 'João Silva',
+  ///     'email': 'joao@example.com',
+  ///     'cpf': '12345678900',
+  ///     'birthDate': 1990,
+  ///     'genre': 'Masculino',
+  ///     'phone': '11999999999',
+  ///   },
+  ///   role: 'PATIENT',
+  ///   roleSpecificData: {
+  ///     'healthPlan': 'Unimed',
+  ///     'documents': 'base64encodeddata',
+  ///   },
+  /// );
+  /// ```
+  ///
+  /// Example for PSYCHOLOGIST:
+  /// ```dart
+  /// await createUserWithRole(
+  ///   userData: {
+  ///     'fullname': 'Dra. Maria Santos',
+  ///     'email': 'maria@example.com',
+  ///     'cpf': '98765432100',
+  ///     'birthDate': 1985,
+  ///     'genre': 'Feminino',
+  ///     'phone': '11988888888',
+  ///   },
+  ///   role: 'PSYCHOLOGIST',
+  ///   roleSpecificData: {
+  ///     'crp': '06/12345',
+  ///     'careerStart': 2010,
+  ///     'specialty': 'Terapia Cognitivo-Comportamental',
+  ///     'healthPlanCover': 'Bradesco, Unimed',
+  ///     'personalizedMessage': 'Especialista em ansiedade',
+  ///     'modality': 'messages,calls,in-person',
+  ///     'officeAddress': 'Rua das Flores 123, São Paulo',
+  ///     'officePhone': '1133334444',
+  ///     'availabilities': [
+  ///       {
+  ///         'dayOfWeek': 'MONDAY',
+  ///         'startTime': '08:00',
+  ///         'endTime': '12:00',
+  ///       },
+  ///       {
+  ///         'dayOfWeek': 'WEDNESDAY',
+  ///         'startTime': '14:00',
+  ///         'endTime': '18:00',
+  ///       },
+  ///     ],
+  ///   },
+  /// );
+  /// ```
+  ///
+  /// Returns the documentId used for all documents (same ID across collections)
+  /// Throws exception if role is invalid or no documentId/authenticated user available
+  Future<String> createUserWithRole({
+    required Map<String, dynamic> userData,
+    required String role,
+    required Map<String, dynamic> roleSpecificData,
+    String? documentId,
+  }) async {
+    try {
+      // Validate role
+      if (role != 'PATIENT' && role != 'PSYCHOLOGIST') {
+        throw Exception('Invalid role: $role. Must be PATIENT or PSYCHOLOGIST');
+      }
+
+      // Use provided documentId or auth user ID
+      final id = documentId ?? _auth.currentUser?.uid;
+      if (id == null) {
+        throw Exception('No documentId provided and no authenticated user found');
+      }
+
+      print('🔄 Creating user with role=$role, documentId=$id');
+
+      // Add role to user data
+      final finalUserData = <String, dynamic>{
+        ...userData,
+        'role': role,
+      };
+
+      // Create batch operation for atomicity
+      final batch = _firestore.batch();
+
+      // Add user document to batch
+      final userRef = _firestore.collection(usersCollection).doc(id);
+      batch.set(userRef, {
+        ...finalUserData,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Add role-specific document to batch
+      if (role == 'PATIENT') {
+        final patientRef = _firestore.collection(patientsCollection).doc(id);
+        batch.set(patientRef, {
+          ...roleSpecificData,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        print('📝 Added patient document to batch');
+      } else {
+        final psychologistRef = _firestore.collection(psychologistsCollection).doc(id);
+        batch.set(psychologistRef, {
+          ...roleSpecificData,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        print('📝 Added psychologist document to batch');
+      }
+
+      // Commit batch (all or nothing)
+      await batch.commit();
+      print('✅ User with role created successfully. DocumentId: $id');
+
+      return id;
+    } catch (e) {
+      print('❌ Error creating user with role: $e');
+      throw e;
+    }
+  }
+
+  // Create Consultation
+  Future<DocumentReference> createConsultation(
+    Map<String, dynamic> consultationData, [
+    String? documentId,
+  ]) async {
+    try {
+      final safeData = <String, dynamic>{
+        ...consultationData,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      final docRef = _firestore.collection(consultationsCollection);
+      if (documentId != null) {
+        await docRef.doc(documentId).set(safeData);
+        print('✅ Consultation created with documentId: $documentId');
+        return docRef.doc(documentId);
+      } else {
+        final newDocRef = await docRef.add(safeData);
+        print('✅ Consultation created with auto-generated id: ${newDocRef.id}');
+        return newDocRef;
+      }
+    } catch (e) {
+      print('❌ Error creating consultation: $e');
+      throw e;
+    }
+  }
+
+  // Get all consultations for a user (patient or psychologist)
+  Future<List<Consultation>> getUserConsultations(
+    String userId,
+    String role,
+  ) async {
+    try {
+      if (role != 'PATIENT' && role != 'PSYCHOLOGIST') {
+        throw Exception('Invalid role: $role. Must be PATIENT or PSYCHOLOGIST');
+      }
+
+      Query<Map<String, dynamic>> query;
+
+      if (role == 'PATIENT') {
+        query = _firestore
+            .collection(consultationsCollection)
+            .where('idPatient', isEqualTo: userId);
+        print('🔍 Querying consultations for patient: $userId');
+      } else {
+        query = _firestore
+            .collection(consultationsCollection)
+            .where('idPsychologist', isEqualTo: userId);
+        print('🔍 Querying consultations for psychologist: $userId');
+      }
+
+      final snapshot = await query.get();
+      final consultations = snapshot.docs
+          .map((doc) => Consultation.fromFirestore(doc.data(), doc.id))
+          .toList();
+
+      print('✅ Found ${consultations.length} consultations for $role: $userId');
+      return consultations;
+    } catch (e) {
+      print('❌ Error fetching consultations: $e');
+      throw e;
+    }
+  }
+
+  // Get psychologist availability and modality
+  Future<Map<String, dynamic>> getPsychologistAvailability(
+    String psychologistId,
+  ) async {
+    try {
+      print('🔍 Fetching availability for psychologist: $psychologistId');
+
+      final doc = await _firestore
+          .collection(psychologistsCollection)
+          .doc(psychologistId)
+          .get();
+
+      if (!doc.exists) {
+        throw Exception('Psychologist not found: $psychologistId');
+      }
+
+      final data = doc.data()!;
+      final availabilityData = <String, dynamic>{
+        'availability': data['availability'],
+        'modality': data['modality'],
+      };
+
+      print('✅ Retrieved availability and modality for psychologist: $psychologistId');
+      return availabilityData;
+    } catch (e) {
+      print('❌ Error fetching psychologist availability: $e');
+      throw e;
+    }
+  }
+
 
   // File Upload
   Future<String> uploadFile(File file, String path) async {

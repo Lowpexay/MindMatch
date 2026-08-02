@@ -254,7 +254,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
         break;
       case 2:
         title = 'Conversas';
-        subtitle = 'Chats com a comunidade';
+        subtitle = 'Seus Chats';
         break;
       case 3:
         title = 'Perfil';

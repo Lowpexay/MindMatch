@@ -117,8 +117,8 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
 
   String _buildInitialGreeting() {
     if (widget.mode == 'PSYCHOLOGIST') {
-      final displayName = _userName.isNotEmpty ? _userName : 'Dr. Gustavo';
-      return 'Olá, $displayName. Eu sou a Luma assistente e posso ajudar a organizar agenda, revisar pacientes do dia e preparar mensagens para consultas.';
+      final prefix = _userName.isNotEmpty ? 'Dr. $_userName' : 'Psicólogo';
+      return 'Olá, $prefix. Eu sou a Luma assistente e posso ajudar a organizar agenda, revisar pacientes do dia e preparar mensagens para consultas.';
     }
 
     return 'Olá! Eu sou a Luma. Vou conversar com você para entender seu momento e indicar o psicólogo ideal. Pode me contar com suas palavras: o que mais está te incomodando hoje?';
@@ -431,7 +431,7 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
               Text('MindMatch', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 20, fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
               Text(
-                widget.mode == 'PSYCHOLOGIST' ? 'Assistente para sua agenda e pacientes' : _getGreeting(),
+                widget.mode == 'PSYCHOLOGIST' ? _getPsychologistGreeting() : _getGreeting(),
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: isDark ? Colors.white70 : Colors.black45, fontSize: 12),
               ),
@@ -671,6 +671,19 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
   String _getGreeting() {
     final hour = DateTime.now().hour;
     final name = _userName.isNotEmpty ? ', $_userName' : '';
+
+    if (hour < 12) {
+      return 'Bom dia$name!';
+    } else if (hour < 18) {
+      return 'Boa tarde$name!';
+    } else {
+      return 'Boa noite$name!';
+    }
+  }
+
+  String _getPsychologistGreeting() {
+    final hour = DateTime.now().hour;
+    final name = _userName.isNotEmpty ? ', Dr. $_userName' : ', Dr. Gustavo';
 
     if (hour < 12) {
       return 'Bom dia$name!';

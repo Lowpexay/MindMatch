@@ -100,7 +100,8 @@ class ConversationsScreenState extends State<ConversationsScreen> {
               borderRadius: BorderRadius.circular(18),
             ),
             child: const Text(
-              'As conversas do psicólogo ficam centradas em confirmações, convites para consulta e acompanhamento dos pacientes.',
+              'Para iniciar uma conversa com um paciente, abra o chat dele na lista acima ou busque pelo nome do paciente.',
+              style: TextStyle(fontSize: 14),
             ),
           ),
         ],

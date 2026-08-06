@@ -27,7 +27,7 @@ import 'screens/profile_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/courses_screen.dart';
-import 'screens/main_navigation.dart';
+import 'screens/home_role_gate.dart';
 import 'screens/settings_screen.dart';
 import 'utils/app_colors.dart';
 // Multi-step signup flow screens
@@ -39,6 +39,7 @@ import 'screens/signup/signup_photo_screen.dart';
 import 'screens/professional_detail_screen.dart';
 import 'screens/schedule_appointment_screen.dart';
 import 'screens/appointment_confirmation_screen.dart';
+import 'screens/signup/psicologo/cadastro_psicologo_screen.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -306,7 +307,7 @@ final GoRouter _router = GoRouter(
     ),
     GoRoute(
       path: '/home',
-      builder: (context, state) => MainNavigation(key: MainNavigation.mainNavigationKey),
+      builder: (context, state) => const HomeRoleGate(),
     ),
     GoRoute(
       path: '/profile',
@@ -357,6 +358,12 @@ final GoRouter _router = GoRouter(
     GoRoute(
       path: '/cadastroPaciente',
       builder: (context, state) => CadastroPacienteScreen(
+        data: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+      ),
+    ),
+    GoRoute(
+      path: '/cadastroPsicologo',
+      builder: (context, state) => CadastroPsicologoScreen(
         data: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
       ),
     ),

@@ -31,7 +31,7 @@ class _SignupPhotoScreenState extends State<SignupPhotoScreen> {
 
   Future<void> _finish() async {
     final stateExtra = GoRouterState.of(context).extra;
-  final args = widget.data ?? (stateExtra is Map<String,dynamic> ? stateExtra : {});
+    final args = widget.data ?? (stateExtra is Map<String,dynamic> ? stateExtra : {});
     debugPrint('[SignupPhoto] received args=$args');
     final name = (args['name'] as String?)?.trim() ?? '';
     final email = (args['email'] as String?)?.trim() ?? '';
@@ -40,6 +40,23 @@ class _SignupPhotoScreenState extends State<SignupPhotoScreen> {
     final bio = (args['bio'] as String?)?.trim() ?? '';
     final tags = (args['tags'] as List<String>?) ?? const [];
     final goal = (args['goal'] as String?)?.trim() ?? '';
+    final role = (args['role'] as String?)?.trim().toUpperCase() ?? 'PATIENT';
+    final gender = (args['gender'] as String?)?.trim() ?? '';
+    final cpf = (args['cpf'] as String?)?.trim() ?? '';
+    final phone = (args['nTelefone'] as String?)?.trim() ?? '';
+    final healthPlan = (args['healthPlan'] as String?)?.trim() ?? '';
+    final documentPaths = (args['documentPaths'] as List?)?.cast<String>() ?? const <String>[];
+    final documentNames = (args['documentNames'] as List?)?.cast<String>() ?? const <String>[];
+    final crp = (args['crp'] as String?)?.trim() ?? '';
+    final careerStart = (args['careerStart'] as String?)?.trim() ?? '';
+    final modality = (args['modality'] as String?)?.trim() ?? '';
+    final officeAddress = (args['officeAddress'] as String?)?.trim() ?? '';
+    final officePhone = (args['officePhone'] as String?)?.trim() ?? '';
+    final availabilityDays = (args['availabilityDays'] as String?)?.trim() ?? '';
+    final availabilityHours = (args['availabilityHours'] as String?)?.trim() ?? '';
+    final healthPlans = (args['healthPlans'] as String?)?.trim() ?? '';
+    final personalizedMessage = (args['personalizedMessage'] as String?)?.trim() ?? '';
+    final specialties = (args['specialties'] as List?)?.map((item) => item.toString()).toList() ?? const <String>[];
 
     if (name.isEmpty || email.isEmpty || password.isEmpty) {
       // Se algo realmente essencial sumiu, avisar e voltar ao início do fluxo.
@@ -67,26 +84,44 @@ class _SignupPhotoScreenState extends State<SignupPhotoScreen> {
       }
       final user = auth.currentUser;
       if (user == null) throw Exception('Falha na autenticação (usuário nulo após signup)');
+      String? profileImageUrl;
 
-      await firebaseService.createBasicProfile(user.uid, name, email);
+      final Map<String, dynamic> userData = {
+        'name': name,
+        'email': email,
+        'birthDate': dobMs,
+        'bio': bio,
+        'goal': goal,
+        'gender': gender,
+        'cpf': cpf,
+        'phone': phone,
+        'tags': tags,
+        'role': role,
+      };
 
-      if (dobMs != null) {
-        await firebaseService.addProfileFields(user.uid, {'birthDate': dobMs});
-      }
-      if (bio.isNotEmpty) {
-        await firebaseService.addProfileFields(user.uid, {'bio': bio});
-      }
-      if (goal.isNotEmpty) {
-        await firebaseService.addProfileFields(user.uid, {'goal': goal});
-      }
-      if (tags.isNotEmpty) {
-        await firebaseService.addProfileFields(user.uid, {
-          'tag_count': tags.length,
-          'tags_string': tags.join(','),
+      final Map<String, dynamic> roleSpecificData = {
+        'goal': goal,
+      };
+
+      if (role == 'PATIENT') {
+        roleSpecificData.addAll({
+          'healthPlan': healthPlan,
+          'documentPaths': documentPaths,
+          'documentNames': documentNames,
         });
-        for (int i=0;i<tags.length && i<10;i++) {
-          await firebaseService.addProfileFields(user.uid, {'tag_$i': tags[i]});
-        }
+      } else {
+        roleSpecificData.addAll({
+          'crp': crp,
+          'careerStart': careerStart,
+          'modality': modality,
+          'officeAddress': officeAddress,
+          'officePhone': officePhone,
+          'availabilityDays': availabilityDays,
+          'availabilityHours': availabilityHours,
+          'healthPlans': healthPlans,
+          'personalizedMessage': personalizedMessage,
+          'specialties': specialties,
+        });
       }
 
       if (_image != null) {
@@ -94,15 +129,57 @@ class _SignupPhotoScreenState extends State<SignupPhotoScreen> {
           final bytes = await _image!.readAsBytes();
           // try upload (function might create url) fallback base64
           String? imageUrl;
-          try { imageUrl = await firebaseService.uploadUserProfileImage(user.uid, bytes); } catch(_){ imageUrl = null; }
+          try {
+            imageUrl = await firebaseService.uploadUserProfileImage(user.uid, bytes);
+          } catch (_) {
+            imageUrl = null;
+          }
           if (imageUrl != null && imageUrl.isNotEmpty) {
-            await firebaseService.addProfileFields(user.uid, {'profileImageUrl': imageUrl});
+            profileImageUrl = imageUrl;
+            userData['profileImageUrl'] = imageUrl;
+            roleSpecificData['profileImageUrl'] = imageUrl;
           } else if (bytes.isNotEmpty) {
             final base64 = base64Encode(bytes);
-            await firebaseService.addProfileFields(user.uid, {'profileImageBase64': base64});
+            userData['profileImageBase64'] = base64;
+            roleSpecificData['profileImageBase64'] = base64;
           }
         } catch (_) {}
       }
+
+      if (documentPaths.isNotEmpty) {
+        final uploadedDocuments = <Map<String, String>>[];
+        for (var i = 0; i < documentPaths.length; i++) {
+          try {
+            final path = documentPaths[i];
+            final file = File(path);
+            final fileName = i < documentNames.length ? documentNames[i] : file.path.split(RegExp(r'[\\/]')).last;
+            final ext = fileName.contains('.') ? fileName.split('.').last.toLowerCase() : 'jpg';
+            final storagePath = 'users/${user.uid}/documents/${DateTime.now().millisecondsSinceEpoch}_$i.$ext';
+            final url = await firebaseService.uploadFile(file, storagePath);
+            uploadedDocuments.add({'name': fileName, 'url': url});
+          } catch (_) {}
+        }
+        if (uploadedDocuments.isNotEmpty) {
+          roleSpecificData['documents'] = uploadedDocuments;
+        }
+      }
+
+      if (goal.isNotEmpty) {
+        userData['goal'] = goal;
+        roleSpecificData['goal'] = goal;
+      }
+      if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
+        userData['profileImageUrl'] = profileImageUrl;
+        roleSpecificData['profileImageUrl'] = profileImageUrl;
+      }
+
+      await auth.updateUserProfile(displayName: name);
+      await firebaseService.createUserWithRole(
+        userData: userData,
+        role: role,
+        roleSpecificData: roleSpecificData,
+        documentId: user.uid,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Conta criada!')));

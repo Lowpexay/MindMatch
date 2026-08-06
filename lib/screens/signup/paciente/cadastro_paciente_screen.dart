@@ -55,9 +55,12 @@ class _CadastroPacienteScreenState extends State<CadastroPacienteScreen> {
     final previous =
         widget.data ?? (stateExtra is Map<String, dynamic> ? stateExtra : null);
     debugPrint('[CadastroPaciente] previous=$previous convenioId=$convenioId');
-    context.push('/home', extra: {
+    context.push('/signupPhoto', extra: {
       ...?previous,
-      'convenio': convenioId,
+      'healthPlan': convenioId,
+      'documentPaths': _selectedFiles.map((file) => file.path).toList(),
+      'documentNames': _selectedFiles.map((file) => file.name).toList(),
+      'role': 'PATIENT',
     });
   }
 

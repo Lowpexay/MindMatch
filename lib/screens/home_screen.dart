@@ -447,13 +447,13 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
     if (widget.userRole == 'PSYCHOLOGIST') {
       return _buildPsychologistHome(context);
     }
 
-    final theme = Theme.of(context);
+final theme = Theme.of(context);
     // scheme reserved for future use in additional refactors
   final scheme = theme.colorScheme; // ignore: unused_local_variable
     return Container(
@@ -491,21 +491,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 24),
                   
-                  // Reflective Questions Section - só mostra se não foram todas respondidas
-                  if (!_areAllQuestionsAnswered()) ...[
-                    _buildSectionCard(
-                      icon: Icons.psychology,
-                      title: 'Perguntas Reflexivas',
-                      subtitle: 'Responda para encontrar pessoas compatíveis',
-                      child: ReflectiveQuestionsWidget(
-                        questions: _dailyQuestions,
-                        existingAnswers: _questionAnswers,
-                        onQuestionAnswered: _handleQuestionAnswer,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                  
                   // Completed Questions Message - mostra quando todas foram respondidas
                   if (_areAllQuestionsAnswered() && _dailyQuestions.isNotEmpty) ...[
                     _buildCompletedQuestionsCard(),
@@ -514,9 +499,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   
                   // Compatible Users Section
                   _buildSectionCard(
-                    icon: Icons.people,
-                    title: 'Pessoas com mais afinidade',
-                    subtitle: 'Conecte-se com quem pensa como você',
+                    icon: Icons.calendar_today,
+                    title: 'Minhas consultas agendadas',
+                    subtitle: 'Veja suas proximas consultas',
                     child: CompatibleUsersWidget(
                       compatibleUsers: _compatibleUsers,
                       onUserTapped: _showUserProfile,
@@ -539,7 +524,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   
-                  const SizedBox(height: 32), // Espaço no final
+const SizedBox(height: 32), // Espaço no final
                 ],
               ),
             ),
@@ -606,20 +591,24 @@ class _HomeScreenState extends State<HomeScreen> {
     required String subtitle,
     required Widget child,
   }) {
-    final theme = Theme.of(context);
+final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: scheme.surface,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(isDark ? 0.25 : 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
+        border: Border.all(
+          color: isDark ? Colors.white12 : Colors.black.withOpacity(0.04),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -680,20 +669,25 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCompletedQuestionsCard() {
-    final scheme = Theme.of(context).colorScheme;
+Widget _buildCompletedQuestionsCard() {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: scheme.surface,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(isDark ? 0.25 : 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
+        border: Border.all(
+          color: isDark ? Colors.white12 : Colors.black.withOpacity(0.04),
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(24),

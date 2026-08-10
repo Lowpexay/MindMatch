@@ -35,7 +35,6 @@ import 'screens/signup/signup_basic_screen.dart';
 import 'screens/signup/signup_bio_screen.dart';
 import 'screens/signup/signup_interests_screen.dart';
 import 'screens/signup/signup_goal_screen.dart';
-import 'screens/signup/signup_photo_screen.dart';
 import 'screens/professional_detail_screen.dart';
 import 'screens/schedule_appointment_screen.dart';
 import 'screens/appointment_confirmation_screen.dart';
@@ -216,13 +215,24 @@ class MindMatchApp extends StatelessWidget {
       ],
       child: Consumer<ThemeService>(
         builder: (context, themeService, _) {
-          // Light theme (original look) - minimal overrides
+// Light theme (original look) - minimal overrides
+          final baseLight = ColorScheme.fromSeed(
+            seedColor: AppColors.primary,
+            brightness: Brightness.light,
+          );
           final lightTheme = ThemeData(
             primarySwatch: Colors.blue,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: AppColors.primary,
-              brightness: Brightness.light,
+            colorScheme: baseLight.copyWith(
+              // Forçar fundo branco acinzentado (sem o tom verde do seed)
+              background: AppColors.background,
+              surface: AppColors.background,
+              surfaceVariant: AppColors.gray100,
+              onSurface: AppColors.textPrimary,
+              onBackground: AppColors.textPrimary,
             ),
+            scaffoldBackgroundColor: AppColors.background,
+            canvasColor: AppColors.background,
+            cardColor: Colors.white,
             useMaterial3: true,
             fontFamily: 'Roboto',
           );
@@ -346,12 +356,6 @@ final GoRouter _router = GoRouter(
     GoRoute(
       path: '/signupGoal',
       builder: (context, state) => SignupGoalScreen(
-        data: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
-      ),
-    ),
-    GoRoute(
-      path: '/signupPhoto',
-      builder: (context, state) => SignupPhotoScreen(
         data: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
       ),
     ),

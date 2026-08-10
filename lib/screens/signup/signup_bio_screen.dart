@@ -221,46 +221,6 @@ class _SignupBioScreenState extends State<SignupBioScreen> {
                         },
                       ),
                       const SizedBox(height: 24),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? const Color(0xFF1E1E1E)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Theme.of(context).brightness == Brightness.dark
-                                  ? const Color.fromRGBO(0, 0, 0, 0.3)
-                                  : const Color.fromRGBO(0, 0, 0, 0.08),
-                              blurRadius: 12,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
-                        ),
-                        child: TextFormField(
-                          controller: _controller,
-                          maxLines: 4,
-                          decoration: InputDecoration(
-                            labelText: 'Fale um pouco sobre você',
-                            filled: true,
-                            fillColor: Colors.transparent,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: AppColors.gray300),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: AppColors.gray300),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: AppColors.primary, width: 2),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
                     ],
                   ),
                 ),

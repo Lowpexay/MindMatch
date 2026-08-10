@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mindmatch/screens/home_screen.dart';
 import 'package:provider/provider.dart';
 
 import '../services/auth_service.dart';
@@ -34,7 +35,7 @@ class _HomeRoleGateState extends State<HomeRoleGate> {
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
     if (!authService.isAuthenticated) {
-      return const LoginScreen();
+      return const HomeScreen();
     }
 
     final future = _profileFuture;

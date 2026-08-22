@@ -7,7 +7,7 @@ import '../models/question_models.dart';
 import '../models/mood_data.dart';
 
 class GeminiService {
-  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
+  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent';
   final List<String> _keys = ApiKeys.geminiApiKeys;
   // Forçar uso do modelo gemini-2.5-flash-lite (não usar fallback)
 

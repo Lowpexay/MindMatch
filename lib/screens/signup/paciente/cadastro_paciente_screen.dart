@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import '../../../widgets/app_dropdown.dart';
 import '../../../utils/app_colors.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/firebase_service.dart';
 
 class CadastroPacienteScreen extends StatefulWidget {
   final Map<String, dynamic>? data;
@@ -25,6 +28,7 @@ class _CadastroPacienteScreenState extends State<CadastroPacienteScreen> {
   ];
 
   String? _selectedConvenioId;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -44,7 +48,7 @@ class _CadastroPacienteScreenState extends State<CadastroPacienteScreen> {
     });
   }
 
-  void _next() {
+  Future<void> _next() async {
     final String? convenioId = _selectedConvenioId;
     if (convenioId == null || convenioId.isEmpty) {
       ScaffoldMessenger.of(context)
@@ -54,14 +58,75 @@ class _CadastroPacienteScreenState extends State<CadastroPacienteScreen> {
     final stateExtra = GoRouterState.of(context).extra;
     final previous =
         widget.data ?? (stateExtra is Map<String, dynamic> ? stateExtra : null);
-    debugPrint('[CadastroPaciente] previous=$previous convenioId=$convenioId');
-    context.push('/signupPhoto', extra: {
-      ...?previous,
-      'healthPlan': convenioId,
-      'documentPaths': _selectedFiles.map((file) => file.path).toList(),
-      'documentNames': _selectedFiles.map((file) => file.name).toList(),
-      'role': 'PATIENT',
-    });
+    final email = previous?['email']?.toString() ?? '';
+    final password = previous?['password']?.toString() ?? '';
+    final name = previous?['name']?.toString() ?? '';
+    final goal = previous?['goal']?.toString() ?? '';
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Dados de e-mail/senha ausentes. Refaça o cadastro.')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      // 1) Criar a conta no Firebase Auth (sem isso o HomeRoleGate volta para o login)
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final userCredential =
+          await authService.createUserWithEmailAndPassword(email, password);
+      final uid = userCredential.user?.uid;
+
+      if (uid == null) {
+        throw Exception('Falha ao obter o usuário após o cadastro.');
+      }
+
+      // Atualizar o displayName no Auth
+      if (name.isNotEmpty) {
+        await authService.updateProfile(displayName: name);
+      }
+
+      // 2) Criar perfil no Firestore com role e dados do paciente
+      final firebaseService =
+          Provider.of<FirebaseService>(context, listen: false);
+      await firebaseService.createUserWithRole(
+        userData: {
+          'name': name,
+          'email': email,
+          'role': 'PATIENT',
+          'goal': goal,
+          'healthPlan': convenioId,
+          'dob': previous?['dob'],
+          'gender': previous?['gender'],
+          'cpf': previous?['cpf'],
+          'nTelefone': previous?['nTelefone'],
+          'bio': previous?['bio'],
+          'tags': previous?['tags'],
+        },
+        role: 'PATIENT',
+        roleSpecificData: {
+          'healthPlan': convenioId,
+          'documentPaths': _selectedFiles.map((file) => file.path).toList(),
+          'documentNames': _selectedFiles.map((file) => file.name).toList(),
+        },
+        documentId: uid,
+      );
+
+      if (!mounted) return;
+      debugPrint(
+          '[CadastroPaciente] Conta criada com sucesso para $email (uid=$uid)');
+      context.go('/home');
+    } catch (e) {
+      debugPrint('[CadastroPaciente] Erro ao criar conta: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao criar conta: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -178,7 +243,7 @@ class _CadastroPacienteScreenState extends State<CadastroPacienteScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _next,
+                          onPressed: _isLoading ? null : _next,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
@@ -187,7 +252,13 @@ class _CadastroPacienteScreenState extends State<CadastroPacienteScreen> {
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
-                          child: const Text('Continuar'),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.5, color: Colors.white))
+                              : const Text('Continuar'),
                         ),
                       ),
                     ],

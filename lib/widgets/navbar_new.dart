@@ -15,14 +15,13 @@ class CustomNavbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Container(
           height: 70,
           decoration: BoxDecoration(
-            color: isDark ? AppColors.blackFont : AppColors.whiteBack,
+            color:  AppColors.background,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             boxShadow: [
               BoxShadow(
@@ -57,7 +56,7 @@ class CustomNavbar extends StatelessWidget {
                   width: 60,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: isDark ? AppColors.blackFont : AppColors.whiteBack, width: 4),
+                    border: Border.all(color: AppColors.background, width: 4),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.deepPurple.withOpacity(0.3),
@@ -75,7 +74,7 @@ class CustomNavbar extends StatelessWidget {
                   height: 4,
                   width: 40,
                   decoration: BoxDecoration(
-                    color: Colors.deepPurple,
+                    color: AppColors.primary,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -89,7 +88,6 @@ class CustomNavbar extends StatelessWidget {
 
   Widget _buildNavItem(IconData icon, String label, int index, context) {
     final isSelected = selectedIndex == index;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: () => onItemTapped(index),
@@ -99,19 +97,19 @@ class CustomNavbar extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: isDark ? (isSelected ? AppColors.purpleBack : AppColors.whiteBack) : (isSelected ? AppColors.purpleBack : AppColors.blackFont),
+            color: isSelected ? AppColors.primary : AppColors.blackFont,
           ),
           Text(
             label,
             style: TextStyle(
               fontSize: 12,
-              color: isDark ? (isSelected ? AppColors.purpleBack : AppColors.whiteBack) : (isSelected ? AppColors.purpleBack : AppColors.blackFont),
+              color: isSelected ? AppColors.primary : AppColors.blackFont,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
           Container(
             height: 1,
-            color: isDark ? (isSelected ? AppColors.purpleBack : AppColors.whiteBack) : (isSelected ? AppColors.purpleBack : AppColors.blackFont),
+            color: isSelected ? AppColors.primary : AppColors.blackFont,
           ),
         ],
       ),

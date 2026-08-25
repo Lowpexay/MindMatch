@@ -8,13 +8,20 @@ import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import '../services/gemini_service.dart';
+import '../models/consultation_model.dart';
+import '../models/conversation_models.dart';
 import '../widgets/global_drawer.dart';
 import '../widgets/checkup_heart_widget.dart';
 import '../widgets/user_avatar.dart';
+import '../widgets/navbar_new.dart';
 import 'profile_screen.dart';
+import 'user_chat_screen.dart';
+import 'main_navigation.dart';
 
 class LumaChatScreen extends StatefulWidget {
-  const LumaChatScreen({super.key});
+  final String mode;
+
+  const LumaChatScreen({super.key, this.mode = 'PATIENT'});
 
   @override
   State<LumaChatScreen> createState() => _LumaChatScreenState();
@@ -72,48 +79,38 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
   bool _isLoading = false;
   bool _hasRecommended = false;
   final Map<String, String> _collectedInfo = {};
-
-  final List<PsychologistProfile> _profiles = const [
-    PsychologistProfile(
-      name: 'Dr. Gustavo Teodoro Gabilan',
-      rating: 4.9,
-      approach: 'TCC para ansiedade e regulação emocional',
-      mode: 'Online e Presencial',
-      availability: 'Segunda a Sábado, 09:00 às 19:00',
-      location: 'Morro da Mooca',
-      summary: 'Especialista em ansiedade, autocobrança e estresse no trabalho.',
-    ),
-    PsychologistProfile(
-      name: 'Dra. Camila Nogueira',
-      rating: 4.8,
-      approach: 'Terapia focada em relacionamentos e comunicação',
-      mode: 'Online',
-      availability: 'Segunda a Sexta, 10:00 às 20:00',
-      location: 'Atendimento remoto',
-      summary: 'Foco em relacionamentos, conflitos familiares e autoestima.',
-    ),
-    PsychologistProfile(
-      name: 'Dr. Rafael Mendes',
-      rating: 4.7,
-      approach: 'Psicoterapia breve para rotina e organização emocional',
-      mode: 'Presencial e Online',
-      availability: 'Terça a Sexta, 08:00 às 18:00',
-      location: 'Vila Mariana',
-      summary: 'Atende questões de rotina, produtividade e sobrecarga mental.',
-    ),
-  ];
+  final List<Consultation> _todayConsultations = [];
+  List<Map<String, dynamic>> _registeredPsychologists = [];
+  bool _catalogLoading = true;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadUserName();
-      _loadHeaderImage();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadUserName();
+      await _loadHeaderImage();
+      await _loadAppointmentsContext();
+      await _loadRegisteredPsychologists();
       _addLumaMessage(
-        'Olá! Eu sou a Luma. Vou conversar com você para entender seu momento e indicar o psicólogo ideal. '
-        'Pode me contar com suas palavras: o que mais está te incomodando hoje?',
+        _buildInitialGreeting(),
+        content: widget.mode == 'PSYCHOLOGIST' && _todayConsultations.isNotEmpty
+            ? _buildAppointmentCards()
+            : null,
       );
     });
+  }
+
+  String _buildInitialGreeting() {
+    if (widget.mode == 'PSYCHOLOGIST') {
+      final prefix = _userName.isNotEmpty ? 'Dr. $_userName' : 'Psicólogo';
+      if (_todayConsultations.isNotEmpty) {
+        return 'Olá, $prefix. Eu sou a Luma assistente e vi ${_todayConsultations.length} consulta(s) agendada(s) na lista de registros. Posso ajudar a organizar a agenda e preparar mensagens para esses atendimentos.';
+      }
+
+      return 'Olá, $prefix. Eu sou a Luma assistente e posso ajudar a organizar sua agenda e preparar mensagens quando houver consultas agendadas.';
+    }
+
+    return 'Olá! Eu sou a Luma. Vou conversar com você para entender seu momento e indicar o psicólogo ideal. Pode me contar com suas palavras: o que mais está te incomodando hoje?';
   }
 
   Future<void> _loadUserName() async {
@@ -156,6 +153,307 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
     } catch (e) {
       debugPrint('Error loading header image in LumaChat: $e');
     }
+  }
+
+  Future<void> _loadAppointmentsContext() async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+      final userId = authService.currentUser?.uid;
+      if (userId == null) return;
+
+      final role = (widget.mode == 'PSYCHOLOGIST') ? 'PSYCHOLOGIST' : 'PATIENT';
+      // A agenda da Luma deve incluir consultas futuras, não somente as de hoje.
+      final consultations = await firebaseService.getUpcomingConsultationsForUser(userId, role);
+      if (!mounted) return;
+
+      setState(() {
+        _todayConsultations
+          ..clear()
+          ..addAll(consultations);
+      });
+    } catch (e) {
+      debugPrint('Error loading appointments context in LumaChat: $e');
+    }
+  }
+
+  Future<void> _loadRegisteredPsychologists() async {
+    try {
+      final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+      final catalog = await firebaseService.getRegisteredPsychologists();
+      if (!mounted) return;
+      setState(() {
+        _registeredPsychologists = catalog;
+        _catalogLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _registeredPsychologists = [];
+        _catalogLoading = false;
+      });
+      debugPrint('Error loading registered psychologists in LumaChat: $e');
+    }
+  }
+
+  List<PsychologistProfile> _buildPsychologistProfiles() {
+    return _registeredPsychologists.map((data) {
+      final name = data['name']?.toString() ?? 'Profissional';
+      final specialty = data['specialty']?.toString() ?? '';
+      final modality = data['modality']?.toString() ?? '';
+      final availability = data['availability']?.toString() ?? '';
+      final location = data['officeAddress']?.toString() ?? '';
+      final summary = data['personalizedMessage']?.toString().isNotEmpty == true
+          ? data['personalizedMessage'].toString()
+          : specialty.isNotEmpty
+              ? specialty
+              : 'Psicólogo cadastrado na aplicação.';
+      final parsedRating = double.tryParse(data['rating']?.toString() ?? '');
+      return PsychologistProfile(
+        name: name,
+        rating: parsedRating ?? 4.8,
+        approach: specialty.isNotEmpty ? specialty : 'Atendimento psicológico',
+        mode: modality.isNotEmpty ? modality : 'Online e presencial',
+        availability: availability.isNotEmpty ? availability : 'A combinar',
+        location: location.isNotEmpty ? location : 'A combinar',
+        summary: summary,
+      );
+    }).toList();
+  }
+
+  String _buildAppointmentsContext() {
+    if (_todayConsultations.isEmpty) {
+      return 'Nenhuma consulta futura agendada.';
+    }
+
+    return _todayConsultations.map((consultation) {
+      final patientName = consultation.patientName?.trim().isNotEmpty == true ? consultation.patientName : 'Paciente';
+      final psychologistName = consultation.psychologistName?.trim().isNotEmpty == true ? consultation.psychologistName : 'Psicólogo';
+      final specialty = consultation.psychologistSpecialty?.trim().isNotEmpty == true ? consultation.psychologistSpecialty : '';
+      final modality = consultation.psychologistModality?.trim().isNotEmpty == true ? consultation.psychologistModality : '';
+      final availability = consultation.psychologistAvailability?.trim().isNotEmpty == true ? consultation.psychologistAvailability : '';
+      return '- $patientName com $psychologistName em ${consultation.hour} (${consultation.modality}, ${consultation.status})${specialty != '' ? ' • Especialidade: $specialty' : ''}${modality != '' ? ' • Atendimento: $modality' : ''}${availability != '' ? ' • Disponibilidade: $availability' : ''}';
+    }).join('\n');
+  }
+
+  bool _isAppointmentInteraction(String message) {
+    final normalized = message.toLowerCase().trim();
+    const appointmentTerms = [
+      'consulta',
+      'consultas',
+      'agendamento',
+      'agendada',
+      'agendado',
+    ];
+    return appointmentTerms.any(normalized.contains) ||
+        (normalized.contains('hoje') &&
+            (normalized.contains('tenho') || normalized.contains('psicólogo') || normalized.contains('psicologo')));
+  }
+
+  String _buildPatientAppointmentReply(String message) {
+    if (_todayConsultations.isEmpty) {
+      return 'Não encontrei nenhuma consulta registrada para você. Se quiser, posso continuar nossa conversa para entender o que você está sentindo e ajudar a encontrar um psicólogo.';
+    }
+
+    final asksToday = message.toLowerCase().contains('hoje');
+    final today = DateTime.now();
+    final consultations = asksToday
+        ? _todayConsultations.where((consultation) {
+            final date = DateTime.fromMillisecondsSinceEpoch(consultation.date);
+            return date.year == today.year && date.month == today.month && date.day == today.day;
+          }).toList()
+        : _todayConsultations;
+
+    if (consultations.isEmpty) {
+      return 'Não encontrei consulta registrada para hoje. Posso te mostrar suas próximas consultas ou continuar nossa conversa sobre como você está se sentindo.';
+    }
+
+    final details = consultations.map((consultation) {
+      final date = DateTime.fromMillisecondsSinceEpoch(consultation.date);
+      final dateLabel = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+      final psychologist = consultation.psychologistName?.trim().isNotEmpty == true
+          ? consultation.psychologistName!.trim()
+          : 'seu psicólogo';
+      return '$dateLabel às ${consultation.hour} com $psychologist (${_modalityLabel(consultation.modality).toLowerCase()})';
+    }).join('; ');
+
+    return consultations.length == 1
+        ? 'Sim. Você tem uma consulta registrada para $details.'
+        : 'Encontrei ${consultations.length} consultas registradas: $details.';
+  }
+
+  Widget _buildAppointmentCards() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: _todayConsultations
+          .map((consultation) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildAppointmentCard(consultation),
+              ))
+          .toList(),
+    );
+  }
+
+  Widget _buildAppointmentCard(Consultation consultation) {
+    final patientName = consultation.patientName?.trim().isNotEmpty == true
+        ? consultation.patientName!.trim()
+        : 'Paciente';
+    final date = DateTime.fromMillisecondsSinceEpoch(consultation.date);
+    final dateLabel = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _showAppointmentDetails(consultation),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green.shade300),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 21,
+                backgroundColor: Colors.green.shade400,
+                child: const Icon(Icons.person_outline, color: Colors.white),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      patientName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF2E7D32)),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '$dateLabel • ${consultation.hour} • ${_modalityLabel(consultation.modality)}',
+                      style: TextStyle(fontSize: 12, color: Colors.green.shade800),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.green.shade700),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _modalityLabel(String modality) {
+    switch (modality) {
+      case 'CALL':
+        return 'Online';
+      case 'IN_PERSON':
+        return 'Presencial';
+      case 'MESSAGE':
+        return 'Mensagem';
+      default:
+        return modality.isEmpty ? 'A combinar' : modality;
+    }
+  }
+
+  void _showAppointmentDetails(Consultation consultation) {
+    final patientName = consultation.patientName?.trim().isNotEmpty == true
+        ? consultation.patientName!.trim()
+        : 'Paciente';
+    final date = DateTime.fromMillisecondsSinceEpoch(consultation.date);
+    final dateLabel = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(
+                radius: 48,
+                backgroundColor: Colors.green.shade400,
+                child: const Icon(Icons.person_outline, color: Colors.white, size: 56),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                patientName,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.green.shade900.withOpacity(0.35) : Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.green.shade300),
+                ),
+                child: Column(
+                  children: [
+                    _buildDetailLine('Atendimento', _modalityLabel(consultation.modality)),
+                    const SizedBox(height: 6),
+                    _buildDetailLine('Dia', dateLabel),
+                    const SizedBox(height: 6),
+                    _buildDetailLine('Horário', consultation.hour.isEmpty ? 'A combinar' : consultation.hour),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    _openPatientChat(consultation, patientName);
+                  },
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  label: const Text('Abrir conversa com o paciente'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailLine(String label, String value) {
+    return RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        style: TextStyle(color: Colors.green.shade800, fontSize: 13),
+        children: [
+          TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.w700)),
+          TextSpan(text: value),
+        ],
+      ),
+    );
+  }
+
+  void _openPatientChat(Consultation consultation, String patientName) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UserChatScreen(
+          otherUser: ChatUser(id: consultation.idPatient, name: patientName),
+        ),
+      ),
+    );
   }
 
   void _addLumaMessage(String text, {Widget? content}) {
@@ -201,43 +499,70 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
     });
 
     try {
-      final triageResult = await _geminiService.generatePsychologistTriageResponse(
-        userMessage: text,
-        conversationContext: _buildConversationContext(),
-        collectedInfo: _collectedInfo,
-        userName: _userName.isNotEmpty ? _userName : null,
-        psychologistOptions: _profiles.map((p) => p.toPromptMap()).toList(),
-      );
-
-      final extracted = triageResult['extracted_info'];
-      if (extracted is Map) {
-        extracted.forEach((key, value) {
-          final parsed = value?.toString().trim() ?? '';
-          if (parsed.isNotEmpty) {
-            _collectedInfo[key.toString()] = parsed;
-          }
-        });
-      }
-
-      final reply = (triageResult['assistant_reply']?.toString().trim().isNotEmpty ?? false)
-          ? triageResult['assistant_reply'].toString().trim()
-          : 'Entendi. Quero te ajudar com cuidado. Pode me contar um pouco mais sobre seu momento atual?';
-
-      _addLumaMessage(reply);
-
-      final ready = triageResult['ready_for_recommendation'] == true;
-      if (ready && !_hasRecommended) {
-        final recommended = _resolveRecommendedProfile(triageResult['recommended_psychologist']);
-        setState(() {
-          _hasRecommended = true;
-        });
-        _addLumaMessage(
-          'Com base no que você compartilhou, encontrei um profissional que combina com o seu momento:',
-          content: _buildProfessionalCard(recommended),
+      if (widget.mode == 'PSYCHOLOGIST') {
+        final reply = await _geminiService.generatePsychologistAssistantResponse(
+          userMessage: text,
+          conversationContext: _buildConversationContext(),
+          userName: _userName.isNotEmpty ? _userName : null,
+          contextData: {
+            ..._collectedInfo,
+            'consultas_de_hoje': _buildAppointmentsContext(),
+          },
         );
+        _addLumaMessage(reply);
+      } else {
+        final psychologistProfiles = _buildPsychologistProfiles();
+        if (psychologistProfiles.isEmpty || _catalogLoading) {
+          _addLumaMessage('Ainda não encontrei psicólogos cadastrados na aplicação para recomendar. Assim que houver profissionais registrados, eu consigo fazer a triagem com base no que eles configuraram.');
+          return;
+        }
+
+        final triageResult = await _geminiService.generatePsychologistTriageResponse(
+          userMessage: text,
+          conversationContext: _buildConversationContext(),
+          collectedInfo: {
+            ..._collectedInfo,
+            'consultas_agendadas': _buildAppointmentsContext(),
+          },
+          userName: _userName.isNotEmpty ? _userName : null,
+          psychologistOptions: _registeredPsychologists,
+        );
+
+        final extracted = triageResult['extracted_info'];
+        final interactionType = triageResult['interaction_type']?.toString().toLowerCase();
+        if (interactionType != 'agenda' && extracted is Map) {
+          extracted.forEach((key, value) {
+            final parsed = value?.toString().trim() ?? '';
+            if (parsed.isNotEmpty) {
+              _collectedInfo[key.toString()] = parsed;
+            }
+          });
+        }
+
+        final reply = (triageResult['assistant_reply']?.toString().trim().isNotEmpty ?? false)
+            ? triageResult['assistant_reply'].toString().trim()
+            : 'Entendi. Quero te ajudar com cuidado. Pode me contar um pouco mais sobre seu momento atual?';
+
+        _addLumaMessage(reply);
+
+        final ready = interactionType != 'agenda' && triageResult['ready_for_recommendation'] == true;
+        if (ready && !_hasRecommended) {
+          final recommended = _resolveRecommendedProfile(triageResult['recommended_psychologist']);
+          setState(() {
+            _hasRecommended = true;
+          });
+          _addLumaMessage(
+            'Com base no que você compartilhou, encontrei um profissional que combina com o seu momento:',
+            content: _buildProfessionalCard(recommended),
+          );
+        }
       }
     } catch (e) {
-      _addLumaMessage('Desculpe, tive uma instabilidade agora. Podemos continuar? Me conta mais sobre como você está se sentindo.');
+      _addLumaMessage(widget.mode == 'PSYCHOLOGIST'
+          ? (_todayConsultations.isNotEmpty
+              ? 'Posso ajudar com agenda, pacientes e mensagens. O que você quer organizar agora?'
+              : 'Não encontrei consultas agendadas para hoje. Posso ajudar com a organização da agenda quando houver atendimentos.')
+          : 'Desculpe, tive uma instabilidade agora. Podemos continuar? Me conta mais sobre como você está se sentindo.');
     } finally {
       if (mounted) {
         setState(() {
@@ -251,7 +576,7 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
     if (raw is Map) {
       final name = raw['name']?.toString().trim();
       if (name != null && name.isNotEmpty) {
-        for (final p in _profiles) {
+        for (final p in _buildPsychologistProfiles()) {
           if (p.name.toLowerCase() == name.toLowerCase()) {
             return p;
           }
@@ -269,7 +594,17 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
       }
     }
 
-    return _profiles.first;
+    final profiles = _buildPsychologistProfiles();
+    if (profiles.isNotEmpty) return profiles.first;
+    return const PsychologistProfile(
+      name: 'Profissional',
+      rating: 4.8,
+      approach: 'Atendimento psicológico',
+      mode: 'Online e presencial',
+      availability: 'A combinar',
+      location: 'A combinar',
+      summary: 'Psicólogo cadastrado na aplicação.',
+    );
   }
 
   Widget _buildProfessionalCard(PsychologistProfile profile) {
@@ -391,7 +726,7 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      drawer: const GlobalDrawer(),
+      drawer: GlobalDrawer(userRole: widget.mode),
       appBar: AppBar(
         toolbarHeight: 88,
         elevation: 0,
@@ -411,7 +746,7 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
               Text('MindMatch', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 20, fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
               Text(
-                _getGreeting(),
+                widget.mode == 'PSYCHOLOGIST' ? _getPsychologistGreeting() : _getGreeting(),
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: isDark ? Colors.white70 : Colors.black45, fontSize: 12),
               ),
@@ -434,6 +769,15 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
         ],
       ),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      bottomNavigationBar: CustomNavbar(
+        selectedIndex: MainNavigation.lastTabIndex,
+        onItemTapped: (index) {
+          Navigator.of(context).pop();
+          MainNavigation.switchTab(index);
+        },
+        // A Luma jÃ¡ estÃ¡ aberta; tocar no avatar central nÃ£o cria outra tela.
+        onCenterAvatarTap: () {},
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -441,7 +785,7 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                 child: _messages.isEmpty
-                    ? Center(child: Text('Converse com a Luma', style: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade600)))
+                ? Center(child: Text(widget.mode == 'PSYCHOLOGIST' ? 'Converse com a Luma assistente' : 'Converse com a Luma', style: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade600)))
                     : ListView.builder(
                         controller: _scroll,
                         reverse: true,
@@ -466,7 +810,6 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
                                   child: Column(
                                     crossAxisAlignment: msg.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                                     children: [
-                                      if (msg.content != null) msg.content!,
                                       if (msg.text.isNotEmpty)
                                         Container(
                                           margin: const EdgeInsets.only(top: 6),
@@ -479,6 +822,11 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
                                             msg.text,
                                             style: TextStyle(color: msg.isUser ? Colors.white : (isDark ? Colors.white : Colors.black87)),
                                           ),
+                                        ),
+                                      if (msg.content != null)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 8),
+                                          child: msg.content!,
                                         ),
                                     ],
                                   ),
@@ -651,6 +999,19 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
   String _getGreeting() {
     final hour = DateTime.now().hour;
     final name = _userName.isNotEmpty ? ', $_userName' : '';
+
+    if (hour < 12) {
+      return 'Bom dia$name!';
+    } else if (hour < 18) {
+      return 'Boa tarde$name!';
+    } else {
+      return 'Boa noite$name!';
+    }
+  }
+
+  String _getPsychologistGreeting() {
+    final hour = DateTime.now().hour;
+    final name = _userName.isNotEmpty ? ', Dr. $_userName' : ', Dr. Gustavo';
 
     if (hour < 12) {
       return 'Bom dia$name!';

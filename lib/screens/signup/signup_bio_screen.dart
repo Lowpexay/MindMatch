@@ -115,9 +115,10 @@ class _SignupBioScreenState extends State<SignupBioScreen> {
     context.push('/signupGoal', extra: {
       ...?previous,
       'gender': _selectedGender,
-      'cpf': _cpfController,
+      'cpf': _cpfController.text.trim(),
       'dob': _selectedDate?.millisecondsSinceEpoch,
-      'nTelefone': _telefoneController,
+      'nTelefone': _telefoneController.text.trim(),
+      'bio': _controller.text.trim(),
     });
   }
 

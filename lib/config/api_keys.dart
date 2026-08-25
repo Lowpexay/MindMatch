@@ -4,7 +4,10 @@ class ApiKeys {
   // ElevenLabs API Key
   // Para usar, substitua por sua chave real da ElevenLabs
   // Obtenha em: https://elevenlabs.io/
-  static const String elevenLabsApiKey = 'sk_669d869dbe55c7e8a26a8f4552f77df3ac26ccbbd0100829';
+  static const String elevenLabsApiKey = String.fromEnvironment(
+    'ELEVENLABS_API_KEY',
+    defaultValue: '',
+  );
   
   // URLs da API
   static const String elevenLabsBaseUrl = 'https://api.elevenlabs.io/v1';
@@ -19,9 +22,9 @@ class ApiKeys {
   }
 
   // Gemini API Keys (suporta rotação)
-  // Adicione aqui suas chaves; serão usadas em fallback/rotação em caso de 429/403/401
+  // Configure com: flutter run --dart-define=GEMINI_API_KEY=SUA_CHAVE
   static const List<String> geminiApiKeys = [
-    'AIzaSyCWau-HcYi8taHkns6V1mZwMuqvf3SytIY',
+    String.fromEnvironment('GEMINI_API_KEY', defaultValue: ''),
   ];
 
   static bool get isGeminiConfigured => geminiApiKeys.isNotEmpty && geminiApiKeys.first.isNotEmpty;

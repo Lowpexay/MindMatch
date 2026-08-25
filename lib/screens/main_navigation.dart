@@ -19,7 +19,9 @@ import 'conversations_screen.dart';
 import 'profile_screen.dart';
 
 class MainNavigation extends StatefulWidget {
-  const MainNavigation({super.key});
+  final String userRole;
+
+  const MainNavigation({super.key, this.userRole = 'PATIENT'});
 
   // Chave global para acessar a própria MainNavigation
   static final GlobalKey<_MainNavigationState> mainNavigationKey = GlobalKey<_MainNavigationState>();
@@ -67,14 +69,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
   // kept minimal state
   PageController _pageController = PageController();
   late AnimationController _animationController;
-
-  // Ordem nova: 0 Home | 1 Vídeos (Cursos) | 2 Chats (conversas usuários) | 3 Perfil
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const CoursesScreen(),
-    ConversationsScreen(key: MainNavigation.conversationsKey),
-    const ProfileScreen(),
-  ];
+  late List<Widget> _screens;
 
   @override
   void initState() {
@@ -84,6 +79,12 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
+    _screens = [
+      HomeScreen(userRole: widget.userRole),
+      const CoursesScreen(),
+      ConversationsScreen(key: MainNavigation.conversationsKey, userRole: widget.userRole),
+      const ProfileScreen(),
+    ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeGlobalNotifications();
       _loadUserName();
@@ -182,7 +183,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => LumaChatScreen(key: MainNavigation.aiChatKey),
+        builder: (_) => LumaChatScreen(key: MainNavigation.aiChatKey, mode: widget.userRole),
       ),
     );
   }
@@ -194,7 +195,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
     return Scaffold(
         key: MainNavigation.scaffoldKey,
         backgroundColor: theme.scaffoldBackgroundColor,
-        drawer: const GlobalDrawer(),
+        drawer: GlobalDrawer(userRole: widget.userRole),
         appBar: _buildAppBar(),
         body: PageView(
           controller: _pageController,
@@ -253,7 +254,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
         break;
       case 2:
         title = 'Conversas';
-        subtitle = 'Chats com a comunidade';
+        subtitle = 'Seus Chats';
         break;
       case 3:
         title = 'Perfil';

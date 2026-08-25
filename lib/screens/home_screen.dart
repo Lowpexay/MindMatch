@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:convert';
@@ -10,6 +11,7 @@ import '../services/achievement_service.dart';
 import '../services/course_service.dart';
 import '../services/daily_checkup_history_service.dart';
 import '../models/mood_data.dart';
+import '../models/consultation_model.dart';
 import '../models/question_models.dart';
 import '../models/conversation_models.dart';
 import '../models/course_models.dart';
@@ -17,7 +19,6 @@ import '../models/daily_checkup.dart';
 import '../utils/app_colors.dart';
 import '../widgets/mood_check_widget.dart';
 import '../widgets/reflective_questions_widget.dart';
-import '../widgets/compatible_users_widget.dart';
 import '../widgets/courses_widget.dart';
 import '../widgets/user_avatar.dart';
 import '../screens/user_chat_screen.dart';
@@ -25,7 +26,9 @@ import '../screens/luma_chat_screen.dart';
 import '../screens/main_navigation.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String userRole;
+
+  const HomeScreen({super.key, this.userRole = 'PATIENT'});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -37,7 +40,6 @@ class _HomeScreenState extends State<HomeScreen> {
   // Data
   MoodData? _todayMood;
   List<ReflectiveQuestion> _dailyQuestions = [];
-  List<Map<String, dynamic>> _compatibleUsers = [];
   Map<String, bool> _questionAnswers = {};
   String _userName = ''; // Nome do usuário
   List<Course> _courses = []; // Cache local (espelho do CourseService)
@@ -45,12 +47,19 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _dailyCheckupCompleted = false;
   bool _editingDailyCheckup = false;
   DateTime? _dailyCheckupDate; // Data do último checkup diário concluído (início do dia)
+  List<Consultation> _psychologistAgenda = [];
+  bool _psychAgendaLoading = false;
+  StreamSubscription<List<Consultation>>? _psychAgendaSubscription;
+  List<Consultation> _patientAgenda = [];
+  bool _patientAgendaLoading = false;
+  StreamSubscription<List<Consultation>>? _patientAgendaSubscription;
   
   // Services
   FirebaseService? _firebaseService;
   AuthService? _authService;
   // ignore: unused_field
   CourseService? _courseService;
+  bool _userNameLoaded = false;
 
   @override
   void initState() {
@@ -68,6 +77,102 @@ class _HomeScreenState extends State<HomeScreen> {
     _firebaseService = Provider.of<FirebaseService>(context);
     _authService = Provider.of<AuthService>(context);
     _courseService = Provider.of<CourseService>(context);
+
+    if (!_userNameLoaded) {
+      _userNameLoaded = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadUserName();
+      });
+    }
+
+    if (widget.userRole == 'PSYCHOLOGIST' && _psychAgendaSubscription == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startPsychologistAgendaListener();
+      });
+    }
+
+    if (widget.userRole == 'PATIENT' && _patientAgendaSubscription == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startPatientAgendaListener();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _psychAgendaSubscription?.cancel();
+    _patientAgendaSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadUserName() async {
+    try {
+      final userId = _authService?.currentUser?.uid;
+      if (userId == null) return;
+
+      final userProfile = await _firebaseService?.getUserProfile(userId);
+      final profileName = userProfile?['name']?.toString().trim() ?? '';
+      final profileFullName = userProfile?['fullname']?.toString().trim() ?? '';
+      final authName = _authService?.currentUser?.displayName?.trim() ?? '';
+
+      final resolvedName = profileName.isNotEmpty
+          ? profileName
+          : profileFullName.isNotEmpty
+              ? profileFullName
+              : authName;
+
+      if (!mounted || resolvedName.isEmpty || resolvedName == _userName) return;
+
+      setState(() {
+        _userName = resolvedName;
+      });
+    } catch (e) {
+      print('⚠️ Failed loading user name: $e');
+    }
+  }
+
+  Future<void> _startPsychologistAgendaListener() async {
+    final userId = _authService?.currentUser?.uid;
+    if (userId == null || widget.userRole != 'PSYCHOLOGIST') return;
+
+    await _psychAgendaSubscription?.cancel();
+    if (mounted) {
+      setState(() {
+        _psychAgendaLoading = true;
+      });
+    }
+
+    _psychAgendaSubscription = _firebaseService
+        ?.watchUpcomingConsultationsForUser(userId, 'PSYCHOLOGIST')
+        .listen((consultations) {
+      if (!mounted) return;
+      setState(() {
+        _psychologistAgenda = consultations;
+        _psychAgendaLoading = false;
+      });
+    });
+  }
+
+  Future<void> _startPatientAgendaListener() async {
+    final userId = _authService?.currentUser?.uid;
+    if (userId == null || widget.userRole != 'PATIENT') return;
+
+    await _patientAgendaSubscription?.cancel();
+    if (mounted) {
+      setState(() {
+        _patientAgendaLoading = true;
+      });
+    }
+
+    _patientAgendaSubscription = _firebaseService
+        ?.watchUpcomingConsultationsForUser(userId, 'PATIENT')
+        .listen((consultations) {
+      if (!mounted) return;
+      setState(() {
+        _patientAgenda = consultations;
+        _patientAgendaLoading = false;
+      });
+    });
   }
 
   Future<void> _loadInitialData() async {
@@ -79,7 +184,6 @@ class _HomeScreenState extends State<HomeScreen> {
       await _loadPersistedDailyCheckup(userId);
       await Future.wait([
         _loadDailyQuestions(),
-        _loadCompatibleUsers(userId),
         _loadSampleCourses(),
       ]);
       _evaluateDailyCheckupCompletion();
@@ -303,23 +407,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ));
   }
 
-  Future<void> _loadCompatibleUsers(String userId) async {
-    try {
-      print('🔄 Loading compatible users for: $userId');
-      
-      // DEBUG: List all users in Firestore
-      await _firebaseService?.debugListAllUsers();
-      
-      // Limitando para 6 usuários compatíveis
-      final users = await _firebaseService?.getCompatibleUsers(userId, limit: 6) ?? [];
-      print('👥 Found ${users.length} compatible users (limited to 6)');
-      if (!mounted) return; // prevenir setState após dispose
-      setState(() { _compatibleUsers = users; });
-    } catch (e) {
-      print('❌ Error loading compatible users: $e');
-    }
-  }
-
   Future<void> _loadSampleCourses() async {
     try {
       final service = Provider.of<CourseService>(context, listen: false);
@@ -411,9 +498,13 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    if (widget.userRole == 'PSYCHOLOGIST') {
+      return _buildPsychologistHome(context);
+    }
+
+final theme = Theme.of(context);
     // scheme reserved for future use in additional refactors
   final scheme = theme.colorScheme; // ignore: unused_local_variable
     return Container(
@@ -427,6 +518,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Support Message Section - aparece quando bem-estar <= 50%
+                  if (_patientAgenda.isNotEmpty || _patientAgendaLoading) ...[
+                    _buildPatientAppointmentCard(context),
+                    const SizedBox(height: 24),
+                  ],
+
                   if (_todayMood != null && _todayMood!.wellnessScore <= 50) ...[
                     _buildSupportMessageCard(),
                     const SizedBox(height: 24),
@@ -451,40 +547,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 24),
                   
-                  // Reflective Questions Section - só mostra se não foram todas respondidas
-                  if (!_areAllQuestionsAnswered()) ...[
-                    _buildSectionCard(
-                      icon: Icons.psychology,
-                      title: 'Perguntas Reflexivas',
-                      subtitle: 'Responda para encontrar pessoas compatíveis',
-                      child: ReflectiveQuestionsWidget(
-                        questions: _dailyQuestions,
-                        existingAnswers: _questionAnswers,
-                        onQuestionAnswered: _handleQuestionAnswer,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                  
                   // Completed Questions Message - mostra quando todas foram respondidas
                   if (_areAllQuestionsAnswered() && _dailyQuestions.isNotEmpty) ...[
                     _buildCompletedQuestionsCard(),
                     const SizedBox(height: 24),
                   ],
-                  
-                  // Compatible Users Section
-                  _buildSectionCard(
-                    icon: Icons.people,
-                    title: 'Pessoas com mais afinidade',
-                    subtitle: 'Conecte-se com quem pensa como você',
-                    child: CompatibleUsersWidget(
-                      compatibleUsers: _compatibleUsers,
-                      onUserTapped: _showUserProfile,
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
                   // Courses Section
                   _buildSectionCard(
                     icon: Icons.school,
@@ -499,7 +566,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   
-                  const SizedBox(height: 32), // Espaço no final
+const SizedBox(height: 32), // Espaço no final
                 ],
               ),
             ),
@@ -566,20 +633,24 @@ class _HomeScreenState extends State<HomeScreen> {
     required String subtitle,
     required Widget child,
   }) {
-    final theme = Theme.of(context);
+final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: scheme.surface,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(isDark ? 0.25 : 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
+        border: Border.all(
+          color: isDark ? Colors.white12 : Colors.black.withOpacity(0.04),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -640,20 +711,25 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCompletedQuestionsCard() {
-    final scheme = Theme.of(context).colorScheme;
+Widget _buildCompletedQuestionsCard() {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: scheme.surface,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(isDark ? 0.25 : 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
+        border: Border.all(
+          color: isDark ? Colors.white12 : Colors.black.withOpacity(0.04),
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -725,30 +801,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       Text(
                         'Respondidas',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: scheme.onSurface.withOpacity(0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    width: 1,
-                    height: 40,
-                    color: AppColors.gray300,
-                  ),
-                  Column(
-                    children: [
-                      Text(
-                        '${_compatibleUsers.length}',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      Text(
-                        'Compatíveis',
                         style: TextStyle(
                           fontSize: 12,
                           color: scheme.onSurface.withOpacity(0.7),
@@ -996,6 +1048,109 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildPatientAppointmentCard(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (_patientAgendaLoading && _patientAgenda.isEmpty) {
+      return _buildSectionCard(
+        icon: Icons.calendar_month_outlined,
+        title: 'Próximo agendamento',
+        subtitle: 'Carregando sua consulta registrada...',
+        child: const LinearProgressIndicator(),
+      );
+    }
+
+    final consultation = _patientAgenda.first;
+    final date = DateTime.fromMillisecondsSinceEpoch(consultation.date);
+    final dateLabel = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    final psychologistName = consultation.psychologistName?.trim().isNotEmpty == true
+        ? consultation.psychologistName!.trim()
+        : 'Psicólogo';
+    final modality = consultation.modality == 'IN_PERSON' ? 'Presencial' : consultation.modality == 'CALL' ? 'Online' : consultation.modality;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.blueGrey.shade900 : const Color(0xFFE1F3FB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.lightBlue.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Bem-vindo de volta${_userName.isNotEmpty ? ', $_userName' : ''}!',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.blue.shade800),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Você tem uma consulta agendada:',
+            style: TextStyle(color: isDark ? Colors.white70 : Colors.lightBlue.shade800),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: AppColors.primary.withOpacity(0.18),
+                child: const Icon(Icons.person, color: AppColors.primary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(psychologistName, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    Text('$dateLabel às ${consultation.hour} • $modality', style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => _showPatientAppointmentDetails(consultation, psychologistName, dateLabel, modality),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.lightBlue.shade600,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              ),
+              child: const Text('Ver agendamento'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPatientAppointmentDetails(Consultation consultation, String psychologistName, String dateLabel, String modality) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(radius: 42, backgroundColor: AppColors.primary.withOpacity(0.18), child: const Icon(Icons.person, size: 44, color: AppColors.primary)),
+              const SizedBox(height: 12),
+              Text(psychologistName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 16),
+              Text('Atendimento: $modality'),
+              Text('Dia: $dateLabel'),
+              Text('Horário: ${consultation.hour.isEmpty ? 'A combinar' : consultation.hour}'),
+              const SizedBox(height: 18),
+              SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(sheetContext), child: const Text('Fechar'))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSupportMessageCard() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
@@ -1177,18 +1332,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _navigateToLumaChat() {
-    // Abre o chat da Luma como overlay dedicado (não é mais aba fixa)
-    try {
+    // Abre o chat dedicado quando a navegação principal está montada.
+    // A chamada estática não lança exceção quando o estado ainda não existe.
+    if (MainNavigation.mainNavigationKey.currentState != null) {
       MainNavigation.openAIChat();
-    } catch (e) {
-      // Fallback direto se MainNavigation não estiver montado
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => LumaChatScreen(),
-        ),
-      );
+      return;
     }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LumaChatScreen(mode: widget.userRole),
+      ),
+    );
   }
 
   // ignore: unused_element
@@ -1315,9 +1471,6 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
       }
-
-      // Recarregar usuários compatíveis
-      _loadCompatibleUsers(userId);
 
       // Verificar se todas as perguntas foram respondidas
       if (_areAllQuestionsAnswered()) {
@@ -1764,6 +1917,569 @@ class _HomeScreenState extends State<HomeScreen> {
       ));
     }
     return _ValidationResult(validated, replaced);
+  }
+
+  Widget _buildPsychologistHome(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final displayName = _userName.isNotEmpty ? _userName : 'Dr. Gustavo';
+    final hasAgenda = _psychologistAgenda.isNotEmpty;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionCard(
+            icon: Icons.medical_services_outlined,
+            title: 'Bem vindo, $displayName!',
+            subtitle: 'Sua agenda, seus pacientes e a Luma em um só lugar.',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _psychAgendaLoading
+                            ? 'Carregando sua agenda...'
+                            : hasAgenda
+                                ? 'Você tem ${_psychologistAgenda.length} consulta(s) agendada(s).'
+                                : 'Você ainda não possui consultas agendadas!',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _psychAgendaLoading
+                            ? 'A Luma está montando sua agenda em tempo real.'
+                            : hasAgenda
+                                ? 'Os agendamentos da sua lista de registros já aparecem aqui e no chat do paciente.'
+                                : 'O próximo passo é organizar os horários, revisar os pacientes marcados ou falar com a Luma.',
+                        style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _navigateToLumaChat,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Quero Organizar'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildSectionCard(
+            icon: Icons.people,
+            title: 'Pacientes com consulta',
+            subtitle: 'Acompanhe quem já está agendado no Firebase.',
+            child: _psychologistAgenda.isEmpty
+                ? Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: isDark ? Colors.white12 : AppColors.gray200),
+                    ),
+                    child: Text(
+                      _psychAgendaLoading
+                          ? 'Buscando agendamentos...'
+                          : 'Nenhum agendamento encontrado no Firebase.',
+                      style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
+                    ),
+                  )
+                : Column(
+                    children: _psychologistAgenda
+                        .map((consultation) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _buildPsychologistAgendaCard(consultation),
+                            ))
+                        .toList(),
+                  ),
+          ),
+          const SizedBox(height: 24),
+          _buildSectionCard(
+            icon: Icons.chat_bubble_outline,
+            title: 'Atalhos',
+            subtitle: 'Acesse rápido as áreas mais usadas.',
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: const [
+                _PsychShortcut(label: 'Chatbot', icon: Icons.smart_toy_outlined),
+                _PsychShortcut(label: 'Chats', icon: Icons.chat_bubble_outline),
+                _PsychShortcut(label: 'Agenda', icon: Icons.calendar_month_outlined),
+                _PsychShortcut(label: 'Perfil', icon: Icons.person_outline),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildPsychologistCoursesSection(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPsychologistAgendaCard(Consultation consultation) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final patientName = consultation.patientName?.trim().isNotEmpty == true
+        ? consultation.patientName!
+        : 'Paciente';
+    final modalityLabel = consultation.modality == 'IN_PERSON'
+        ? 'Presencial'
+        : consultation.modality == 'CALL'
+            ? 'Online'
+            : consultation.modality;
+    final statusLabel = consultation.status == 'SCHEDULED'
+        ? 'Confirmada'
+        : consultation.status;
+
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UserChatScreen(
+              otherUser: ChatUser(
+                id: consultation.idPatient,
+                name: patientName,
+              ),
+            ),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.16 : 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: AppColors.primary.withOpacity(0.14),
+            child: Text(patientName.isNotEmpty ? patientName[0].toUpperCase() : '?', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  patientName,
+                  style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textPrimary),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          subtitle: Text(
+            '$modalityLabel • ${consultation.hour} • Clique para abrir o chat',
+            style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
+          ),
+          trailing: const Icon(Icons.chevron_right),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPsychologistCoursesSection(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final previewCourses = _courses.take(2).toList();
+
+    return _buildSectionCard(
+      icon: Icons.school_outlined,
+      title: 'Cursos de Psicoeducação',
+      subtitle: 'Recomende um curso para seus pacientes e acompanhe o uso.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (previewCourses.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : AppColors.gray50,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                'Nenhum curso carregado ainda. Assim que o catálogo estiver pronto, você poderá recomendar conteúdos aos pacientes.',
+                style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
+              ),
+            )
+          else
+            SizedBox(
+              height: 220,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: previewCourses.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final course = previewCourses[index];
+                  return Container(
+                    width: 190,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(isDark ? 0.18 : 0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          height: 80,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [AppColors.primary, AppColors.primary.withOpacity(0.75)],
+                            ),
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                          ),
+                          padding: const EdgeInsets.all(8),
+                          child: Stack(
+                            children: [
+                              Align(
+                                alignment: Alignment.center,
+                                child: Icon(Icons.school_outlined, color: Colors.white, size: 36),
+                              ),
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black26,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'Recomendado',
+                                    style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Icon(Icons.favorite_border, color: Colors.white.withOpacity(0.9), size: 18),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                          child: Text(
+                            course.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: isDark ? Colors.white : AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                          child: Text(
+                            course.description,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? Colors.white70 : AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () => _showRecommendCourseSheet(course),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                              child: const Text('Recomendar'),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _courses.isEmpty ? null : () => _showRecommendCourseSheet(_courses.first),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Ver cursos e recomendar'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRecommendCourseSheet(Course course) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final patients = [
+      {'id': 'carlos_augusto', 'name': 'Carlos Augusto', 'selected': false},
+      {'id': 'maria_fernanda', 'name': 'Maria Fernanda', 'selected': false},
+      {'id': 'victor_mathias', 'name': 'Victor Mathias', 'selected': true},
+      {'id': 'eduarda_bizarra', 'name': 'Eduarda Bizarra', 'selected': false},
+      {'id': 'arthur_medeiros', 'name': 'Arthur Medeiros', 'selected': true},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+              margin: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 16),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 42,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white24 : AppColors.gray300,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Recomende o curso: ${course.title}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Selecione os pacientes que devem receber esse conteúdo.',
+                        style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 16),
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: patients.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, index) {
+                          final patient = patients[index];
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: isDark ? Colors.white12 : AppColors.gray300),
+                            ),
+                            child: CheckboxListTile(
+                              value: patient['selected'] as bool,
+                              onChanged: (value) {
+                                setSheetState(() {
+                                  patient['selected'] = value ?? false;
+                                });
+                              },
+                              activeColor: AppColors.primary,
+                              controlAffinity: ListTileControlAffinity.trailing,
+                              secondary: CircleAvatar(
+                                backgroundColor: AppColors.primary.withOpacity(0.12),
+                                child: Text((patient['name'] as String)[0], style: const TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                              title: Text(
+                                patient['name'] as String,
+                                style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textPrimary),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final selectedPatients = patients
+                                .where((patient) => patient['selected'] == true)
+                                .map((patient) => {
+                                      'id': patient['id'] as String,
+                                      'name': patient['name'] as String,
+                                    })
+                                .toList();
+
+                            try {
+                              final userId = _authService?.currentUser?.uid;
+                              if (userId != null) {
+                                await _firebaseService?.updateUserExtraData(userId, {
+                                  'lastRecommendedCourse': {
+                                    'courseId': course.id,
+                                    'courseTitle': course.title,
+                                    'courseDescription': course.description,
+                                    'selectedPatients': selectedPatients,
+                                    'updatedAt': DateTime.now().millisecondsSinceEpoch,
+                                  },
+                                  'recommendedCourses': [
+                                    {
+                                      'courseId': course.id,
+                                      'courseTitle': course.title,
+                                      'selectedPatients': selectedPatients,
+                                      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+                                    }
+                                  ],
+                                });
+                              }
+
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Curso "${course.title}" recomendado e salvo no seu perfil.')),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Não foi possível salvar a recomendação: $e')),
+                                );
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text('Recomendar'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _psychPatientCard(String name, String subtitle) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.16 : 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: AppColors.primary.withOpacity(0.14),
+          child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: const TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        title: Text(name, style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textPrimary)),
+        subtitle: Text(subtitle, style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
+        trailing: const Icon(Icons.chevron_right),
+      ),
+    );
+  }
+}
+
+class _PsychShortcut extends StatelessWidget {
+  final String label;
+  final IconData icon;
+
+  const _PsychShortcut({required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.primary, size: 18),
+          const SizedBox(width: 8),
+          Text(label),
+        ],
+      ),
+    );
   }
 }
 

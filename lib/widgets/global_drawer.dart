@@ -15,7 +15,9 @@ import '../screens/main_navigation.dart';
 import '../screens/luma_chat_screen.dart';
 
 class GlobalDrawer extends StatelessWidget {
-  const GlobalDrawer({super.key});
+  final String userRole;
+
+  const GlobalDrawer({super.key, this.userRole = 'PATIENT'});
 
   @override
   Widget build(BuildContext context) {
@@ -368,7 +370,7 @@ class GlobalDrawer extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => LumaChatScreen(),
+            builder: (context) => LumaChatScreen(mode: userRole),
           ),
         );
     }

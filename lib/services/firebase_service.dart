@@ -445,6 +445,97 @@ class FirebaseService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getRegisteredPsychologists({int limit = 50}) async {
+    try {
+      final usersSnapshot = await _firestore
+          .collection(usersCollection)
+          .where('role', isEqualTo: 'PSYCHOLOGIST')
+          .limit(limit)
+          .get();
+
+      final psychologists = <Map<String, dynamic>>[];
+
+      for (final userDoc in usersSnapshot.docs) {
+        final userData = userDoc.data();
+        Map<String, dynamic> psychologistData = {};
+
+        try {
+          final psychDoc = await _firestore.collection(psychologistsCollection).doc(userDoc.id).get();
+          if (psychDoc.exists) {
+            psychologistData = psychDoc.data() ?? {};
+          }
+        } catch (e) {
+          print('⚠️ Error loading psychologist doc ${userDoc.id}: $e');
+        }
+
+        final fullName = (userData['fullname'] ?? userData['name'] ?? userData['displayName'] ?? 'Profissional').toString();
+        final specialty = (psychologistData['specialty'] ?? psychologistData['personalizedMessage'] ?? '').toString();
+        final modalityRaw = (psychologistData['modality'] ?? '').toString();
+        final availabilityDays = (psychologistData['availabilityDays'] ?? '').toString();
+        final availabilityHours = (psychologistData['availabilityHours'] ?? '').toString();
+        final officeAddress = (psychologistData['officeAddress'] ?? '').toString();
+        final officePhone = (psychologistData['officePhone'] ?? '').toString();
+        final healthPlans = (psychologistData['healthPlans'] ?? psychologistData['healthPlanCover'] ?? '').toString();
+
+        final modality = _normalizePsychologistModality(modalityRaw);
+        final availability = [
+          if (availabilityDays.isNotEmpty) availabilityDays,
+          if (availabilityHours.isNotEmpty) availabilityHours,
+        ].join(' • ');
+
+        psychologists.add({
+          'id': userDoc.id,
+          'name': fullName,
+          'fullname': fullName,
+          'email': userData['email'],
+          'profileImageUrl': userData['profileImageUrl'],
+          'profileImageBase64': userData['profileImageBase64'],
+          'crp': psychologistData['crp'],
+          'careerStart': psychologistData['careerStart'],
+          'specialty': specialty,
+          'modality': modality,
+          'availability': availability,
+          'availabilityDays': availabilityDays,
+          'availabilityHours': availabilityHours,
+          'officeAddress': officeAddress,
+          'officePhone': officePhone,
+          'healthPlans': healthPlans,
+          'personalizedMessage': psychologistData['personalizedMessage'],
+          'tags_string': psychologistData['specialties'] is List
+              ? (psychologistData['specialties'] as List).join(', ')
+              : (psychologistData['specialties']?.toString() ?? ''),
+          'role': 'PSYCHOLOGIST',
+        });
+      }
+
+      psychologists.sort((a, b) => (a['name'] ?? '').toString().compareTo((b['name'] ?? '').toString()));
+      return psychologists;
+    } catch (e) {
+      print('❌ Error fetching registered psychologists: $e');
+      return [];
+    }
+  }
+
+  String _normalizePsychologistModality(String raw) {
+    final value = raw.trim().toUpperCase();
+    if (value.contains('BOTH') || value.contains('ONLINE E PRESENCIAL')) {
+      return 'Online e presencial';
+    }
+    if (value.contains('PRESENTIAL')) {
+      return 'Presencial';
+    }
+    if (value.contains('ONLINE')) {
+      return 'Online';
+    }
+    if (value.contains('CALL')) {
+      return 'Online';
+    }
+    if (value.contains('MESSAGE')) {
+      return 'Mensagens';
+    }
+    return raw.isNotEmpty ? raw : 'Online';
+  }
+
   Future<void> updateUserProfile(String userId, Map<String, dynamic> updates) async {
     try {
       await _firestore.collection(usersCollection).doc(userId).update({
@@ -690,6 +781,173 @@ class FirebaseService {
       print('❌ Error creating consultation: $e');
       throw e;
     }
+  }
+
+  Future<Map<String, dynamic>?> findPsychologistByName(String psychologistName) async {
+    try {
+      final normalizedTarget = psychologistName.trim().toLowerCase();
+      if (normalizedTarget.isEmpty) return null;
+
+      final snapshot = await _firestore
+          .collection(usersCollection)
+          .where('role', isEqualTo: 'PSYCHOLOGIST')
+          .get();
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final candidates = <String?>[
+          data['name']?.toString(),
+          data['fullname']?.toString(),
+          data['displayName']?.toString(),
+        ];
+
+        for (final candidate in candidates) {
+          final normalizedCandidate = candidate?.trim().toLowerCase() ?? '';
+          if (normalizedCandidate.isNotEmpty &&
+              (normalizedCandidate == normalizedTarget || normalizedCandidate.contains(normalizedTarget) || normalizedTarget.contains(normalizedCandidate))) {
+            return {
+              ...data,
+              'id': doc.id,
+            };
+          }
+        }
+      }
+
+      return null;
+    } catch (e) {
+      print('❌ Error finding psychologist by name: $e');
+      return null;
+    }
+  }
+
+  Future<List<Consultation>> getConsultationsForDay(
+    String userId,
+    String role, {
+    DateTime? day,
+  }) async {
+    try {
+      final targetDay = day ?? DateTime.now();
+      final startOfDay = DateTime(targetDay.year, targetDay.month, targetDay.day).millisecondsSinceEpoch;
+
+      Query<Map<String, dynamic>> query = _firestore.collection(consultationsCollection);
+      if (role == 'PSYCHOLOGIST') {
+        query = query.where('idPsychologist', isEqualTo: userId);
+      } else if (role == 'PATIENT') {
+        query = query.where('idPatient', isEqualTo: userId);
+      } else {
+        throw Exception('Invalid role: $role. Must be PATIENT or PSYCHOLOGIST');
+      }
+
+      final snapshot = await query.where('date', isEqualTo: startOfDay).get();
+      final consultations = snapshot.docs
+          .map((doc) => Consultation.fromFirestore(doc.data(), doc.id))
+          .toList()
+        ..sort((a, b) => a.hour.compareTo(b.hour));
+
+      print('✅ Found ${consultations.length} consultations for $role on day $startOfDay');
+      return consultations;
+    } catch (e) {
+      print('❌ Error fetching consultations for day: $e');
+      return [];
+    }
+  }
+
+  Stream<List<Consultation>> watchConsultationsForDay(
+    String userId,
+    String role, {
+    DateTime? day,
+  }) {
+    final targetDay = day ?? DateTime.now();
+    final startOfDay = DateTime(targetDay.year, targetDay.month, targetDay.day).millisecondsSinceEpoch;
+
+    Query<Map<String, dynamic>> query = _firestore.collection(consultationsCollection);
+    if (role == 'PSYCHOLOGIST') {
+      query = query.where('idPsychologist', isEqualTo: userId);
+    } else if (role == 'PATIENT') {
+      query = query.where('idPatient', isEqualTo: userId);
+    }
+
+    return _guardedStream(
+      query.where('date', isEqualTo: startOfDay).snapshots().map((snapshot) {
+        final consultations = snapshot.docs
+            .map((doc) => Consultation.fromFirestore(doc.data(), doc.id))
+            .toList()
+          ..sort((a, b) => a.hour.compareTo(b.hour));
+        return consultations;
+      }),
+      'consultations-$role-$userId',
+    );
+  }
+
+  Future<List<Consultation>> getUpcomingConsultationsForUser(
+    String userId,
+    String role, {
+    DateTime? fromDay,
+  }) async {
+    try {
+      if (role != 'PATIENT' && role != 'PSYCHOLOGIST') {
+        throw Exception('Invalid role: $role. Must be PATIENT or PSYCHOLOGIST');
+      }
+
+      final start = fromDay ?? DateTime.now();
+      final startOfDay = DateTime(start.year, start.month, start.day).millisecondsSinceEpoch;
+
+      Query<Map<String, dynamic>> query = _firestore.collection(consultationsCollection);
+      if (role == 'PSYCHOLOGIST') {
+        query = query.where('idPsychologist', isEqualTo: userId);
+      } else {
+        query = query.where('idPatient', isEqualTo: userId);
+      }
+
+      final snapshot = await query.get();
+      final consultations = snapshot.docs
+          .map((doc) => Consultation.fromFirestore(doc.data(), doc.id))
+          .where((consultation) => consultation.date >= startOfDay)
+          .toList()
+        ..sort((a, b) {
+          final dateCompare = a.date.compareTo(b.date);
+          if (dateCompare != 0) return dateCompare;
+          return a.hour.compareTo(b.hour);
+        });
+
+      print('✅ Found ${consultations.length} upcoming consultations for $role starting at $startOfDay');
+      return consultations;
+    } catch (e) {
+      print('❌ Error fetching upcoming consultations: $e');
+      return [];
+    }
+  }
+
+  Stream<List<Consultation>> watchUpcomingConsultationsForUser(
+    String userId,
+    String role, {
+    DateTime? fromDay,
+  }) {
+    final start = fromDay ?? DateTime.now();
+    final startOfDay = DateTime(start.year, start.month, start.day).millisecondsSinceEpoch;
+
+    Query<Map<String, dynamic>> query = _firestore.collection(consultationsCollection);
+    if (role == 'PSYCHOLOGIST') {
+      query = query.where('idPsychologist', isEqualTo: userId);
+    } else if (role == 'PATIENT') {
+      query = query.where('idPatient', isEqualTo: userId);
+    }
+
+    return _guardedStream(
+      query.snapshots().map((snapshot) {
+        final consultations = snapshot.docs
+            .map((doc) => Consultation.fromFirestore(doc.data(), doc.id))
+            .where((consultation) => consultation.date >= startOfDay)
+            .toList()
+          ..sort((a, b) {
+            final dateCompare = a.date.compareTo(b.date);
+            if (dateCompare != 0) return dateCompare;
+            return a.hour.compareTo(b.hour);
+          });
+        return consultations;
+      }),
+      'upcoming-consultations-$role-$userId',
+    );
   }
 
   // Get all consultations for a user (patient or psychologist)

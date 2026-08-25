@@ -624,16 +624,7 @@ Responda somente com texto corrido.
     String? userName,
   }) async {
     final optionsJson = jsonEncode(psychologistOptions);
-    final contextJson = '''${jsonEncode(collectedInfo)}
-
-INSTRUCOES DE INTENCAO:
-- Classifique a mensagem atual como "agenda" ou "triagem".
-- "agenda" trata de consultas registradas, datas, horarios, modalidade e agendamentos existentes.
-- "triagem" trata de sentimentos, motivos para terapia e recomendacao de psicologo.
-- Se misturar os assuntos, responda somente ao assunto mais explicito.
-- Em "agenda", nao faca perguntas emocionais nem recomende psicologo.
-- Em "triagem", ignore consultas_agendadas e nao fale de agenda.
-- Inclua interaction_type no JSON de resposta.''';
+    final contextJson = jsonEncode(collectedInfo);
     final safeName = (userName != null && userName.trim().isNotEmpty) ? userName.trim() : 'Usuário';
 
     final prompt = '''
@@ -673,7 +664,6 @@ Regras:
 
 Formato obrigatório:
 {
-  "interaction_type": "agenda ou triagem",
   "assistant_reply": "texto da Luma",
   "extracted_info": {
     "motivo_principal": "...",
@@ -759,7 +749,6 @@ Formato obrigatório:
 
   Map<String, dynamic> _fallbackTriageResponse() {
     return {
-      'interaction_type': 'triagem',
       'assistant_reply': 'Entendi. Para eu te indicar o profissional ideal, me conta também se você prefere atendimento online, presencial ou ambos, e quais horários funcionam melhor para você.',
       'extracted_info': <String, dynamic>{},
       'missing_fields': ['modalidade_preferida', 'disponibilidade'],

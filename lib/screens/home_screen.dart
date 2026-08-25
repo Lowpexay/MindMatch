@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:convert';
@@ -10,6 +11,7 @@ import '../services/achievement_service.dart';
 import '../services/course_service.dart';
 import '../services/daily_checkup_history_service.dart';
 import '../models/mood_data.dart';
+import '../models/consultation_model.dart';
 import '../models/question_models.dart';
 import '../models/conversation_models.dart';
 import '../models/course_models.dart';
@@ -17,7 +19,6 @@ import '../models/daily_checkup.dart';
 import '../utils/app_colors.dart';
 import '../widgets/mood_check_widget.dart';
 import '../widgets/reflective_questions_widget.dart';
-import '../widgets/compatible_users_widget.dart';
 import '../widgets/courses_widget.dart';
 import '../widgets/user_avatar.dart';
 import '../screens/user_chat_screen.dart';
@@ -39,7 +40,6 @@ class _HomeScreenState extends State<HomeScreen> {
   // Data
   MoodData? _todayMood;
   List<ReflectiveQuestion> _dailyQuestions = [];
-  List<Map<String, dynamic>> _compatibleUsers = [];
   Map<String, bool> _questionAnswers = {};
   String _userName = ''; // Nome do usuário
   List<Course> _courses = []; // Cache local (espelho do CourseService)
@@ -47,6 +47,12 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _dailyCheckupCompleted = false;
   bool _editingDailyCheckup = false;
   DateTime? _dailyCheckupDate; // Data do último checkup diário concluído (início do dia)
+  List<Consultation> _psychologistAgenda = [];
+  bool _psychAgendaLoading = false;
+  StreamSubscription<List<Consultation>>? _psychAgendaSubscription;
+  List<Consultation> _patientAgenda = [];
+  bool _patientAgendaLoading = false;
+  StreamSubscription<List<Consultation>>? _patientAgendaSubscription;
   
   // Services
   FirebaseService? _firebaseService;
@@ -78,6 +84,25 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadUserName();
       });
     }
+
+    if (widget.userRole == 'PSYCHOLOGIST' && _psychAgendaSubscription == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startPsychologistAgendaListener();
+      });
+    }
+
+    if (widget.userRole == 'PATIENT' && _patientAgendaSubscription == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startPatientAgendaListener();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _psychAgendaSubscription?.cancel();
+    _patientAgendaSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadUserName() async {
@@ -106,6 +131,50 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _startPsychologistAgendaListener() async {
+    final userId = _authService?.currentUser?.uid;
+    if (userId == null || widget.userRole != 'PSYCHOLOGIST') return;
+
+    await _psychAgendaSubscription?.cancel();
+    if (mounted) {
+      setState(() {
+        _psychAgendaLoading = true;
+      });
+    }
+
+    _psychAgendaSubscription = _firebaseService
+        ?.watchUpcomingConsultationsForUser(userId, 'PSYCHOLOGIST')
+        .listen((consultations) {
+      if (!mounted) return;
+      setState(() {
+        _psychologistAgenda = consultations;
+        _psychAgendaLoading = false;
+      });
+    });
+  }
+
+  Future<void> _startPatientAgendaListener() async {
+    final userId = _authService?.currentUser?.uid;
+    if (userId == null || widget.userRole != 'PATIENT') return;
+
+    await _patientAgendaSubscription?.cancel();
+    if (mounted) {
+      setState(() {
+        _patientAgendaLoading = true;
+      });
+    }
+
+    _patientAgendaSubscription = _firebaseService
+        ?.watchUpcomingConsultationsForUser(userId, 'PATIENT')
+        .listen((consultations) {
+      if (!mounted) return;
+      setState(() {
+        _patientAgenda = consultations;
+        _patientAgendaLoading = false;
+      });
+    });
+  }
+
   Future<void> _loadInitialData() async {
     setState(() { _isLoading = true; });
     try {
@@ -115,7 +184,6 @@ class _HomeScreenState extends State<HomeScreen> {
       await _loadPersistedDailyCheckup(userId);
       await Future.wait([
         _loadDailyQuestions(),
-        _loadCompatibleUsers(userId),
         _loadSampleCourses(),
       ]);
       _evaluateDailyCheckupCompletion();
@@ -339,23 +407,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ));
   }
 
-  Future<void> _loadCompatibleUsers(String userId) async {
-    try {
-      print('🔄 Loading compatible users for: $userId');
-      
-      // DEBUG: List all users in Firestore
-      await _firebaseService?.debugListAllUsers();
-      
-      // Limitando para 6 usuários compatíveis
-      final users = await _firebaseService?.getCompatibleUsers(userId, limit: 6) ?? [];
-      print('👥 Found ${users.length} compatible users (limited to 6)');
-      if (!mounted) return; // prevenir setState após dispose
-      setState(() { _compatibleUsers = users; });
-    } catch (e) {
-      print('❌ Error loading compatible users: $e');
-    }
-  }
-
   Future<void> _loadSampleCourses() async {
     try {
       final service = Provider.of<CourseService>(context, listen: false);
@@ -467,6 +518,11 @@ final theme = Theme.of(context);
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Support Message Section - aparece quando bem-estar <= 50%
+                  if (_patientAgenda.isNotEmpty || _patientAgendaLoading) ...[
+                    _buildPatientAppointmentCard(context),
+                    const SizedBox(height: 24),
+                  ],
+
                   if (_todayMood != null && _todayMood!.wellnessScore <= 50) ...[
                     _buildSupportMessageCard(),
                     const SizedBox(height: 24),
@@ -496,20 +552,6 @@ final theme = Theme.of(context);
                     _buildCompletedQuestionsCard(),
                     const SizedBox(height: 24),
                   ],
-                  
-                  // Compatible Users Section
-                  _buildSectionCard(
-                    icon: Icons.calendar_today,
-                    title: 'Minhas consultas agendadas',
-                    subtitle: 'Veja suas proximas consultas',
-                    child: CompatibleUsersWidget(
-                      compatibleUsers: _compatibleUsers,
-                      onUserTapped: _showUserProfile,
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
                   // Courses Section
                   _buildSectionCard(
                     icon: Icons.school,
@@ -766,30 +808,6 @@ Widget _buildCompletedQuestionsCard() {
                       ),
                     ],
                   ),
-                  Container(
-                    width: 1,
-                    height: 40,
-                    color: AppColors.gray300,
-                  ),
-                  Column(
-                    children: [
-                      Text(
-                        '${_compatibleUsers.length}',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      Text(
-                        'Compatíveis',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: scheme.onSurface.withOpacity(0.7),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -1030,6 +1048,109 @@ Widget _buildCompletedQuestionsCard() {
     );
   }
 
+  Widget _buildPatientAppointmentCard(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (_patientAgendaLoading && _patientAgenda.isEmpty) {
+      return _buildSectionCard(
+        icon: Icons.calendar_month_outlined,
+        title: 'Próximo agendamento',
+        subtitle: 'Carregando sua consulta registrada...',
+        child: const LinearProgressIndicator(),
+      );
+    }
+
+    final consultation = _patientAgenda.first;
+    final date = DateTime.fromMillisecondsSinceEpoch(consultation.date);
+    final dateLabel = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    final psychologistName = consultation.psychologistName?.trim().isNotEmpty == true
+        ? consultation.psychologistName!.trim()
+        : 'Psicólogo';
+    final modality = consultation.modality == 'IN_PERSON' ? 'Presencial' : consultation.modality == 'CALL' ? 'Online' : consultation.modality;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.blueGrey.shade900 : const Color(0xFFE1F3FB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.lightBlue.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Bem-vindo de volta${_userName.isNotEmpty ? ', $_userName' : ''}!',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.blue.shade800),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Você tem uma consulta agendada:',
+            style: TextStyle(color: isDark ? Colors.white70 : Colors.lightBlue.shade800),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: AppColors.primary.withOpacity(0.18),
+                child: const Icon(Icons.person, color: AppColors.primary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(psychologistName, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    Text('$dateLabel às ${consultation.hour} • $modality', style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => _showPatientAppointmentDetails(consultation, psychologistName, dateLabel, modality),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.lightBlue.shade600,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              ),
+              child: const Text('Ver agendamento'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPatientAppointmentDetails(Consultation consultation, String psychologistName, String dateLabel, String modality) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(radius: 42, backgroundColor: AppColors.primary.withOpacity(0.18), child: const Icon(Icons.person, size: 44, color: AppColors.primary)),
+              const SizedBox(height: 12),
+              Text(psychologistName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 16),
+              Text('Atendimento: $modality'),
+              Text('Dia: $dateLabel'),
+              Text('Horário: ${consultation.hour.isEmpty ? 'A combinar' : consultation.hour}'),
+              const SizedBox(height: 18),
+              SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(sheetContext), child: const Text('Fechar'))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSupportMessageCard() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
@@ -1211,18 +1332,19 @@ Widget _buildCompletedQuestionsCard() {
   }
 
   void _navigateToLumaChat() {
-    // Abre o chat da Luma como overlay dedicado (não é mais aba fixa)
-    try {
+    // Abre o chat dedicado quando a navegação principal está montada.
+    // A chamada estática não lança exceção quando o estado ainda não existe.
+    if (MainNavigation.mainNavigationKey.currentState != null) {
       MainNavigation.openAIChat();
-    } catch (e) {
-      // Fallback direto se MainNavigation não estiver montado
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => LumaChatScreen(),
-        ),
-      );
+      return;
     }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LumaChatScreen(mode: widget.userRole),
+      ),
+    );
   }
 
   // ignore: unused_element
@@ -1349,9 +1471,6 @@ Widget _buildCompletedQuestionsCard() {
           );
         }
       }
-
-      // Recarregar usuários compatíveis
-      _loadCompatibleUsers(userId);
 
       // Verificar se todas as perguntas foram respondidas
       if (_areAllQuestionsAnswered()) {
@@ -1803,6 +1922,7 @@ Widget _buildCompletedQuestionsCard() {
   Widget _buildPsychologistHome(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final displayName = _userName.isNotEmpty ? _userName : 'Dr. Gustavo';
+    final hasAgenda = _psychologistAgenda.isNotEmpty;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1827,7 +1947,11 @@ Widget _buildCompletedQuestionsCard() {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Você ainda não possui nenhuma consulta hoje!',
+                        _psychAgendaLoading
+                            ? 'Carregando sua agenda...'
+                            : hasAgenda
+                                ? 'Você tem ${_psychologistAgenda.length} consulta(s) agendada(s).'
+                                : 'Você ainda não possui consultas agendadas!',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
@@ -1836,14 +1960,18 @@ Widget _buildCompletedQuestionsCard() {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'O próximo passo é organizar os horários, revisar os pacientes marcados ou falar com a Luma.',
+                        _psychAgendaLoading
+                            ? 'A Luma está montando sua agenda em tempo real.'
+                            : hasAgenda
+                                ? 'Os agendamentos da sua lista de registros já aparecem aqui e no chat do paciente.'
+                                : 'O próximo passo é organizar os horários, revisar os pacientes marcados ou falar com a Luma.',
                         style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
                       ),
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {},
+                          onPressed: _navigateToLumaChat,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
@@ -1861,15 +1989,32 @@ Widget _buildCompletedQuestionsCard() {
           const SizedBox(height: 24),
           _buildSectionCard(
             icon: Icons.people,
-            title: 'Pacientes com consulta hoje',
-            subtitle: 'Acompanhe quem está agendado para agora.',
-            child: Column(
-              children: [
-                _psychPatientCard('Carlos Augusto', 'Online • 20:00 • Até a consulta doutor!'),
-                const SizedBox(height: 12),
-                _psychPatientCard('Maria Fernanda', 'Online • 21:00 • Até logo!'),
-              ],
-            ),
+            title: 'Pacientes com consulta',
+            subtitle: 'Acompanhe quem já está agendado no Firebase.',
+            child: _psychologistAgenda.isEmpty
+                ? Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: isDark ? Colors.white12 : AppColors.gray200),
+                    ),
+                    child: Text(
+                      _psychAgendaLoading
+                          ? 'Buscando agendamentos...'
+                          : 'Nenhum agendamento encontrado no Firebase.',
+                      style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
+                    ),
+                  )
+                : Column(
+                    children: _psychologistAgenda
+                        .map((consultation) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _buildPsychologistAgendaCard(consultation),
+                            ))
+                        .toList(),
+                  ),
           ),
           const SizedBox(height: 24),
           _buildSectionCard(
@@ -1890,6 +2035,82 @@ Widget _buildCompletedQuestionsCard() {
           const SizedBox(height: 24),
           _buildPsychologistCoursesSection(context),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPsychologistAgendaCard(Consultation consultation) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final patientName = consultation.patientName?.trim().isNotEmpty == true
+        ? consultation.patientName!
+        : 'Paciente';
+    final modalityLabel = consultation.modality == 'IN_PERSON'
+        ? 'Presencial'
+        : consultation.modality == 'CALL'
+            ? 'Online'
+            : consultation.modality;
+    final statusLabel = consultation.status == 'SCHEDULED'
+        ? 'Confirmada'
+        : consultation.status;
+
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UserChatScreen(
+              otherUser: ChatUser(
+                id: consultation.idPatient,
+                name: patientName,
+              ),
+            ),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.16 : 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: AppColors.primary.withOpacity(0.14),
+            child: Text(patientName.isNotEmpty ? patientName[0].toUpperCase() : '?', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  patientName,
+                  style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : AppColors.textPrimary),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          subtitle: Text(
+            '$modalityLabel • ${consultation.hour} • Clique para abrir o chat',
+            style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
+          ),
+          trailing: const Icon(Icons.chevron_right),
+        ),
       ),
     );
   }

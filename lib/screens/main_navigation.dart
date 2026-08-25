@@ -195,7 +195,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
     return Scaffold(
         key: MainNavigation.scaffoldKey,
         backgroundColor: theme.scaffoldBackgroundColor,
-        drawer: const GlobalDrawer(),
+        drawer: GlobalDrawer(userRole: widget.userRole),
         appBar: _buildAppBar(),
         body: PageView(
           controller: _pageController,

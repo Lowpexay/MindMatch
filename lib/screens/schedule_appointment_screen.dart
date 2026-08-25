@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+
+import '../services/firebase_service.dart';
 
 class ScheduleAppointmentScreen extends StatefulWidget {
   const ScheduleAppointmentScreen({super.key});
@@ -13,14 +16,87 @@ class _ScheduleAppointmentScreenState extends State<ScheduleAppointmentScreen> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   String _selectedTime = '11:00';
   String _attendanceType = 'Online';
+  bool _isLoadingPsychologists = true;
+  List<Map<String, dynamic>> _psychologists = [];
+  Map<String, dynamic>? _selectedPsychologist;
+  Map<String, dynamic>? _routeProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadPsychologists();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final extra = GoRouterState.of(context).extra ?? ModalRoute.of(context)?.settings.arguments;
+    if (extra is Map<String, dynamic> && _routeProfile == null) {
+      _routeProfile = extra;
+    }
+  }
+
+  Future<void> _loadPsychologists() async {
+    try {
+      final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+      final psychologists = await firebaseService.getRegisteredPsychologists();
+      if (!mounted) return;
+
+      setState(() {
+        _psychologists = psychologists;
+        _selectedPsychologist = _resolveInitialSelectedPsychologist();
+        _isLoadingPsychologists = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _psychologists = [];
+        _selectedPsychologist = _resolveInitialSelectedPsychologist();
+        _isLoadingPsychologists = false;
+      });
+    }
+  }
+
+  Map<String, dynamic>? _resolveInitialSelectedPsychologist() {
+    final routeProfile = _routeProfile;
+    if (routeProfile != null) {
+      final routeId = routeProfile['id']?.toString().trim();
+      final routeName = routeProfile['name']?.toString().trim().toLowerCase();
+      for (final psychologist in _psychologists) {
+        final psychologistId = psychologist['id']?.toString().trim();
+        final psychologistName = psychologist['name']?.toString().trim().toLowerCase();
+        if ((routeId != null && routeId.isNotEmpty && psychologistId == routeId) ||
+            (routeName != null && routeName.isNotEmpty && psychologistName == routeName)) {
+          return psychologist;
+        }
+      }
+    }
+
+    if (_psychologists.isNotEmpty) {
+      return _psychologists.first;
+    }
+
+    return routeProfile;
+  }
+
+  Map<String, dynamic>? _selectedProfileOrNull() {
+    if (_selectedPsychologist != null) return _selectedPsychologist;
+    if (_routeProfile != null) return _routeProfile;
+    if (_psychologists.isNotEmpty) return _psychologists.first;
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final extra = GoRouterState.of(context).extra ?? ModalRoute.of(context)?.settings.arguments;
-    final profile = extra is Map<String, dynamic> ? extra : <String, dynamic>{};
-
-    final name = profile['name']?.toString() ?? 'Dr. Gustavo Teodoro Gabilan';
-    final rating = (profile['rating']?.toString() ?? '4.9');
+    final profile = _selectedProfileOrNull();
+    final name = profile?['name']?.toString() ?? 'Selecione um psicólogo';
+    final specialty = profile?['specialty']?.toString() ?? profile?['personalizedMessage']?.toString() ?? '';
+    final modality = profile?['modality']?.toString() ?? '';
+    final availability = profile?['availability']?.toString() ?? '';
+    final officeAddress = profile?['officeAddress']?.toString() ?? '';
+    final rating = (profile?['rating']?.toString() ?? '4.9');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F2F2),
@@ -69,7 +145,79 @@ class _ScheduleAppointmentScreenState extends State<ScheduleAppointmentScreen> {
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 18),
           child: Column(
             children: [
-              _doctorCard(name: name, rating: rating),
+              _sectionCard(
+                icon: Icons.psychology,
+                title: 'Profissionais cadastrados',
+                subtitle: 'Escolha um psicólogo real da aplicação',
+                child: _isLoadingPsychologists
+                    ? const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()))
+                    : _psychologists.isEmpty
+                        ? Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF5F5F5),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFD7D7D7)),
+                            ),
+                            child: const Text('Nenhum psicólogo cadastrado foi encontrado. Faça o cadastro do profissional para liberar agendamentos.'),
+                          )
+                        : Column(
+                            children: _psychologists.map((psychologist) {
+                              final isSelected = _selectedPsychologist?['id']?.toString() == psychologist['id']?.toString();
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: InkWell(
+                                  onTap: () => setState(() => _selectedPsychologist = psychologist),
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? const Color(0xFFEFF8EF) : Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: isSelected ? const Color(0xFF56B35D) : const Color(0xFFD7D7D7)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 44,
+                                          height: 44,
+                                          decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFE3E3E3)),
+                                          child: const Icon(Icons.person, color: Color(0xFF6E6E6E)),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                psychologist['name']?.toString() ?? 'Profissional',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF202020)),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                [
+                                                  if ((psychologist['specialty']?.toString() ?? '').isNotEmpty) psychologist['specialty'].toString(),
+                                                  if ((psychologist['modality']?.toString() ?? '').isNotEmpty) psychologist['modality'].toString(),
+                                                ].join(' • '),
+                                                style: const TextStyle(color: Color(0xFF7A7A7A), fontSize: 12),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        if (isSelected) const Icon(Icons.check_circle, color: Color(0xFF56B35D)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+              ),
+              const SizedBox(height: 12),
+              _doctorCard(name: name, rating: rating, specialty: specialty, modality: modality, availability: availability, officeAddress: officeAddress),
               const SizedBox(height: 12),
               _sectionCard(
                 icon: Icons.calendar_month_outlined,
@@ -132,8 +280,21 @@ class _ScheduleAppointmentScreenState extends State<ScheduleAppointmentScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   onPressed: () {
+                    final selectedProfile = _selectedProfileOrNull();
+                    if (selectedProfile == null || (selectedProfile['id']?.toString().isEmpty ?? true)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Selecione um psicólogo cadastrado antes de continuar.')),
+                      );
+                      return;
+                    }
+
                     final appointment = <String, dynamic>{
-                      'profile': profile,
+                      'profile': selectedProfile,
+                      'psychologistId': selectedProfile['id']?.toString(),
+                      'psychologistName': selectedProfile['name']?.toString(),
+                      'psychologistSpecialty': selectedProfile['specialty']?.toString(),
+                      'psychologistModality': selectedProfile['modality']?.toString(),
+                      'psychologistAvailability': selectedProfile['availability']?.toString(),
                       'date': _selectedDate.toIso8601String(),
                       'time': _selectedTime,
                       'consultation_type': _attendanceType,
@@ -154,7 +315,14 @@ class _ScheduleAppointmentScreenState extends State<ScheduleAppointmentScreen> {
     );
   }
 
-  Widget _doctorCard({required String name, required String rating}) {
+  Widget _doctorCard({
+    required String name,
+    required String rating,
+    required String specialty,
+    required String modality,
+    required String availability,
+    required String officeAddress,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -190,6 +358,24 @@ class _ScheduleAppointmentScreenState extends State<ScheduleAppointmentScreen> {
                     Text(rating, style: const TextStyle(color: Color(0xFF505050), fontSize: 13)),
                   ],
                 )
+                ,
+                if (specialty.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(specialty, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF505050), fontSize: 12)),
+                ],
+                if (modality.isNotEmpty || availability.isNotEmpty || officeAddress.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      if (modality.isNotEmpty) modality,
+                      if (availability.isNotEmpty) availability,
+                      if (officeAddress.isNotEmpty) officeAddress,
+                    ].join(' • '),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Color(0xFF7A7A7A), fontSize: 11),
+                  ),
+                ],
               ],
             ),
           ),

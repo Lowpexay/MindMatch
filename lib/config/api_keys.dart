@@ -24,7 +24,7 @@ class ApiKeys {
   // Gemini API Keys (suporta rotação)
   // Adicione aqui suas chaves; serão usadas em fallback/rotação em caso de 429/403/401
   static const List<String> geminiApiKeys = [
-    String.fromEnvironment('GEMINI_API_KEY', defaultValue: ''),
+    '',
   ];
 
   static bool get isGeminiConfigured => geminiApiKeys.isNotEmpty && geminiApiKeys.first.isNotEmpty;

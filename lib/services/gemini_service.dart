@@ -7,9 +7,9 @@ import '../models/question_models.dart';
 import '../models/mood_data.dart';
 
 class GeminiService {
-  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent';
+  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent';
   final List<String> _keys = ApiKeys.geminiApiKeys;
-  // Forçar uso do modelo gemini-2.5-flash-lite (não usar fallback)
+  // Forçar uso do modelo gemini-3.5-flash-lite (não usar fallback)
 
   // Gera uma ordem aleatória de tentativa para esta requisição
   List<String> _shuffledKeys() {
@@ -69,7 +69,7 @@ class GeminiService {
       attempt++;
       final masked = _maskKey(key);
       final uri = Uri.parse('$_baseUrl?key=$key');
-      print('🔑 [Gemini] Tentativa $attempt/${attemptOrder.length} modelo gemini-2.5-flash-lite com chave $masked');
+      print('🔑 [Gemini] Tentativa $attempt/${attemptOrder.length} modelo gemini-3.5-flash-lite com chave $masked');
       final resp = await http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
       
       if (resp.statusCode == 200) {
@@ -505,7 +505,7 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
         print('❌ Response body: ${response.body}');
         // Se erro 400, pode ser problema com o modelo ou formato da requisição
         if (response.statusCode == 400) {
-          print('⚠️ Erro 400: Verifique se o modelo gemini-2.5-flash-lite está disponível');
+          print('⚠️ Erro 400: Verifique se o modelo gemini-3.5-flash-lite está disponível');
           print('⚠️ Tentando com mensagem simplificada...');
         }
         return _getFallbackChatResponse();
@@ -524,13 +524,27 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
   }) async {
     final safeName = (userName != null && userName.trim().isNotEmpty) ? userName.trim() : 'psicólogo';
     final contextJson = jsonEncode(contextData);
+    final hasAppointments = contextData['tem_consultas_agendadas'] == true ||
+        (contextData['consultas_de_hoje']?.toString().trim().isNotEmpty ?? false);
     final prompt = '''
 Você é a Luma, agora atuando como assistente operacional de um psicólogo.
-Sua função é ajudar com agenda, organização de consultas, mensagens para pacientes e lembretes de acompanhamento.
+Sua função é ajudar com agenda, organização de consultas, mensagens e lembretes.
+
+Contexto importante:
+- Se não houver consultas agendadas hoje, não invente pacientes, horários, confirmações ou acompanhamentos.
+- Se houver consultas, use apenas as informações presentes no contexto abaixo.
+- Há consultas agendadas hoje: ${hasAppointments ? 'sim' : 'não'}.
 
 Nome do profissional: $safeName
 Contexto disponível:
 $contextJson
+
+Classifique a mensagem atual em apenas um tipo de interaÃ§Ã£o:
+- "agenda": perguntas sobre consultas registradas, data, horÃ¡rio, modalidade, psicÃ³logo da consulta ou agendamento existente.
+- "triagem": relatos emocionais, sentimentos, motivos para buscar terapia, preferÃªncia de atendimento ou pedido de recomendaÃ§Ã£o.
+- Se a mensagem misturar os dois assuntos, responda somente ao assunto mais explÃ­cito e nÃ£o misture os fluxos.
+- Se for "agenda", use somente consultas_agendadas, nÃ£o faÃ§a perguntas emocionais, nÃ£o recomende psicÃ³logo e nÃ£o extraia campos de triagem.
+- Se for "triagem", ignore consultas_agendadas na resposta e nÃ£o fale de agenda.
 
 Histórico da conversa:
 ${conversationContext ?? ''}
@@ -541,11 +555,13 @@ $userMessage
 Regras:
 1) Responda em português do Brasil.
 2) Seja prática, objetiva e acolhedora.
-3) Não faça triagem emocional; foque em agenda, pacientes e organização.
-4) Se faltar informação, faça uma pergunta curta para destravar a ação.
-5) Se possível, já sugira o próximo passo.
-6) Máximo de 3 frases.
-7) Não use markdown.
+3) Não faça triagem emocional; foque em agenda e organização.
+4) Se não houver consultas, diga isso de forma direta e sem criar dados.
+5) Se houver consultas, use apenas os dados reais recebidos.
+6) Se faltar informação, faça uma pergunta curta para destravar a ação.
+7) Se possível, já sugira o próximo passo.
+8) Máximo de 3 frases.
+9) Não use markdown.
 
 Responda somente com texto corrido.
 ''';
@@ -608,7 +624,16 @@ Responda somente com texto corrido.
     String? userName,
   }) async {
     final optionsJson = jsonEncode(psychologistOptions);
-    final contextJson = jsonEncode(collectedInfo);
+    final contextJson = '''${jsonEncode(collectedInfo)}
+
+INSTRUCOES DE INTENCAO:
+- Classifique a mensagem atual como "agenda" ou "triagem".
+- "agenda" trata de consultas registradas, datas, horarios, modalidade e agendamentos existentes.
+- "triagem" trata de sentimentos, motivos para terapia e recomendacao de psicologo.
+- Se misturar os assuntos, responda somente ao assunto mais explicito.
+- Em "agenda", nao faca perguntas emocionais nem recomende psicologo.
+- Em "triagem", ignore consultas_agendadas e nao fale de agenda.
+- Inclua interaction_type no JSON de resposta.''';
     final safeName = (userName != null && userName.trim().isNotEmpty) ? userName.trim() : 'Usuário';
 
     final prompt = '''
@@ -648,6 +673,7 @@ Regras:
 
 Formato obrigatório:
 {
+  "interaction_type": "agenda ou triagem",
   "assistant_reply": "texto da Luma",
   "extracted_info": {
     "motivo_principal": "...",
@@ -733,6 +759,7 @@ Formato obrigatório:
 
   Map<String, dynamic> _fallbackTriageResponse() {
     return {
+      'interaction_type': 'triagem',
       'assistant_reply': 'Entendi. Para eu te indicar o profissional ideal, me conta também se você prefere atendimento online, presencial ou ambos, e quais horários funcionam melhor para você.',
       'extracted_info': <String, dynamic>{},
       'missing_fields': ['modalidade_preferida', 'disponibilidade'],

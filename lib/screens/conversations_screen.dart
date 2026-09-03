@@ -62,13 +62,7 @@ class ConversationsScreenState extends State<ConversationsScreen> {
 
   Widget _buildPsychologistView(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final patientsToday = [
-      ChatUser(id: 'p1', name: 'Carlos Augusto', isOnline: true),
-      ChatUser(id: 'p2', name: 'Maria Fernanda', isOnline: true),
-      ChatUser(id: 'p3', name: 'Victor Mathias', isOnline: false),
-      ChatUser(id: 'p4', name: 'Eduarda Bizarra', isOnline: false),
-      ChatUser(id: 'p5', name: 'Arthur Medeiros', isOnline: false),
-    ];
+    final liveConversations = _conversations;
 
     return Container(
       color: isDark ? AppColors.darkSurface : AppColors.gray50,
@@ -86,9 +80,28 @@ class ConversationsScreenState extends State<ConversationsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Pacientes com consulta hoje', style: TextStyle(fontWeight: FontWeight.w700)),
+                const Text('Chats de pacientes', style: TextStyle(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 12),
-                ...patientsToday.map((patient) => _buildPsychologistChatTile(context, patient, patient.isOnline ? 'Online • 20:00 • Até a consulta doutor!' : 'Offline • Até logo!')).toList(),
+                if (_isLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (liveConversations.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'As conversas que vierem de consultas agendadas vão aparecer aqui.',
+                      style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
+                    ),
+                  )
+                else
+                  ...liveConversations.map((conversation) {
+                    final preview = conversation.lastMessage?.content.isNotEmpty == true
+                        ? conversation.lastMessage!.content
+                        : 'Consulta agendada e chat liberado.';
+                    return _buildPsychologistChatTile(context, conversation.otherUser, preview);
+                  }).toList(),
               ],
             ),
           ),
@@ -99,9 +112,9 @@ class ConversationsScreenState extends State<ConversationsScreen> {
               color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const Text(
-              'Para iniciar uma conversa com um paciente, abra o chat dele na lista acima ou busque pelo nome do paciente.',
-              style: TextStyle(fontSize: 14),
+            child: Text(
+              'As conversas aparecem quando uma consulta é marcada e a mensagem automática é criada no chat.',
+              style: TextStyle(fontSize: 14, color: isDark ? Colors.white70 : AppColors.textSecondary),
             ),
           ),
         ],

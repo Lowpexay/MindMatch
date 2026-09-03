@@ -1,18 +1,169 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
-class AppointmentConfirmationScreen extends StatelessWidget {
+import '../models/conversation_models.dart';
+import '../services/auth_service.dart';
+import '../services/firebase_service.dart';
+import '../screens/user_chat_screen.dart';
+
+class AppointmentConfirmationScreen extends StatefulWidget {
   const AppointmentConfirmationScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  State<AppointmentConfirmationScreen> createState() => _AppointmentConfirmationScreenState();
+}
+
+class _AppointmentConfirmationScreenState extends State<AppointmentConfirmationScreen> {
+  bool _isSaving = false;
+
+  Map<String, dynamic> get _appointment {
     final extra = GoRouterState.of(context).extra ?? ModalRoute.of(context)?.settings.arguments;
-    final appointment = extra is Map<String, dynamic> ? extra : <String, dynamic>{};
+    return extra is Map<String, dynamic> ? extra : <String, dynamic>{};
+  }
+
+  Future<void> _confirmAppointment() async {
+    if (_isSaving) return;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final currentUser = authService.currentUser;
+      final patientId = currentUser?.uid;
+      if (patientId == null) {
+        throw Exception('Usuário não autenticado');
+      }
+
+      final appointment = _appointment;
+      final profile = appointment['profile'] is Map<String, dynamic>
+          ? appointment['profile'] as Map<String, dynamic>
+          : <String, dynamic>{};
+
+      final psychologistName = profile['name']?.toString().trim().isNotEmpty == true
+          ? profile['name'].toString().trim()
+          : 'Profissional';
+        final psychologistIdFromAppointment = appointment['psychologistId']?.toString().trim();
+        final psychologistNameFromAppointment = appointment['psychologistName']?.toString().trim();
+      final dateIso = appointment['date']?.toString();
+      final time = appointment['time']?.toString() ?? '11:00';
+      final consultationType = appointment['consultation_type']?.toString() ?? 'Online';
+        final psychologistModality = (appointment['psychologistModality'] ?? profile['modality'] ?? '').toString();
+      final parsedDate = DateTime.tryParse(dateIso ?? '');
+      final selectedDate = parsedDate ?? DateTime.now().add(const Duration(days: 1));
+      final startOfDay = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      final formattedDate = '${startOfDay.day.toString().padLeft(2, '0')}/${startOfDay.month.toString().padLeft(2, '0')}/${startOfDay.year}';
+
+      final patientProfile = await firebaseService.getUserProfile(patientId);
+      final patientName = (patientProfile?['name'] ?? currentUser?.displayName ?? 'Paciente').toString();
+      final resolvedPsychologist = psychologistIdFromAppointment != null && psychologistIdFromAppointment.isNotEmpty
+          ? {'id': psychologistIdFromAppointment}
+          : profile['id']?.toString().isNotEmpty == true
+              ? {'id': profile['id'].toString()}
+              : psychologistNameFromAppointment != null && psychologistNameFromAppointment.isNotEmpty
+                  ? await firebaseService.findPsychologistByName(psychologistNameFromAppointment)
+                  : await firebaseService.findPsychologistByName(psychologistName);
+      final psychologistId = resolvedPsychologist?['id']?.toString();
+      if (psychologistId == null || psychologistId.isEmpty) {
+        throw Exception('Não foi possível localizar o psicólogo selecionado');
+      }
+
+      if (!_isSupportedAttendanceType(psychologistModality, consultationType)) {
+        throw Exception('O psicólogo selecionado não atende no formato $consultationType. Escolha uma modalidade compatível com o cadastro dele.');
+      }
+
+      final modality = consultationType.toUpperCase() == 'PRESENCIAL' ? 'IN_PERSON' : 'CALL';
+      final consultationData = <String, dynamic>{
+        'idPsychologist': psychologistId,
+        'idPatient': patientId,
+        'psychologistName': psychologistNameFromAppointment ?? psychologistName,
+        'psychologistSpecialty': appointment['psychologistSpecialty']?.toString() ?? profile['specialty']?.toString(),
+        'psychologistModality': appointment['psychologistModality']?.toString() ?? profile['modality']?.toString(),
+        'psychologistAvailability': appointment['psychologistAvailability']?.toString() ?? profile['availability']?.toString(),
+        'patientName': patientName,
+        'date': startOfDay.millisecondsSinceEpoch,
+        'hour': time,
+        'modality': modality,
+        'status': 'SCHEDULED',
+      };
+
+      final consultationRef = await firebaseService.createConsultation(consultationData);
+      final conversationId = await firebaseService.getOrCreateConversation(patientId, psychologistId);
+      if (conversationId != null) {
+        final chatMessage = ChatMessage(
+          id: '${DateTime.now().millisecondsSinceEpoch}',
+          conversationId: conversationId,
+          senderId: patientId,
+          receiverId: psychologistId,
+          content: 'Nova consulta agendada com ${psychologistNameFromAppointment ?? psychologistName} para $formattedDate às $time ($consultationType).',
+          type: MessageType.system,
+          timestamp: DateTime.now(),
+        );
+        await firebaseService.sendChatMessage(chatMessage);
+      }
+
+      if (!mounted) return;
+      final chatUser = ChatUser(
+        id: psychologistId,
+        name: psychologistName,
+        profileImageUrl: profile['profileImageUrl']?.toString(),
+        profileImageBase64: profile['profileImageBase64']?.toString(),
+        isOnline: false,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Consulta salva e mensagem enviada ao psicólogo.')),
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => UserChatScreen(otherUser: chatUser),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Não foi possível concluir o agendamento: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  bool _isSupportedAttendanceType(String psychologistModality, String consultationType) {
+    final modality = psychologistModality.toLowerCase();
+    final selected = consultationType.toLowerCase();
+
+    if (modality.contains('online e presencial') || modality.contains('both')) {
+      return selected == 'online' || selected == 'presencial';
+    }
+    if (modality.contains('online')) {
+      return selected == 'online';
+    }
+    if (modality.contains('presencial')) {
+      return selected == 'presencial';
+    }
+
+    return true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final appointment = _appointment;
     final profile = appointment['profile'] is Map<String, dynamic>
         ? appointment['profile'] as Map<String, dynamic>
         : <String, dynamic>{};
 
-    final name = profile['name']?.toString() ?? 'Dr. Gustavo Teodoro Gabilan';
+    final name = profile['name']?.toString() ?? 'Profissional';
     final dateIso = appointment['date']?.toString();
     final time = appointment['time']?.toString() ?? '11:00';
     final consultationType = appointment['consultation_type']?.toString() ?? 'Online';
@@ -99,19 +250,15 @@ class AppointmentConfirmationScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 32 / 2, color: Color(0xFF5C5C5C), fontWeight: FontWeight.w600, height: 1.45),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    'Deseja mais informações sobre o\nprofissional e a consulta? Fale\ndiretamente com o Dr. Gustavo',
-                    style: TextStyle(fontSize: 32 / 2, color: Color(0xFF5C5C5C), fontWeight: FontWeight.w600, height: 1.45),
+                  Text(
+                    'Deseja mais informações sobre o\nprofissional e a consulta? Fale\ndiretamente com $name',
+                    style: const TextStyle(fontSize: 32 / 2, color: Color(0xFF5C5C5C), fontWeight: FontWeight.w600, height: 1.45),
                   ),
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Em breve: chat direto com o profissional.')),
-                        );
-                      },
+                      onPressed: _isSaving ? null : _confirmAppointment,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF56B35D),
                         foregroundColor: Colors.white,
@@ -119,7 +266,13 @@ class AppointmentConfirmationScreen extends StatelessWidget {
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 13),
                       ),
-                      child: const Text('Falar com o profissional', style: TextStyle(fontWeight: FontWeight.w700)),
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Falar com o profissional', style: TextStyle(fontWeight: FontWeight.w700)),
                     ),
                   ),
                   const SizedBox(height: 10),

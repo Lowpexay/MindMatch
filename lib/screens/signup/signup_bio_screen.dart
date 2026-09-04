@@ -6,6 +6,7 @@ import '../../widgets/app_button.dart';
 import '../../widgets/app_dropdown.dart';
 import '../../widgets/date_picker_field.dart';
 import '../../widgets/styled_text_field.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Etapa de bio (opcional). Agora recebe explicitamente o mapa acumulado via construtor
 /// para reduzir risco de perda de dados quando GoRouterState.extra não propaga.
@@ -36,6 +37,8 @@ class _SignupBioScreenState extends State<SignupBioScreen> {
     {'value': 'P', 'text': 'Prefiro não identificar'},
     {'value': 'O', 'text': 'Outros'},
   ];
+  bool _cpfAlreadyExists = false;
+  bool _telefoneAlreadyExists = false;
 
   Map<String, dynamic>? get _incomingData {
     // Prioriza widget.data; fallback para state.extra se disponível.
@@ -107,8 +110,84 @@ class _SignupBioScreenState extends State<SignupBioScreen> {
     _telefoneController.text = buffer.toString();
   }
 
-  void _next() {
+  Future<bool> _documentExists({
+    required String field,
+    required String formattedValue,
+    required String digitsValue,
+  }) async {
+    final collection = FirebaseFirestore.instance.collection('users');
+    final formattedSnapshot = await collection
+        .where(field, isEqualTo: formattedValue)
+        .limit(1)
+        .get();
+
+    if (formattedSnapshot.docs.isNotEmpty || formattedValue == digitsValue) {
+      return formattedSnapshot.docs.isNotEmpty;
+    }
+
+    final digitsSnapshot = await collection
+        .where(field, isEqualTo: digitsValue)
+        .limit(1)
+        .get();
+    return digitsSnapshot.docs.isNotEmpty;
+  }
+
+  Future<bool> _validateUniqueDocuments() async {
+    final cpf = _cpfController.text.trim();
+    final cpfDigits = cpf.replaceAll(RegExp(r'\D'), '');
+    final telefone = _telefoneController.text.trim();
+    final telefoneDigits = telefone.replaceAll(RegExp(r'\D'), '');
+
+    try {
+      final cpfExists = await _documentExists(
+        field: 'cpf',
+        formattedValue: cpf,
+        digitsValue: cpfDigits,
+      );
+      final telefoneExists = await _documentExists(
+        field: 'nTelefone',
+        formattedValue: telefone,
+        digitsValue: telefoneDigits,
+      );
+
+      if (!mounted) return false;
+      if (cpfExists) {
+        setState(() {
+          _cpfAlreadyExists = true;
+          _cpfController.clear();
+        });
+      }
+      if (telefoneExists) {
+        setState(() {
+          _telefoneAlreadyExists = true;
+          _telefoneController.clear();
+        });
+      }
+      if (cpfExists || telefoneExists) {
+        _formKey.currentState?.validate();
+        return false;
+      }
+      return true;
+    } on FirebaseException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível verificar seus dados. Tente novamente.'),
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<void> _next() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+    final uniqueDocuments = await _validateUniqueDocuments();
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    if (!uniqueDocuments) return;
+
     final previous = _incomingData;
     debugPrint(
         '[SignupBio] forwarding with previous=$previous bio=${_controller.text.trim()}');
@@ -171,7 +250,13 @@ class _SignupBioScreenState extends State<SignupBioScreen> {
                           FilteringTextInputFormatter.digitsOnly,
                           LengthLimitingTextInputFormatter(11),
                         ],
+                        onChanged: (_) {
+                          if (_cpfAlreadyExists) {
+                            setState(() => _cpfAlreadyExists = false);
+                          }
+                        },
                         validator: (v) {
+                          if (_cpfAlreadyExists) return 'Este CPF já está cadastrado';
                           final digits = v?.replaceAll(RegExp(r'\D'), '') ?? '';
                           if (digits.length != 11)
                             return 'Informe um CPF válido';
@@ -213,7 +298,15 @@ class _SignupBioScreenState extends State<SignupBioScreen> {
                           FilteringTextInputFormatter.digitsOnly,
                           LengthLimitingTextInputFormatter(11),
                         ],
+                        onChanged: (_) {
+                          if (_telefoneAlreadyExists) {
+                            setState(() => _telefoneAlreadyExists = false);
+                          }
+                        },
                         validator: (v) {
+                          if (_telefoneAlreadyExists) {
+                            return 'Este telefone já está cadastrado';
+                          }
                           final digits = v?.replaceAll(RegExp(r'\D'), '') ?? '';
                           if (digits.length < 10)
                             return 'Informe um telefone válido';

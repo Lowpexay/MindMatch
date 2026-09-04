@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../../utils/app_colors.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/firebase_service.dart';
 
 class CadastroPsicologoScreen extends StatefulWidget {
   final Map<String, dynamic>? data;
@@ -45,6 +48,7 @@ class _CadastroPsicologoScreenState extends State<CadastroPsicologoScreen>
 
   String? _selectedModality;
   final Set<String> _selectedSpecialties = <String>{};
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -115,7 +119,7 @@ class _CadastroPsicologoScreenState extends State<CadastroPsicologoScreen>
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _next() {
+  Future<void> _next() async {
     if (!_validateCurrentStep()) return;
 
     if (_tabController.index < _tabController.length - 1) {
@@ -124,21 +128,77 @@ class _CadastroPsicologoScreenState extends State<CadastroPsicologoScreen>
     }
 
     final previous = _incomingData;
-    context.push('/signupPhoto', extra: {
-      ...?previous,
-      'role': 'PSYCHOLOGIST',
-      'goal': previous?['goal'] ?? 'Psicólogo(a) procurando por pacientes',
-      'crp': _crpController.text.trim(),
-      'careerStart': _careerStartController.text.trim(),
-      'modality': _selectedModality,
-      'officeAddress': _officeAddressController.text.trim(),
-      'officePhone': _officePhoneController.text.trim(),
-      'healthPlans': _healthPlansController.text.trim(),
-      'availabilityDays': _availabilityDaysController.text.trim(),
-      'availabilityHours': _availabilityHoursController.text.trim(),
-      'specialties': _selectedSpecialties.toList(),
-      'personalizedMessage': _personalizedMessageController.text.trim(),
-    });
+    final email = previous?['email']?.toString().trim() ?? '';
+    final password = previous?['password']?.toString() ?? '';
+    final name = previous?['name']?.toString().trim() ?? '';
+
+    if (email.isEmpty || password.isEmpty) {
+      _showSnack('Dados de e-mail/senha ausentes. Refaça o cadastro.');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final firebaseService =
+          Provider.of<FirebaseService>(context, listen: false);
+      final userCredential = await authService.createUserWithEmailAndPassword(
+        email,
+        password,
+      );
+      final uid = userCredential.user?.uid;
+
+      if (uid == null) {
+        throw Exception('Falha ao obter o usuário após o cadastro.');
+      }
+
+      if (name.isNotEmpty) {
+        await authService.updateProfile(displayName: name);
+      }
+
+      await firebaseService.createUserWithRole(
+        userData: {
+          'name': name,
+          'email': email,
+          'role': 'PSYCHOLOGIST',
+          'goal': previous?['goal'] ?? 'Psicólogo(a) procurando por pacientes',
+          'crp': _crpController.text.trim(),
+          'careerStart': _careerStartController.text.trim(),
+          'modality': _selectedModality,
+          'officeAddress': _officeAddressController.text.trim(),
+          'officePhone': _officePhoneController.text.trim(),
+          'healthPlans': _healthPlansController.text.trim(),
+          'availabilityDays': _availabilityDaysController.text.trim(),
+          'availabilityHours': _availabilityHoursController.text.trim(),
+          'specialties': _selectedSpecialties.toList(),
+          'personalizedMessage': _personalizedMessageController.text.trim(),
+        },
+        role: 'PSYCHOLOGIST',
+        roleSpecificData: {
+          'crp': _crpController.text.trim(),
+          'careerStart': _careerStartController.text.trim(),
+          'modality': _selectedModality,
+          'officeAddress': _officeAddressController.text.trim(),
+          'officePhone': _officePhoneController.text.trim(),
+          'healthPlans': _healthPlansController.text.trim(),
+          'availabilityDays': _availabilityDaysController.text.trim(),
+          'availabilityHours': _availabilityHoursController.text.trim(),
+          'specialties': _selectedSpecialties.toList(),
+          'personalizedMessage': _personalizedMessageController.text.trim(),
+        },
+        documentId: uid,
+      );
+
+      if (!mounted) return;
+      debugPrint('[CadastroPsicologo] Conta criada com sucesso para $email (uid=$uid)');
+      context.go('/home');
+    } catch (error) {
+      debugPrint('[CadastroPsicologo] Erro ao criar conta: $error');
+      if (!mounted) return;
+      _showSnack('Erro ao criar conta: $error');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -183,14 +243,25 @@ class _CadastroPsicologoScreenState extends State<CadastroPsicologoScreen>
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _next,
+                  onPressed: _isLoading ? null : _next,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  child: Text(_tabController.index == _tabController.length - 1 ? 'Concluir cadastro' : 'Continuar'),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(_tabController.index == _tabController.length - 1
+                          ? 'Concluir cadastro'
+                          : 'Continuar'),
                 ),
               ),
             ),

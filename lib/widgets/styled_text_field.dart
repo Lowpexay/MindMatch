@@ -10,6 +10,7 @@ class StyledTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final FocusNode? focusNode;
   final List<TextInputFormatter>? inputFormatters;
+  final ValueChanged<String>? onChanged;
 
   const StyledTextField({
     super.key,
@@ -20,6 +21,7 @@ class StyledTextField extends StatelessWidget {
     this.keyboardType,
     this.focusNode,
     this.inputFormatters,
+    this.onChanged,
   });
 
   @override
@@ -44,6 +46,7 @@ class StyledTextField extends StatelessWidget {
         keyboardType: keyboardType,
         focusNode: focusNode,
         inputFormatters: inputFormatters,
+        onChanged: onChanged,
         decoration: InputDecoration(
           labelText: label,
           filled: true,

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 import '../../widgets/app_button.dart';
-import '../../widgets/date_picker_field.dart';
 import '../../widgets/styled_text_field.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Tela inicial do fluxo de cadastro: nome, data de nascimento, email e senhas.
 class SignupBasicScreen extends StatefulWidget {
@@ -23,6 +23,7 @@ class _SignupBasicScreenState extends State<SignupBasicScreen> {
 
   DateTime? _selectedDate;
   bool _isLoading = false;
+  bool _emailAlreadyExists = false;
 
   @override
   void dispose() {
@@ -34,8 +35,59 @@ class _SignupBasicScreenState extends State<SignupBasicScreen> {
     super.dispose();
   }
 
-  void _next() {
+  Future<bool> validaEmail(String email) async {
+    const collectionName = 'users';
+    final normalizedEmail = email.trim().toLowerCase();
+    final maskedEmail = normalizedEmail.replaceFirst(
+      RegExp(r'(?<=.).(?=[^@]*@)'),
+      '*',
+    );
+
+    try {
+      final userSnapshot = await FirebaseFirestore.instance
+          .collection(collectionName)
+          .where('email', isEqualTo: normalizedEmail)
+          .limit(1)
+          .get();
+
+      if (userSnapshot.docs.isNotEmpty && mounted) {
+        setState(() {
+          _emailAlreadyExists = true;
+          _emailController.clear();
+        });
+        _formKey.currentState?.validate();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Este e-mail já está cadastrado.'),
+          ),
+        );
+        return false;
+      }
+
+      return true;
+    } on FirebaseException catch (error) {
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível verificar o e-mail. Tente novamente.'),
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<void> _next() async {
     if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+    final emailAvailable = await validaEmail(_emailController.text);
+    if (!mounted) return;
+
+    setState(() => _isLoading = false);
+    if (!emailAvailable) return;
+
     context.push('/signupBio', extra: {
       'name': _nameController.text.trim(),
       'dob': _selectedDate?.millisecondsSinceEpoch,
@@ -80,7 +132,13 @@ class _SignupBasicScreenState extends State<SignupBasicScreen> {
                     controller: _emailController,
                     label: 'Email',
                     keyboardType: TextInputType.emailAddress,
+                    onChanged: (_) {
+                      if (_emailAlreadyExists) {
+                        setState(() => _emailAlreadyExists = false);
+                      }
+                    },
                     validator: (v) {
+                      if (_emailAlreadyExists) return 'Este e-mail já está cadastrado';
                       if (v == null || v.isEmpty) return 'Informe o e-mail';
                       final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.[A-Za-z]{2,}$');
                       if (!emailRegex.hasMatch(v)) return 'E-mail inválido';

@@ -657,6 +657,8 @@ Regras:
 4) Considere pronto para recomendação quando existir pelo menos:
    motivo_principal + modalidade_preferida + disponibilidade.
 5) Quando pronto, escolha UM perfil da lista disponível e retorne em recommended_psychologist.
+   Compare a disponibilidade do usuário com availabilityDays/availabilityHours (também resumidos em availability).
+   Se o usuário mencionar convênio, priorize perfis cujo healthPlansList ou healthPlans contenha esse convênio.
 6) Não invente perfis fora da lista.
 7) Responda SOMENTE JSON válido, sem markdown.
 8) Mantenha assistant_reply curto, com no máximo 2 frases.
@@ -679,6 +681,7 @@ Formato obrigatório:
     "approach": "...",
     "mode": "...",
     "availability": "...",
+    "healthPlans": ["..."],
     "location": "...",
     "summary": "...",
     "rating": 4.9

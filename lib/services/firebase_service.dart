@@ -476,6 +476,9 @@ class FirebaseService {
         final officeAddress = (psychologistData['officeAddress'] ?? '').toString();
         final officePhone = (psychologistData['officePhone'] ?? '').toString();
         final healthPlans = (psychologistData['healthPlans'] ?? psychologistData['healthPlanCover'] ?? '').toString();
+        final healthPlansList = psychologistData['healthPlansList'] is List
+            ? (psychologistData['healthPlansList'] as List).map((item) => item.toString()).toList()
+            : healthPlans.split(',').map((item) => item.trim()).where((item) => item.isNotEmpty).toList();
 
         final modality = _normalizePsychologistModality(modalityRaw);
         final availability = [
@@ -500,6 +503,7 @@ class FirebaseService {
           'officeAddress': officeAddress,
           'officePhone': officePhone,
           'healthPlans': healthPlans,
+          'healthPlansList': healthPlansList,
           'personalizedMessage': psychologistData['personalizedMessage'],
           'tags_string': psychologistData['specialties'] is List
               ? (psychologistData['specialties'] as List).join(', ')

@@ -919,3 +919,44 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 
 </div>
 
+### Validação do CRP
+
+O cadastro consulta diretamente o endpoint público do Cadastro Nacional do CFP antes de criar a conta Firebase. A URL padrão já está configurada. Se o CFP alterar o endpoint, ela pode ser substituída na compilação:
+
+```bash
+flutter run --dart-define=CFP_API_URL=https://cn-api.cfp.org.br/psi/busca
+```
+
+Essa integração não utiliza token da Infosimples. Como é uma consulta direta a um endpoint público, ela pode sofrer alterações, bloqueios ou CAPTCHA aplicados pelo CFP.
+
+Para demonstração local sem chamar a Internet, use o modo simulação. Nesse modo, o único CRP aceito é `05/80177`:
+
+```bash
+flutter run --dart-define=CFP_VALIDATION_MODE=mock
+```
+
+Esse modo é apenas um fixture acadêmico e não valida profissionais reais.
+
+#### Scraper local do cadastro público
+
+O scraper local usa um navegador visível para consultar o cadastro público. Na raiz de `MindMatch/backend`, execute uma vez:
+
+```powershell
+npm install
+npx playwright install chromium
+```
+
+Depois mantenha o servidor rodando:
+
+```powershell
+npm start
+```
+
+Em outro terminal, conecte o servidor local ao aparelho:
+
+```powershell
+adb reverse tcp:3000 tcp:3000
+flutter run -d 1df358fe --dart-define=CFP_VALIDATION_MODE=local_scrape
+```
+
+O scraper retorna apenas se o registro existe. Se o CFP exibir CAPTCHA, a consulta será interrompida; o projeto não tenta burlar mecanismos antirobô.

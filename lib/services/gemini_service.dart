@@ -55,6 +55,13 @@ class GeminiService {
     return body.contains('quota') || body.contains('rate') || body.contains('exceeded') || body.contains('limit');
   }
 
+  String _safeErrorBody(http.Response response) {
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      return '[conteúdo ocultado por segurança: erro de autenticação/permissão]';
+    }
+    return response.body;
+  }
+
   Future<http.Response> _postWithRotation(Map<String, dynamic> body) async {
     if (_keys.isEmpty) {
       final uri = Uri.parse('$_baseUrl?key=');
@@ -127,7 +134,7 @@ class GeminiService {
   return parsed;
       } else {
         print('❌ Gemini API error: ${response.statusCode}');
-        print('❌ Response body: ${response.body}');
+        print('❌ Response body: ${_safeErrorBody(response)}');
         return _getFallbackQuestions(count: count);
       }
     } catch (e) {
@@ -473,7 +480,7 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
           'contents': history,
           'generationConfig': {
             'temperature': 0.8,
-            'maxOutputTokens': 350,
+            'maxOutputTokens': 700,
             'topP': 0.95,
             'topK': 40,
           },
@@ -499,6 +506,7 @@ Você não está sozinho. Sua jornada emocional é válida e importante. 💙
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        print('📝 [Gemini] chat finishReason=${data['candidates']?[0]?['finishReason']}');
         return data['candidates'][0]['content']['parts'][0]['text'];
       } else {
         print('❌ Gemini API error in chat: ${response.statusCode}');
@@ -545,6 +553,7 @@ Classifique a mensagem atual em apenas um tipo de interaÃ§Ã£o:
 - Se a mensagem misturar os dois assuntos, responda somente ao assunto mais explÃ­cito e nÃ£o misture os fluxos.
 - Se for "agenda", use somente consultas_agendadas, nÃ£o faÃ§a perguntas emocionais, nÃ£o recomende psicÃ³logo e nÃ£o extraia campos de triagem.
 - Se for "triagem", ignore consultas_agendadas na resposta e nÃ£o fale de agenda.
+- A classificação é exclusivamente interna. Nunca escreva "agenda", "triagem", "tipo de interação" ou o nome da classificação na resposta ao usuário.
 
 Histórico da conversa:
 ${conversationContext ?? ''}
@@ -605,7 +614,7 @@ Responda somente com texto corrido.
         final data = jsonDecode(response.body);
         final text = data['candidates'][0]['content']['parts'][0]['text'];
         return (text?.toString().trim().isNotEmpty ?? false)
-            ? text.toString().trim()
+            ? _removeInternalClassification(text.toString().trim())
             : _getFallbackPsychologistAssistantResponse();
       }
 
@@ -614,6 +623,13 @@ Responda somente com texto corrido.
       print('❌ Error generating psychologist assistant response: $e');
       return _getFallbackPsychologistAssistantResponse();
     }
+  }
+
+  String _removeInternalClassification(String text) {
+    var sanitized = text.trim();
+    sanitized = sanitized.replaceFirst(RegExp(r'^\s*(tipo\s*de\s*intera[cç][aã]o|classifica[cç][aã]o)\s*:\s*(agenda|triagem)\s*[\-–—:]?\s*', caseSensitive: false), '');
+    sanitized = sanitized.replaceFirst(RegExp(r'^\s*(agenda|triagem)\s*[\-–—:]\s*', caseSensitive: false), '');
+    return sanitized.trim();
   }
 
   Future<Map<String, dynamic>> generatePsychologistTriageResponse({
@@ -647,22 +663,23 @@ $optionsJson
 
 Regras:
 1) A conversa deve ser natural (sem perguntas de múltipla escolha).
-2) Extraia informações do texto do usuário (NLP) para os campos:
+2) Este fluxo é de acolhimento e triagem emocional. Não ofereça agendamento, horários ou confirmação de consulta, a menos que a mensagem atual peça isso explicitamente.
+3) Extraia informações do texto do usuário (NLP) para os campos:
    - motivo_principal
    - modalidade_preferida
    - disponibilidade
    - objetivo_terapia
    - observacoes_relevantes
-3) Se ainda faltar dados essenciais, faça apenas UMA pergunta de continuidade no campo assistant_reply.
-4) Considere pronto para recomendação quando existir pelo menos:
+4) Se ainda faltar dados essenciais, faça apenas UMA pergunta de continuidade no campo assistant_reply.
+5) Considere pronto para recomendação quando existir pelo menos:
    motivo_principal + modalidade_preferida + disponibilidade.
-5) Quando pronto, escolha UM perfil da lista disponível e retorne em recommended_psychologist.
+6) Quando pronto, escolha UM perfil da lista disponível e retorne em recommended_psychologist.
    Compare a disponibilidade do usuário com availabilityDays/availabilityHours (também resumidos em availability).
    Se o usuário mencionar convênio, priorize perfis cujo healthPlansList ou healthPlans contenha esse convênio.
-6) Não invente perfis fora da lista.
-7) Responda SOMENTE JSON válido, sem markdown.
-8) Mantenha assistant_reply curto, com no máximo 2 frases.
-9) Preencha only os campos necessários; não escreva textos longos nos campos do JSON.
+7) Não invente perfis fora da lista.
+8) Responda SOMENTE JSON válido, sem markdown.
+9) Mantenha assistant_reply curto, com no máximo 2 frases.
+10) Preencha only os campos necessários; não escreva textos longos nos campos do JSON.
 
 Formato obrigatório:
 {
@@ -686,6 +703,7 @@ Formato obrigatório:
     "summary": "...",
     "rating": 4.9
   }
+
 }
 ''';
 
@@ -700,7 +718,7 @@ Formato obrigatório:
         ],
         'generationConfig': {
           'temperature': 0.3,
-          'maxOutputTokens': 384,
+          'maxOutputTokens': 768,
           'topP': 0.9,
           'responseMimeType': 'application/json',
         },
@@ -708,7 +726,7 @@ Formato obrigatório:
 
       if (response.statusCode != 200) {
         print('❌ Gemini triage API error: ${response.statusCode}');
-        print('❌ Gemini triage response body: ${response.body}');
+        print('❌ Gemini triage response body: ${_safeErrorBody(response)}');
         return _fallbackTriageResponse();
       }
 
@@ -728,6 +746,43 @@ Formato obrigatório:
       print('❌ Error generating psychologist triage response: $e');
       return _fallbackTriageResponse();
     }
+  }
+
+  Future<String> generateLumaPsychologistSummary({
+    required String conversation,
+    double? averageMoodLast7Days,
+  }) async {
+    final prompt = '''
+Você é a Luma, assistente de apoio emocional. Gere um resumo objetivo, acolhedor e não diagnóstico para o psicólogo que atenderá o paciente.
+Use somente as informações da conversa abaixo. Não invente fatos, não faça diagnóstico e destaque quando algo não foi informado.
+Inclua: temas e acontecimentos relatados, emoções percebidas com cautela, impacto na rotina, necessidades/pontos para explorar na consulta e sinais de urgência caso existam.
+Média de humor dos checkups dos últimos 7 dias: ${averageMoodLast7Days == null ? 'não disponível' : '${averageMoodLast7Days.toStringAsFixed(1)}/5'}.
+Conversa:
+$conversation
+Responda em português do Brasil, em até 5 tópicos curtos. Use texto simples, sem Markdown: não use **, *, #, crases ou títulos formatados.
+''';
+    try {
+      final response = await _postWithRotation({
+        'contents': [{'parts': [{'text': prompt}]}],
+        'generationConfig': {'temperature': 0.2, 'maxOutputTokens': 420, 'topP': 0.8},
+      });
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final text = data['candidates'][0]['content']['parts'][0]['text']?.toString().trim();
+        if (text != null && text.isNotEmpty) return _cleanPsychologistSummary(text);
+      }
+    } catch (e) {
+      print('❌ Error generating Luma psychologist summary: $e');
+    }
+    return 'Resumo automático indisponível no momento. Consulte a conversa registrada e valide as informações diretamente com o paciente.';
+  }
+
+  String _cleanPsychologistSummary(String text) {
+    return text
+        .replaceAll('**', '')
+        .replaceAll('```', '')
+        .replaceAll(RegExp(r'^\s*#{1,6}\s*', multiLine: true), '')
+        .trim();
   }
 
   Map<String, dynamic>? _extractTriageJson(String raw) {
@@ -913,6 +968,7 @@ ${_getMoodGuidance(userMood)}
     systemPrompt += '''
 ## 📝 INSTRUÇÕES FINAIS
 - Responda sempre como Luma, mantendo sua essência empática
+- Cumprimente e se apresente somente na primeira mensagem da conversa. O histórico já contém essa apresentação; nas respostas seguintes, não comece com "Oi", "Olá" ou "Sou a Luma".
 - Limite: 100-200 palavras por resposta
 - Priorize conexão emocional antes de soluções práticas
 - Termine com abertura para continuidade da conversa
@@ -946,17 +1002,12 @@ ${_getMoodGuidance(userMood)}
 
   String _getFallbackChatResponse() {
     final responses = [
-      "Oi, sou a Luma 💙 Entendo que às vezes as palavras podem ser difíceis de encontrar. Estou aqui, presente com você neste momento. Que tal respirarmos juntas por um instante? Como você gostaria de começar nossa conversa?",
-      
-      "Olá! Sou a Luma, e percebo que você chegou até aqui buscando algum tipo de apoio. Isso já demonstra muita coragem da sua parte. Seus sentimentos são completamente válidos, e este é um espaço seguro para você se expressar. O que está em seu coração hoje?",
-      
-      "Que bom te encontrar aqui! Sou a Luma 🌟 Mesmo quando as palavras falham, sua presença aqui já conta uma história. Às vezes, simplesmente estar presente com nossos sentimentos é o primeiro passo. Como posso te acompanhar neste momento?",
-      
-      "Oi! Luma aqui 💫 Sinto que você pode estar passando por algo importante. Lembre-se: você é mais resiliente do que imagina, e cada momento difícil carrega em si a semente de crescimento. Quer compartilhar o que está sentindo?",
-      
-      "Olá, querido(a)! Sou a Luma, e estou honrada por você ter escolhido este espaço para se expressar. Às vezes, só o ato de estar aqui já é uma forma de autocuidado. Não há pressa - vamos no seu ritmo. O que seu coração precisa hoje?",
-      
-      "Que alegria te receber! Sou a Luma 🤗 Percebo que você chegou até mim, e isso já é um ato de coragem e amor-próprio. Este é um momento seu, um espaço onde seus sentimentos têm lugar e importância. Como você gostaria de usar este tempo juntas?",
+      "Entendo que às vezes as palavras podem ser difíceis de encontrar. Estou aqui com você. Que tal respirarmos juntas por um instante e você me contar um pouco mais?",
+      "Seus sentimentos são válidos, e este continua sendo um espaço seguro para você se expressar. O que está mais presente em você agora?",
+      "Mesmo quando as palavras falham, estar presente com seus sentimentos já é um passo importante. Como posso te acompanhar neste momento?",
+      "Parece que isso tem sido importante para você. Vamos com calma; o que você gostaria de explorar primeiro?",
+      "Não há pressa. Podemos seguir no seu ritmo e olhar para o que seu coração precisa agora.",
+      "Estou acompanhando você. Conte um pouco mais sobre o que aconteceu ou sobre como isso tem afetado seu dia.",
     ];
     
     // Retorna uma resposta aleatória

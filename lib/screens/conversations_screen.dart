@@ -6,6 +6,7 @@ import '../services/firebase_service.dart';
 import '../providers/conversations_provider.dart';
 import '../utils/app_colors.dart';
 import '../models/conversation_models.dart';
+import '../models/consultation_model.dart';
 import '../widgets/user_avatar.dart';
 import 'user_chat_screen.dart';
 import '../utils/scaffold_utils.dart';
@@ -24,6 +25,10 @@ class ConversationsScreenState extends State<ConversationsScreen> {
   List<Conversation> _conversations = [];
   FirebaseService? _firebaseService;
   AuthService? _authService;
+  List<Consultation> _patientConsultations = [];
+  bool _patientsLoading = false;
+  bool _patientsLoaded = false;
+  final Map<String, String> _patientReports = {};
 
   @override
   void didChangeDependencies() {
@@ -40,6 +45,32 @@ class ConversationsScreenState extends State<ConversationsScreen> {
     final userId = _authService?.currentUser?.uid;
     if (userId != null) {
       conversationsProvider.updateUser(userId);
+      if (widget.userRole == 'PSYCHOLOGIST' && !_patientsLoaded && !_patientsLoading) _loadPatients(userId);
+    }
+  }
+
+  Future<void> _loadPatients(String psychologistId) async {
+    _patientsLoading = true;
+    try {
+      final consultations = await _firebaseService!.getUserConsultations(psychologistId, 'PSYCHOLOGIST');
+      if (!mounted) return;
+      final unique = <String, Consultation>{};
+      for (final consultation in consultations) {
+        unique[consultation.idPatient] = consultation;
+        if (consultation.id != null) {
+          final report = await _firebaseService!.getLumaSummaryForConsultation(consultation.id!);
+          final summary = report?['summary']?.toString().replaceAll('**', '').replaceAll('```', '').trim();
+          if (summary != null && summary.isNotEmpty) _patientReports[consultation.idPatient] = summary;
+        }
+      }
+      setState(() {
+        _patientConsultations = unique.values.toList();
+        _patientsLoaded = true;
+        _patientsLoading = false;
+      });
+    } catch (e) {
+      debugPrint('[Conversations][patients] load error: $e');
+      if (mounted) setState(() { _patientsLoaded = true; _patientsLoading = false; });
     }
   }
 
@@ -66,60 +97,94 @@ class ConversationsScreenState extends State<ConversationsScreen> {
 
     return Container(
       color: isDark ? AppColors.darkSurface : AppColors.gray50,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _psychologistConversationsHeader(context),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              borderRadius: BorderRadius.circular(18),
+      child: DefaultTabController(
+        length: 2,
+        child: Column(
+          children: [
+            Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: _psychologistConversationsHeader(context)),
+            const TabBar(tabs: [Tab(text: 'Conversas'), Tab(text: 'Pacientes')]),
+            Expanded(
+              child: TabBarView(children: [
+                ListView(padding: const EdgeInsets.all(16), children: [
+                  _buildConversationPanel(context, liveConversations),
+                  const SizedBox(height: 16),
+                  _buildInfoPanel(context, 'As conversas aparecem quando uma consulta é marcada e a mensagem automática é criada no chat.'),
+                ]),
+                _buildPatientsPanel(context),
+              ]),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Chats de pacientes', style: TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 12),
-                if (_isLoading)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (liveConversations.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Text(
-                      'As conversas que vierem de consultas agendadas vão aparecer aqui.',
-                      style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
-                    ),
-                  )
-                else
-                  ...liveConversations.map((conversation) {
-                    final preview = conversation.lastMessage?.content.isNotEmpty == true
-                        ? conversation.lastMessage!.content
-                        : 'Consulta agendada e chat liberado.';
-                    return _buildPsychologistChatTile(context, conversation.otherUser, preview);
-                  }).toList(),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Text(
-              'As conversas aparecem quando uma consulta é marcada e a mensagem automática é criada no chat.',
-              style: TextStyle(fontSize: 14, color: isDark ? Colors.white70 : AppColors.textSecondary),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  Widget _buildConversationPanel(BuildContext context, List<Conversation> liveConversations) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(18)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Chats de pacientes', style: TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        if (_isLoading) const Center(child: CircularProgressIndicator())
+        else if (liveConversations.isEmpty) Text('Nenhuma conversa disponível.', style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary))
+        else ...liveConversations.map((conversation) {
+          final preview = conversation.lastMessage?.content.isNotEmpty == true ? conversation.lastMessage!.content : 'Consulta agendada e chat liberado.';
+          return _buildPsychologistChatTile(context, conversation.otherUser, preview);
+        }),
+      ]),
+    );
+  }
+
+  Widget _buildInfoPanel(BuildContext context, String text) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(18)), child: Text(text, style: TextStyle(fontSize: 14, color: isDark ? Colors.white70 : AppColors.textSecondary)));
+  }
+
+  Widget _buildPatientsPanel(BuildContext context) {
+    if (_patientsLoading) return const Center(child: CircularProgressIndicator());
+    if (_patientConsultations.isEmpty) return const Center(child: Text('Nenhum paciente vinculado encontrado.'));
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _patientConsultations.length,
+      itemBuilder: (context, index) {
+        final consultation = _patientConsultations[index];
+        final name = consultation.patientName?.trim().isNotEmpty == true ? consultation.patientName!.trim() : 'Paciente';
+        if (consultation.id == null) {
+          return _buildPatientTile(context, name, null);
+        }
+        return FutureBuilder<Map<String, dynamic>?>(
+          future: _firebaseService!.getLatestLumaSummaryForPatient(consultation.idPatient),
+          builder: (context, snapshot) {
+            final liveSummary = snapshot.data?['summary']?.toString().replaceAll('**', '').replaceAll('```', '').trim();
+            if (liveSummary != null && liveSummary.isNotEmpty) _patientReports[consultation.idPatient] = liveSummary;
+            return _buildPatientTile(context, name, liveSummary ?? _patientReports[consultation.idPatient]);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPatientTile(BuildContext context, String name, String? summary) {
+    final hasSummary = summary != null && summary.trim().isNotEmpty;
+    return Card(
+      child: ListTile(
+        leading: CircleAvatar(child: Text(name[0].toUpperCase())),
+        title: Text(name),
+        subtitle: Text(hasSummary ? 'Resumo gerado pela Luma disponível' : 'Peça para a Luma no chat gerar um resumo'),
+        trailing: Icon(hasSummary ? Icons.summarize_outlined : Icons.chat_outlined),
+        onTap: () => _showPatientSummaryOrInstruction(context, name, summary),
+      ),
+    );
+  }
+
+  void _showPatientSummaryOrInstruction(BuildContext context, String patientName, String? summary) {
+    if (summary == null || summary.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Peça para a Luma no chat gerar um resumo deste paciente.')));
+      return;
+    }
+    showDialog(context: context, builder: (_) => AlertDialog(title: Text('Resumo de $patientName'), content: SingleChildScrollView(child: Text(summary)), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fechar'))]));
   }
 
   Widget _psychologistConversationsHeader(BuildContext context) {

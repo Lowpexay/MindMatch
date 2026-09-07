@@ -67,16 +67,23 @@ class CrpValidationService {
       name: 'CrpValidation',
     );
 
+    final queryParameters = {
+      'nome': '',
+      'regiao': int.parse(crp.substring(0, 2)).toString(),
+      'registro': crp.substring(3),
+      'cpf': '',
+      'recaptchaToken': '',
+    };
+    final requestUri = Uri.parse(_cfpApiUrl).replace(queryParameters: queryParameters);
+    developer.log(
+      'Endpoint CFP: $requestUri',
+      name: 'CrpValidation',
+    );
+
     late final http.Response response;
     try {
       response = await http
-          .get(Uri.parse(_cfpApiUrl).replace(queryParameters: {
-            'nome': '',
-            'regiao': int.parse(crp.substring(0, 2)).toString(),
-            'registro': crp.substring(3),
-            'cpf': '',
-            'recaptchaToken': '',
-          }))
+          .get(requestUri)
           .timeout(const Duration(seconds: 12));
     } on TimeoutException catch (error, stackTrace) {
       developer.log('Timeout na consulta ao CFP.', name: 'CrpValidation', error: error, stackTrace: stackTrace);
@@ -94,11 +101,15 @@ class CrpValidationService {
       'Resposta do CFP: HTTP ${response.statusCode}, ${response.body.length} bytes.',
       name: 'CrpValidation',
     );
+    developer.log(
+      'Corpo da resposta do CFP: ${response.body}',
+      name: 'CrpValidation',
+    );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       if (response.statusCode == 422) {
         throw const CrpValidationException(
-          'O CFP rejeitou os parâmetros da consulta (o cadastro público pode exigir CAPTCHA).',
+          'O CFP rejeitou os parâmetros da consulta. Veja o corpo da resposta no log CrpValidation para identificar o campo inválido ou CAPTCHA.',
         );
       }
       if (response.statusCode == 400 || response.statusCode == 403) {

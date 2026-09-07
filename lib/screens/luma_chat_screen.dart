@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import '../services/gemini_service.dart';
+import '../services/daily_checkup_history_service.dart';
 import '../models/consultation_model.dart';
 import '../models/conversation_models.dart';
 import '../widgets/global_drawer.dart';
@@ -81,7 +82,14 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
   final Map<String, String> _collectedInfo = {};
   final List<Consultation> _todayConsultations = [];
   List<Map<String, dynamic>> _registeredPsychologists = [];
+  final Map<String, String> _patientLumaSummaries = {};
+  final Map<String, String> _patientLumaReports = {};
   bool _catalogLoading = true;
+  bool _recordingConsent = false;
+  bool _consentPromptShown = false;
+  bool _consentDecisionPending = false;
+  bool _summaryGenerationRunning = false;
+  String _patientConversationMode = 'undecided';
 
   @override
   void initState() {
@@ -90,7 +98,9 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
       await _loadUserName();
       await _loadHeaderImage();
       await _loadAppointmentsContext();
+      await _loadLumaConsent();
       await _loadRegisteredPsychologists();
+      await _maybeGenerateSummaryBeforeAppointment();
       _addLumaMessage(
         _buildInitialGreeting(),
         content: widget.mode == 'PSYCHOLOGIST' && _todayConsultations.isNotEmpty
@@ -98,6 +108,161 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
             : null,
       );
     });
+  }
+
+  Future<void> _loadLumaConsent() async {
+    if (widget.mode == 'PSYCHOLOGIST') return;
+    // O consentimento é intencionalmente renovado em cada nova conversa.
+    // Não reutilizamos uma autorização antiga para iniciar novos registros.
+    if (mounted) {
+      setState(() => _recordingConsent = false);
+      debugPrint('[Luma][consent] new conversation requires fresh permission');
+    }
+  }
+
+  bool _looksLikeAcuteAnxiety(String text) {
+    final value = text.toLowerCase();
+    const terms = ['crise de ansiedade', 'ataque de ansiedade', 'ataque de pânico', 'ataque de panico', 'não consigo respirar', 'nao consigo respirar', 'meu coração está disparado', 'meu coracao esta disparado'];
+    return terms.any(value.contains);
+  }
+
+  bool _isWeeklyOccurrence(String text) {
+    final value = text.toLowerCase();
+    const terms = ['aconteceu', 'essa semana', 'esta semana', 'ocorreu', 'briguei', 'perdi', 'fui demit', 'me senti', 'estou me sentindo', 'tenho tido'];
+    return terms.any(value.contains);
+  }
+
+  void _requestRecordingConsent() {
+    if (_recordingConsent || _consentPromptShown || _consentDecisionPending || !mounted) return;
+    _consentPromptShown = true;
+    _consentDecisionPending = true;
+    debugPrint('[Luma][consent] asking inline permission before recording');
+    _addLumaMessage(
+      'Posso registrar o que você compartilhou? Se você permitir, salvo esta conversa e preparo um resumo para o seu psicólogo. Isso pode ajudar o profissional a ser mais assertivo no atendimento. Você decide: a conversa continua mesmo se preferir não registrar.',
+      content: _buildConsentActions(),
+    );
+  }
+
+  Widget _buildConsentActions() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        OutlinedButton(
+          onPressed: _consentDecisionPending ? () => _resolveRecordingConsent(false) : null,
+          child: const Text('Agora não'),
+        ),
+        const SizedBox(width: 8),
+        FilledButton(
+          onPressed: _consentDecisionPending ? () => _resolveRecordingConsent(true) : null,
+          child: const Text('Permitir registro'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _resolveRecordingConsent(bool allowed) async {
+    if (!_consentDecisionPending) return;
+    setState(() => _consentDecisionPending = false);
+    debugPrint('[Luma][consent] decision=${allowed ? 'allowed' : 'declined'}');
+    if (allowed) {
+      final auth = Provider.of<AuthService>(context, listen: false);
+      final id = auth.currentUser?.uid;
+      if (id != null) {
+        await Provider.of<FirebaseService>(context, listen: false).setLumaRecordingConsent(id, true);
+        if (mounted) setState(() => _recordingConsent = true);
+        await _persistConversationIfAllowed();
+      }
+      _addLumaMessage('Certo, registrei esta conversa. Podemos continuar de onde paramos — o que mais você gostaria de me contar?');
+    } else {
+      _addLumaMessage('Tudo bem, não vou registrar esta conversa. Podemos continuar falando sobre como você está se sentindo.');
+    }
+  }
+
+  double? _averageMoodLast7Days() {
+    final history = Provider.of<DailyCheckupHistoryService>(context, listen: false).getLastNDaysCheckups(7).where((c) => c.moodScore > 0).toList();
+    if (history.isEmpty) return null;
+    return history.map((c) => c.moodScore).reduce((a, b) => a + b) / history.length;
+  }
+
+  List<Map<String, dynamic>> _recordableMessages() => _messages.reversed.where((m) => m.text.trim().isNotEmpty).map((m) => {
+    'role': m.isUser ? 'user' : 'luma', 'text': m.text, 'createdAt': DateTime.now().toIso8601String(),
+  }).toList();
+
+  Future<void> _persistConversationIfAllowed() async {
+    if (!_recordingConsent || widget.mode == 'PSYCHOLOGIST') return;
+    final id = Provider.of<AuthService>(context, listen: false).currentUser?.uid;
+    if (id == null) return;
+    final user = Provider.of<AuthService>(context, listen: false).currentUser;
+    debugPrint('[Luma][storage] saving userId=$id email=${user?.email} name=$_userName messages=${_recordableMessages().length}');
+    final firebase = Provider.of<FirebaseService>(context, listen: false);
+    await firebase.registerLumaUser(userId: id, userEmail: user?.email, userName: _userName);
+    await firebase.saveLumaConversationSnapshot(
+      userId: id,
+      userEmail: user?.email,
+      userName: _userName,
+      messages: _recordableMessages(),
+      averageMoodLast7Days: _averageMoodLast7Days(),
+    );
+  }
+
+  Future<void> _recordOrAskConsent() async {
+    if (_recordingConsent) {
+      await _persistConversationIfAllowed();
+    } else {
+      _requestRecordingConsent();
+    }
+  }
+
+  DateTime? _appointmentDateTime(Consultation consultation) {
+    final match = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(consultation.hour.trim());
+    if (match == null) return null;
+    final hour = int.tryParse(match.group(1)!) ?? -1;
+    final minute = int.tryParse(match.group(2)!) ?? -1;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    final date = DateTime.fromMillisecondsSinceEpoch(consultation.date);
+    return DateTime(date.year, date.month, date.day, hour, minute);
+  }
+
+  Future<void> _maybeGenerateSummaryBeforeAppointment() async {
+    if (widget.mode == 'PSYCHOLOGIST' || _summaryGenerationRunning) return;
+    final userId = Provider.of<AuthService>(context, listen: false).currentUser?.uid;
+    if (userId == null) return;
+    final now = DateTime.now();
+    final candidates = _todayConsultations.map((c) => MapEntry(c, _appointmentDateTime(c))).where((entry) {
+      final date = entry.value;
+      return date != null && date.isAfter(now) && date.difference(now) <= const Duration(hours: 6) && entry.key.id != null;
+    }).toList();
+    if (candidates.isEmpty) return;
+    candidates.sort((a, b) => a.value!.compareTo(b.value!));
+    final appointment = candidates.first.key;
+    _summaryGenerationRunning = true;
+    try {
+      final firebase = Provider.of<FirebaseService>(context, listen: false);
+      final consultationId = appointment.id!;
+      if (await firebase.getLumaSummaryForConsultation(consultationId) != null) return;
+      final dailyRecords = await firebase.getLumaDailyRecordsForUser(userId, limit: 30);
+      final historicalConversation = dailyRecords.expand((record) {
+        final date = record['conversationDate']?.toString() ?? 'data não informada';
+        final messages = (record['messages'] as List?)?.map((message) => '${message['role']}: ${message['text']}').join('\n') ?? '';
+        return ['Data: $date\n$messages'];
+      }).join('\n\n');
+      if (historicalConversation.trim().isEmpty) return;
+      final conversation = historicalConversation;
+      final summary = await _geminiService.generateLumaPsychologistSummary(conversation: conversation, averageMoodLast7Days: _averageMoodLast7Days());
+      final user = Provider.of<AuthService>(context, listen: false).currentUser;
+      await firebase.saveLumaPsychologistSummary(
+        consultationId: consultationId,
+        userId: userId,
+        userEmail: user?.email,
+        userName: _userName,
+        psychologistId: appointment.idPsychologist,
+        summary: summary,
+        messages: _recordableMessages(),
+        averageMoodLast7Days: _averageMoodLast7Days(),
+      );
+      _patientLumaReports[userId] = summary;
+    } catch (e) { debugPrint('Error generating Luma summary: $e'); }
+    finally { _summaryGenerationRunning = false; }
   }
 
   String _buildInitialGreeting() {
@@ -110,7 +275,7 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
       return 'Olá, $prefix. Eu sou a Luma assistente e posso ajudar a organizar sua agenda e preparar mensagens quando houver consultas agendadas.';
     }
 
-    return 'Olá! Eu sou a Luma. Vou conversar com você para entender seu momento e indicar o psicólogo ideal. Pode me contar com suas palavras: o que mais está te incomodando hoje?';
+    return 'Olá! Eu sou a Luma. Você prefere apenas conversar sobre algo que está sentindo ou quer marcar uma consulta? Pode responder com suas palavras — se mudar de ideia durante a conversa, eu acompanho o novo caminho.';
   }
 
   Future<void> _loadUserName() async {
@@ -172,6 +337,33 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
           ..clear()
           ..addAll(consultations);
       });
+      if (widget.mode == 'PSYCHOLOGIST') {
+        final recordsByPatient = <String, String>{};
+        for (final consultation in consultations) {
+          try {
+            final records = await firebaseService.getLumaDailyRecordsForUser(consultation.idPatient);
+            if (records.isEmpty) continue;
+            final lines = records.take(7).expand((record) {
+              final date = record['conversationDate'] ?? 'data não informada';
+              final mood = record['averageMoodLast7Days'];
+              final messages = (record['messages'] as List?)?.map((message) => '${message['role']}: ${message['text']}').join(' | ') ?? '';
+              return ['[$date] humor médio: ${mood ?? 'não disponível'}; conversa: $messages'];
+            }).join('\n');
+            recordsByPatient[consultation.idPatient] = lines;
+            final consultationId = consultation.id;
+            if (consultationId != null) {
+              final report = await firebaseService.getLumaSummaryForConsultation(consultationId);
+              final reportText = report?['summary']?.toString().replaceAll('**', '').replaceAll('```', '').trim();
+              if (reportText != null && reportText.isNotEmpty) {
+                _patientLumaReports[consultation.idPatient] = reportText;
+              }
+            }
+          } catch (e) {
+            debugPrint('[Luma][storage] failed loading patient records: $e');
+          }
+        }
+        if (mounted) setState(() => _patientLumaSummaries.addAll(recordsByPatient));
+      }
     } catch (e) {
       debugPrint('Error loading appointments context in LumaChat: $e');
     }
@@ -232,7 +424,9 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
       final specialty = consultation.psychologistSpecialty?.trim().isNotEmpty == true ? consultation.psychologistSpecialty : '';
       final modality = consultation.psychologistModality?.trim().isNotEmpty == true ? consultation.psychologistModality : '';
       final availability = consultation.psychologistAvailability?.trim().isNotEmpty == true ? consultation.psychologistAvailability : '';
-      return '- $patientName com $psychologistName em ${consultation.hour} (${consultation.modality}, ${consultation.status})${specialty != '' ? ' • Especialidade: $specialty' : ''}${modality != '' ? ' • Atendimento: $modality' : ''}${availability != '' ? ' • Disponibilidade: $availability' : ''}';
+      final lumaSummary = _patientLumaSummaries[consultation.idPatient];
+      final lumaReport = _patientLumaReports[consultation.idPatient];
+      return '- $patientName com $psychologistName em ${consultation.hour} (${consultation.modality}, ${consultation.status})${specialty != '' ? ' • Especialidade: $specialty' : ''}${modality != '' ? ' • Atendimento: $modality' : ''}${availability != '' ? ' • Disponibilidade: $availability' : ''}${lumaSummary != null ? ' • Registros recentes da Luma: $lumaSummary' : ''}${lumaReport != null ? ' • Resumo para o psicólogo: $lumaReport' : ''}';
     }).join('\n');
   }
 
@@ -487,11 +681,121 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
         .join('\n');
   }
 
+  bool _isExplicitAppointmentRequest(String message) {
+    final normalized = message.toLowerCase().trim();
+    final negatesAgenda = normalized.contains('sem marcar') ||
+        normalized.contains('não marcar') ||
+        normalized.contains('nao marcar') ||
+        normalized.contains('não quero marcar') ||
+        normalized.contains('nao quero marcar') ||
+        normalized.contains('só falar com a luma') ||
+        normalized.contains('so falar com a luma');
+    if (negatesAgenda) return false;
+    return _isAppointmentInteraction(normalized) &&
+        (normalized.contains('tenho') ||
+            normalized.contains('marcar') ||
+            normalized.contains('agendar') ||
+            normalized.contains('quando') ||
+            normalized.contains('horário') ||
+            normalized.contains('horario') ||
+            normalized.contains('dia'));
+  }
+
+  bool _isConversationChoice(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('só conversar') || normalized.contains('so conversar') ||
+        normalized.contains('apenas conversar') || normalized.contains('só falar') ||
+        normalized.contains('so falar') || normalized.contains('desabafar') ||
+        normalized.contains('conversar com a luma');
+  }
+
+  bool _isSchedulingRequest(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('marcar') || normalized.contains('agendar') ||
+        normalized.contains('quero uma consulta') || normalized.contains('quero consulta') ||
+        normalized.contains('encontrar um psicólogo') || normalized.contains('encontrar um psicologo');
+  }
+
+  bool _isPatientSummaryRequest(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('como está') || normalized.contains('como esta') ||
+        normalized.contains('resumo') || normalized.contains('relatório') ||
+        normalized.contains('relatorio') || normalized.contains('situação do paciente') ||
+        normalized.contains('situacao do paciente');
+  }
+
+  Future<bool> _handlePatientSummaryRequest(String message) async {
+    if (!_isPatientSummaryRequest(message)) return false;
+    Consultation? consultation;
+    final normalized = message.toLowerCase();
+    for (final item in _todayConsultations) {
+      final name = item.patientName?.trim();
+      final nameParts = name?.toLowerCase().split(RegExp(r'\s+')).where((part) => part.length >= 3).toList() ?? const <String>[];
+      if (name != null && name.isNotEmpty &&
+          (normalized.contains(name.toLowerCase()) || nameParts.any((part) => normalized.contains(part)))) {
+        consultation = item;
+        break;
+      }
+    }
+    if (consultation == null) {
+      _addLumaMessage('Claro. De qual paciente você gostaria de ver o resumo? Informe o nome como aparece na sua agenda.');
+      return true;
+    }
+    final patientName = consultation.patientName?.trim().isNotEmpty == true ? consultation.patientName!.trim() : 'este paciente';
+    debugPrint('[Luma][report] generating on demand for patient=$patientName id=${consultation.idPatient}');
+    try {
+      final firebase = Provider.of<FirebaseService>(context, listen: false);
+      final records = await firebase.getLumaDailyRecordsForUser(consultation.idPatient, limit: 30);
+      if (records.isEmpty) {
+        _addLumaMessage('Ainda não há registros autorizados da Luma para $patientName.');
+        return true;
+      }
+      final historicalConversation = records.expand((record) {
+        final date = record['conversationDate']?.toString() ?? 'data não informada';
+        final messages = (record['messages'] as List?)?.map((item) => '${item['role']}: ${item['text']}').join('\n') ?? '';
+        return ['Data: $date\n$messages'];
+      }).join('\n\n');
+      final moodValues = records.map((record) => (record['averageMoodLast7Days'] as num?)?.toDouble()).whereType<double>().toList();
+      final averageMood = moodValues.isEmpty ? null : moodValues.reduce((a, b) => a + b) / moodValues.length;
+      final summary = await _geminiService.generateLumaPsychologistSummary(conversation: historicalConversation, averageMoodLast7Days: averageMood);
+      if (consultation.id != null) {
+        final firstRecord = records.first;
+        await firebase.saveLumaPsychologistSummary(
+          consultationId: consultation.id!,
+          userId: consultation.idPatient,
+          userEmail: firstRecord['userEmail']?.toString(),
+          userName: patientName,
+          psychologistId: consultation.idPsychologist,
+          summary: summary,
+          messages: records.expand((record) => (record['messages'] as List?)?.cast<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[]).toList(),
+          averageMoodLast7Days: averageMood,
+        );
+      }
+      _patientLumaReports[consultation.idPatient] = summary;
+      debugPrint('[Luma][report] saved for consultation=${consultation.id}');
+      _addLumaMessage('Resumo de $patientName:\n\n$summary');
+    } catch (e) {
+      debugPrint('[Luma][report][error] $e');
+      _addLumaMessage('Não consegui gerar o resumo de $patientName agora. Verifique se há registros autorizados e tente novamente.');
+    }
+    return true;
+  }
+
+  String _sanitizeLumaReply(String text) {
+    var sanitized = text.trim();
+    sanitized = sanitized.replaceFirst(RegExp(r'^\s*(oi|olá|ola)\s*[!,.:;\-–—]*\s*', caseSensitive: false), '');
+    sanitized = sanitized.replaceFirst(RegExp(r'^\s*(sou\s+a\s+luma|luma\s+aqui)\s*[!,.:;\-–—]*\s*', caseSensitive: false), '');
+    sanitized = sanitized.replaceFirst(RegExp(r'^\s*(tipo\s*de\s*intera[cç][aã]o|classifica[cç][aã]o)\s*:\s*(agenda|triagem)\s*[\-–—:]?\s*', caseSensitive: false), '');
+    sanitized = sanitized.replaceFirst(RegExp(r'^\s*(agenda|triagem)\s*[\-–—:]\s*', caseSensitive: false), '');
+    return sanitized.trim();
+  }
+
   Future<void> _handleSend() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _isLoading) return;
 
     _addUserMessage(text);
+    debugPrint('[Luma][input] mode=$_patientConversationMode text="$text"');
     _controller.clear();
 
     setState(() {
@@ -500,6 +804,7 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
 
     try {
       if (widget.mode == 'PSYCHOLOGIST') {
+        if (await _handlePatientSummaryRequest(text)) return;
         final reply = await _geminiService.generatePsychologistAssistantResponse(
           userMessage: text,
           conversationContext: _buildConversationContext(),
@@ -511,22 +816,55 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
         );
         _addLumaMessage(reply);
       } else {
+        if (_isSchedulingRequest(text)) {
+          _patientConversationMode = 'triage';
+          debugPrint('[Luma][route] explicit scheduling request -> triage');
+        } else if (_patientConversationMode == 'undecided') {
+          _patientConversationMode = 'conversation';
+          debugPrint('[Luma][route] initial patient choice -> conversation');
+        } else if (_isExplicitAppointmentRequest(text)) {
+          _patientConversationMode = 'triage';
+          debugPrint('[Luma][route] conversation changed to triage');
+        }
+        if (_looksLikeAcuteAnxiety(text)) {
+          _addLumaMessage('Sinto muito que isso esteja acontecendo. Vamos atravessar este momento juntos: coloque os pés no chão, inspire pelo nariz por 4 segundos e solte o ar lentamente por 6 segundos por alguns ciclos; olhe ao redor e nomeie 5 coisas que vê, 4 que sente pelo toque, 3 que ouve, 2 que cheira e 1 que saboreia. Se houver dor no peito intensa, desmaio, falta de ar persistente, risco de se machucar ou você não se sentir seguro(a), procure o SAMU (192), uma emergência ou alguém de confiança agora.');
+          if (_isWeeklyOccurrence(text)) await _recordOrAskConsent();
+          return;
+        }
+        if (_patientConversationMode == 'conversation') {
+          debugPrint('[Luma][gemini] requesting emotional conversation response');
+          final reply = await _geminiService.generateChatResponse(
+            userMessage: text,
+            conversationContext: _buildConversationContext(),
+            userName: _userName.isNotEmpty ? _userName : null,
+          );
+          debugPrint('[Luma][gemini] emotional response received (${reply.length} chars)');
+          _addLumaMessage(_sanitizeLumaReply(reply));
+          if (_isWeeklyOccurrence(text)) await _recordOrAskConsent();
+          await _maybeGenerateSummaryBeforeAppointment();
+          return;
+        }
+
+        debugPrint('[Luma][route] triage flow');
         final psychologistProfiles = _buildPsychologistProfiles();
         if (psychologistProfiles.isEmpty || _catalogLoading) {
+          debugPrint('[Luma][triage] psychologist catalog unavailable');
           _addLumaMessage('Ainda não encontrei psicólogos cadastrados na aplicação para recomendar. Assim que houver profissionais registrados, eu consigo fazer a triagem com base no que eles configuraram.');
           return;
         }
 
+        debugPrint('[Luma][gemini] requesting triage response');
         final triageResult = await _geminiService.generatePsychologistTriageResponse(
           userMessage: text,
           conversationContext: _buildConversationContext(),
           collectedInfo: {
             ..._collectedInfo,
-            'consultas_agendadas': _buildAppointmentsContext(),
           },
           userName: _userName.isNotEmpty ? _userName : null,
           psychologistOptions: _registeredPsychologists,
         );
+        final detectedInteraction = triageResult['interaction_type'];
+        debugPrint('[Luma][gemini] triage response keys=${triageResult.keys.toList()} interaction=$detectedInteraction');
 
         final extracted = triageResult['extracted_info'];
         final interactionType = triageResult['interaction_type']?.toString().toLowerCase();
@@ -540,7 +878,7 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
         }
 
         final reply = (triageResult['assistant_reply']?.toString().trim().isNotEmpty ?? false)
-            ? triageResult['assistant_reply'].toString().trim()
+            ? _sanitizeLumaReply(triageResult['assistant_reply'].toString().trim())
             : 'Entendi. Quero te ajudar com cuidado. Pode me contar um pouco mais sobre seu momento atual?';
 
         _addLumaMessage(reply);
@@ -556,8 +894,11 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
             content: _buildProfessionalCard(recommended),
           );
         }
+        if (_isWeeklyOccurrence(text)) await _recordOrAskConsent();
+        await _maybeGenerateSummaryBeforeAppointment();
       }
     } catch (e) {
+      debugPrint('[Luma][error] mode=$_patientConversationMode error=$e');
       _addLumaMessage(widget.mode == 'PSYCHOLOGIST'
           ? (_todayConsultations.isNotEmpty
               ? 'Posso ajudar com agenda, pacientes e mensagens. O que você quer organizar agora?'

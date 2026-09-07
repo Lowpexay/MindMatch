@@ -56,6 +56,119 @@ class FirebaseService {
   static const String patientsCollection = 'patients';
   static const String psychologistsCollection = 'psychologists';
   static const String consultationsCollection = 'consultations';
+  // Private, consent-based notes that Luma prepares for the patient's psychologist.
+  static const String lumaSummariesCollection = 'user_summary_for_psychologist';
+  static const String lumaUsersCollection = 'luma_users';
+
+  Future<void> registerLumaUser({
+    required String userId,
+    String? userEmail,
+    String? userName,
+  }) async {
+    await _firestore.collection(lumaUsersCollection).doc(userId).set({
+      'userId': userId,
+      'email': userEmail,
+      'name': userName,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<bool> getLumaRecordingConsent(String userId) async {
+    final snapshot = await _firestore.collection(usersCollection).doc(userId).get();
+    return snapshot.data()?['lumaRecordingConsent'] == true;
+  }
+
+  Future<void> setLumaRecordingConsent(String userId, bool allowed) async {
+    await _firestore.collection(usersCollection).doc(userId).set({
+      'lumaRecordingConsent': allowed,
+      'lumaRecordingConsentUpdatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> saveLumaConversationSnapshot({
+    required String userId,
+    String? userEmail,
+    String? userName,
+    required List<Map<String, dynamic>> messages,
+    double? averageMoodLast7Days,
+  }) async {
+    final now = DateTime.now();
+    final dayKey = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final documentId = '${userId}_$dayKey';
+    await _firestore.collection(lumaSummariesCollection).doc(documentId).set({
+      'userId': userId,
+      'userEmail': userEmail,
+      'userName': userName,
+      'conversationId': documentId,
+      'conversationDate': dayKey,
+      'messages': messages,
+      'averageMoodLast7Days': averageMoodLast7Days,
+      'consentGranted': true,
+      'status': 'conversation_in_progress',
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<List<Map<String, dynamic>>> getLumaDailyRecordsForUser(String userId, {int limit = 14}) async {
+    final snapshot = await _firestore
+        .collection(lumaSummariesCollection)
+        .where('userId', isEqualTo: userId)
+        .limit(limit)
+        .get();
+    final records = snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+    records.sort((a, b) => (b['conversationDate']?.toString() ?? '').compareTo(a['conversationDate']?.toString() ?? ''));
+    return records;
+  }
+
+  Future<Map<String, dynamic>?> getLumaConversationSnapshot(String userId) async {
+    final snapshot = await _firestore.collection(lumaSummariesCollection).doc('${userId}_draft').get();
+    return snapshot.exists ? snapshot.data() : null;
+  }
+
+  Future<Map<String, dynamic>?> getLumaSummaryForConsultation(String consultationId) async {
+    final snapshot = await _firestore.collection(lumaSummariesCollection).doc(consultationId).get();
+    return snapshot.exists ? snapshot.data() : null;
+  }
+
+  Future<Map<String, dynamic>?> getLatestLumaSummaryForPatient(String userId) async {
+    final snapshot = await _firestore
+        .collection(lumaSummariesCollection)
+        .where('userId', isEqualTo: userId)
+        .limit(100)
+        .get();
+    final summaries = snapshot.docs
+        .map((doc) => doc.data())
+        .where((data) => data['status'] == 'ready_for_psychologist' && (data['summary']?.toString().trim().isNotEmpty ?? false))
+        .toList();
+    if (summaries.isEmpty) return null;
+    summaries.sort((a, b) => (b['generatedAt']?.toString() ?? '').compareTo(a['generatedAt']?.toString() ?? ''));
+    return summaries.first;
+  }
+
+  Future<void> saveLumaPsychologistSummary({
+    required String consultationId,
+    required String userId,
+    required String psychologistId,
+    String? userEmail,
+    String? userName,
+    required String summary,
+    required List<Map<String, dynamic>> messages,
+    double? averageMoodLast7Days,
+  }) async {
+    await _firestore.collection(lumaSummariesCollection).doc(consultationId).set({
+      'consultationId': consultationId,
+      'userId': userId,
+      'userEmail': userEmail,
+      'userName': userName,
+      'psychologistId': psychologistId,
+      'summary': summary,
+      'messages': messages,
+      'averageMoodLast7Days': averageMoodLast7Days,
+      'consentGranted': true,
+      'status': 'ready_for_psychologist',
+      'generatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
 
   /// Delete basic user related data (best-effort) before account deletion.
   /// This avoids leaving orphaned profile docs or storage assets.

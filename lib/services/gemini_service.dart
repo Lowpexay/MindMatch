@@ -8,7 +8,9 @@ import '../models/mood_data.dart';
 
 class GeminiService {
   static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent';
-  final List<String> _keys = ApiKeys.geminiApiKeys;
+  final List<String> _keys = ApiKeys.geminiApiKeys
+      .where((key) => key.trim().isNotEmpty)
+      .toList();
   // Forçar uso do modelo gemini-3.5-flash-lite (não usar fallback)
 
   // Gera uma ordem aleatória de tentativa para esta requisição
@@ -64,6 +66,7 @@ class GeminiService {
 
   Future<http.Response> _postWithRotation(Map<String, dynamic> body) async {
     if (_keys.isEmpty) {
+      print('❌ [Gemini] Nenhuma GEMINI_API_KEY configurada. Inicie o app com --dart-define=GEMINI_API_KEY=SUA_CHAVE.');
       final uri = Uri.parse('$_baseUrl?key=');
       return http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
     }

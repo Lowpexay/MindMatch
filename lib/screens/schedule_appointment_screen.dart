@@ -21,6 +21,46 @@ class _ScheduleAppointmentScreenState extends State<ScheduleAppointmentScreen> {
   Map<String, dynamic>? _selectedPsychologist;
   Map<String, dynamic>? _routeProfile;
 
+  List<String> get _availableTimes {
+    final profile = _selectedProfileOrNull();
+    final raw = profile?['availabilityHours']?.toString() ?? '';
+    final match = RegExp(r'(\d{1,2}):(\d{2})\s*(?:às|as|-|até|ate)\s*(\d{1,2}):(\d{2})', caseSensitive: false).firstMatch(raw);
+    if (match == null) return _timeOptions;
+    final start = (int.parse(match.group(1)!) * 60) + int.parse(match.group(2)!);
+    final end = (int.parse(match.group(3)!) * 60) + int.parse(match.group(4)!);
+    final slots = <String>[];
+    for (var minutes = start; minutes <= end; minutes += 60) {
+      final hour = (minutes ~/ 60).toString().padLeft(2, '0');
+      final minute = (minutes % 60).toString().padLeft(2, '0');
+      slots.add('$hour:$minute');
+    }
+    return slots.isEmpty ? _timeOptions : slots;
+  }
+
+  bool _isDateAvailable(DateTime date) {
+    final rawDays = _selectedProfileOrNull()?['availabilityDays']?.toString().toLowerCase() ?? '';
+    if (rawDays.trim().isEmpty) return true;
+    const names = {
+      1: ['segunda', 'seg'],
+      2: ['terça', 'terca', 'ter'],
+      3: ['quarta', 'qua'],
+      4: ['quinta', 'qui'],
+      5: ['sexta', 'sex'],
+      6: ['sábado', 'sabado', 'sáb', 'sab'],
+      7: ['domingo', 'dom'],
+    };
+    return names[date.weekday]!.any(rawDays.contains);
+  }
+
+  DateTime _nextAvailableDate() {
+    var candidate = DateTime.now().add(const Duration(days: 1));
+    for (var i = 0; i < 31; i++) {
+      if (_isDateAvailable(candidate)) return candidate;
+      candidate = candidate.add(const Duration(days: 1));
+    }
+    return DateTime.now().add(const Duration(days: 1));
+  }
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +87,8 @@ class _ScheduleAppointmentScreenState extends State<ScheduleAppointmentScreen> {
       setState(() {
         _psychologists = psychologists;
         _selectedPsychologist = _resolveInitialSelectedPsychologist();
+        _selectedTime = _availableTimes.first;
+        _selectedDate = _nextAvailableDate();
         _isLoadingPsychologists = false;
       });
     } catch (e) {
@@ -54,6 +96,8 @@ class _ScheduleAppointmentScreenState extends State<ScheduleAppointmentScreen> {
       setState(() {
         _psychologists = [];
         _selectedPsychologist = _resolveInitialSelectedPsychologist();
+        _selectedTime = _availableTimes.first;
+        _selectedDate = _nextAvailableDate();
         _isLoadingPsychologists = false;
       });
     }
@@ -168,7 +212,11 @@ class _ScheduleAppointmentScreenState extends State<ScheduleAppointmentScreen> {
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 10),
                                 child: InkWell(
-                                  onTap: () => setState(() => _selectedPsychologist = psychologist),
+                                  onTap: () => setState(() {
+                                    _selectedPsychologist = psychologist;
+                                    _selectedTime = _availableTimes.first;
+                                    _selectedDate = _nextAvailableDate();
+                                  }),
                                   borderRadius: BorderRadius.circular(12),
                                   child: Container(
                                     padding: const EdgeInsets.all(12),
@@ -234,7 +282,7 @@ class _ScheduleAppointmentScreenState extends State<ScheduleAppointmentScreen> {
                   spacing: 8,
                   runSpacing: 10,
                   alignment: WrapAlignment.center,
-                  children: _timeOptions
+                    children: _availableTimes
                       .map((time) => _optionPill(
                             label: time,
                             selected: _selectedTime == time,
@@ -461,18 +509,22 @@ class _ScheduleAppointmentScreenState extends State<ScheduleAppointmentScreen> {
           date.day == _selectedDate.day && date.month == _selectedDate.month && date.year == _selectedDate.year;
       cells.add(
         InkWell(
-          onTap: () => setState(() => _selectedDate = date),
+          onTap: _isDateAvailable(date) ? () => setState(() => _selectedDate = date) : null,
           borderRadius: BorderRadius.circular(8),
           child: Container(
             alignment: Alignment.center,
-            decoration: isSelected
+            decoration: isSelected && _isDateAvailable(date)
                 ? const BoxDecoration(color: Color(0xFF56B35D), shape: BoxShape.circle)
                 : null,
             child: Text(
               '$day',
               style: TextStyle(
                 fontSize: 12,
-                color: isSelected ? Colors.white : const Color(0xFF5F9462),
+                color: !_isDateAvailable(date)
+                    ? const Color(0xFFBDBDBD)
+                    : isSelected
+                        ? Colors.white
+                        : const Color(0xFF5F9462),
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),
             ),

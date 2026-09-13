@@ -9,9 +9,6 @@ class PreferencesService {
   static const String interactionModeText = 'text';
   static const String interactionModeVoice = 'voice';
   
-  // Voice ID fixo da nova voz (não exposto ao usuário)
-  static const String _defaultVoiceId = '21m00Tcm4TlvDq8ikWAM'; // Rachel - Voz feminina natural
-  
   /// Verifica se a Luma já foi configurada
   static Future<bool> hasConfiguredLuma() async {
     final prefs = await SharedPreferences.getInstance();
@@ -34,11 +31,6 @@ class PreferencesService {
   static Future<void> setLumaInteractionMode(String mode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_lumaInteractionModeKey, mode);
-  }
-  
-  /// Obtém o voice ID (sempre a mesma voz, mas não exposto ao usuário)
-  static String getVoiceId() {
-    return _defaultVoiceId;
   }
   
   /// Verifica se está no modo voz

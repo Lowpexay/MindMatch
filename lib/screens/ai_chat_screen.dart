@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/gemini_service.dart';
-import '../services/elevenlabs_service.dart';
 import '../services/speech_recognition_service.dart';
 import '../services/preferences_service.dart';
 import '../services/firebase_service.dart';
@@ -45,15 +44,12 @@ class AiChatScreenState extends State<AiChatScreen> {
   AuthService? _authService;
   
   // Configurações de voz simplificadas
-  ElevenLabsService? _elevenLabsService;
   SpeechRecognitionService? _speechService;
   String _interactionMode = 'text'; // 'text' ou 'voice'
   bool _hasConfigured = false;
   
   // Controle do modo visual de voz
   bool _isVisualVoiceMode = false;
-  String? _currentSpeechText;
-  bool _isSpeakingNow = false;
   
   // Controles de áudio para o usuário
   bool _isRecordingAudio = false;
@@ -64,45 +60,6 @@ class AiChatScreenState extends State<AiChatScreen> {
   void initState() {
     super.initState();
     _geminiService = GeminiService();
-    
-    // Inicializar ElevenLabs
-    try {
-      _elevenLabsService = ElevenLabsService();
-      // Callbacks para controlar estado de fala sem bloquear botão
-      _elevenLabsService!.onStart = () {
-        if (mounted) {
-          setState(() {
-            _isSpeakingNow = true;
-          });
-        }
-      };
-      _elevenLabsService!.onComplete = () {
-        if (mounted) {
-          setState(() {
-            _isSpeakingNow = false;
-            _currentSpeechText = null;
-          });
-        }
-      };
-      _elevenLabsService!.onStop = () {
-        if (mounted) {
-          setState(() {
-            _isSpeakingNow = false;
-            _currentSpeechText = null;
-          });
-        }
-      };
-      _elevenLabsService!.onError = (error) {
-        if (mounted) {
-          setState(() {
-            _isSpeakingNow = false;
-          });
-        }
-      };      
-      print('✅ ElevenLabs inicializado');
-    } catch (e) {
-      print('⚠️ ElevenLabs não disponível: $e');
-    }
     
     // Inicializar Speech Recognition
     _initializeSpeechRecognition();
@@ -219,23 +176,8 @@ class AiChatScreenState extends State<AiChatScreen> {
     }
   }
 
-  /// Manipula o toque na Luma no modo voz
-  void _handleLumaTap() {
-    if (_isSpeakingNow) {
-      // Se estiver falando, parar
-      _elevenLabsService?.stop();
-      setState(() {
-        _isSpeakingNow = false;
-        _currentSpeechText = null;
-      });
-    }
-  }
-
   /// Alterna para modo texto
   Future<void> _switchToTextMode() async {
-    // Parar qualquer operação em andamento
-    _elevenLabsService?.stop();
-    
     // Cancelar loading se estiver em progresso
     if (_isLoading) {
       setState(() {
@@ -247,8 +189,6 @@ class AiChatScreenState extends State<AiChatScreen> {
     setState(() {
       _interactionMode = 'text';
       _isVisualVoiceMode = false;
-      _isSpeakingNow = false;
-      _currentSpeechText = null;
     });
     
     ScaffoldUtils.showSuccessSnackBar('Modo de chat por texto ativado 💬');
@@ -256,9 +196,6 @@ class AiChatScreenState extends State<AiChatScreen> {
 
   /// Alterna para modo voz
   Future<void> _switchToVoiceMode() async {
-    // Parar qualquer operação em andamento
-    _elevenLabsService?.stop();
-    
     // Cancelar loading se estiver em progresso
     if (_isLoading) {
       setState(() {
@@ -270,8 +207,6 @@ class AiChatScreenState extends State<AiChatScreen> {
     setState(() {
       _interactionMode = 'voice';
       _isVisualVoiceMode = true;
-      _isSpeakingNow = false;
-      _currentSpeechText = null;
     });
     
     ScaffoldUtils.showSuccessSnackBar('Modo de conversa por voz ativado 🗣️🦊');
@@ -521,12 +456,6 @@ class AiChatScreenState extends State<AiChatScreen> {
 
       _scrollToBottom();
 
-      // 🔊 FALAR RESPOSTA SE MODO VOZ ATIVO
-      if (_interactionMode == 'voice') {
-        // Não usar await aqui para não manter o botão em loading enquanto a Luma fala
-        _speakMessage(response);
-      }
-
     } catch (e) {
       setState(() {
         _messages.add(ChatMessage(
@@ -577,9 +506,7 @@ class AiChatScreenState extends State<AiChatScreen> {
             // Interface visual da Luma
             Expanded(
                       child: LumaVoiceWidget(
-                                isSpeaking: _isSpeakingNow,
-                                currentMessage: _currentSpeechText,
-                                onTap: _handleLumaTap,
+                                isSpeaking: false,
                               ),
             ),
             
@@ -1367,29 +1294,6 @@ class AiChatScreenState extends State<AiChatScreen> {
     _sendWelcomeMessage();
   }
 
-  /// Atualiza o método de fala para funcionar com o modo visual
-  Future<void> _speakMessage(String text) async {
-    if (_interactionMode != 'voice' || _elevenLabsService == null) return;
-    
-    try {
-      // Definir texto atual (estado de fala controlado pelos callbacks)
-      setState(() {
-        _currentSpeechText = text;
-      });
-      
-      print('🌐 Falando com ElevenLabs: $text');
-      await _elevenLabsService!.speak(text, voiceId: '21m00Tcm4TlvDq8ikWAM');
-      
-    } catch (e) {
-      print('❌ Erro ao falar: $e');
-      setState(() {
-        _isSpeakingNow = false;
-        _currentSpeechText = null;
-      });
-      ScaffoldUtils.showErrorSnackBar('Erro ao reproduzir áudio');
-    }
-  }
-
   void showChatOptions() {
     showModalBottomSheet(
       context: context,
@@ -1443,17 +1347,6 @@ class AiChatScreenState extends State<AiChatScreen> {
               },
             ),
             
-            // Opção para parar fala (só no modo voz)
-            if (_isVisualVoiceMode)
-              ListTile(
-                leading: const Icon(Icons.volume_off, color: AppColors.error),
-                title: Text('Parar fala atual', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),
-                subtitle: Text('Interromper a Luma se estiver falando', style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _handleLumaTap();
-                },
-              ),
             ListTile(
               leading: const Icon(Icons.auto_awesome, color: AppColors.primary),
               title: Text('Sobre a Luma', style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary)),

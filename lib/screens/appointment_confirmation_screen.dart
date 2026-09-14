@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/conversation_models.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
+import '../services/telegram_service.dart';
 import '../screens/user_chat_screen.dart';
 
 class AppointmentConfirmationScreen extends StatefulWidget {
@@ -91,6 +92,19 @@ class _AppointmentConfirmationScreenState extends State<AppointmentConfirmationS
       };
 
       final consultationRef = await firebaseService.createConsultation(consultationData);
+      try {
+        await TelegramService.instance.notifyConsultationCreated(
+          consultationId: consultationRef.id,
+          patientId: patientId,
+          psychologistId: psychologistId,
+          patientName: patientName,
+          date: startOfDay.millisecondsSinceEpoch,
+          hour: time,
+          modality: modality,
+        );
+      } catch (error) {
+        debugPrint('Telegram notification skipped: $error');
+      }
       final conversationId = await firebaseService.getOrCreateConversation(patientId, psychologistId);
       if (conversationId != null) {
         final chatMessage = ChatMessage(

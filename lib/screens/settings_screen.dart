@@ -4,10 +4,62 @@ import 'package:go_router/go_router.dart';
 import '../services/theme_service.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
+import '../services/telegram_service.dart';
 import 'main_navigation.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  bool? _telegramConnected;
+  bool _telegramLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTelegramStatus();
+  }
+
+  Future<void> _loadTelegramStatus() async {
+    try {
+      final connected = await TelegramService.instance.isConnected();
+      if (mounted) setState(() => _telegramConnected = connected);
+    } catch (_) {
+      if (mounted) setState(() => _telegramConnected = false);
+    }
+  }
+
+  Future<void> _connectTelegram() async {
+    setState(() => _telegramLoading = true);
+    try {
+      await TelegramService.instance.connect();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Abra o Telegram e toque em Iniciar no bot MindMatch.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) setState(() => _telegramLoading = false);
+    }
+  }
+
+  Future<void> _disconnectTelegram() async {
+    setState(() => _telegramLoading = true);
+    try {
+      await TelegramService.instance.disconnect();
+      if (mounted) setState(() => _telegramConnected = false);
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) setState(() => _telegramLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +93,20 @@ class SettingsScreen extends StatelessWidget {
             subtitle: const Text('Ativar/desativar tema escuro'),
             value: themeService.isDark,
             onChanged: (v) => themeService.setDark(v),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.send, color: Color(0xFF229ED9)),
+            title: const Text('Notificações pelo Telegram'),
+            subtitle: Text(_telegramConnected == true
+                ? 'Telegram conectado para lembretes de consultas'
+                : 'Conecte o Telegram para receber lembretes'),
+            trailing: _telegramLoading
+                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                : _telegramConnected == true
+                    ? TextButton(onPressed: _disconnectTelegram, child: const Text('Desconectar'))
+                    : TextButton(onPressed: _connectTelegram, child: const Text('Conectar')),
+            onTap: _telegramConnected == true ? null : _connectTelegram,
           ),
           const Divider(),
           ListTile(

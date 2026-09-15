@@ -444,7 +444,7 @@ class _MainNavigationState extends State<MainNavigation>
                 subtitle: 'Alterar informações pessoais',
                 onTap: () {
                   Navigator.pop(context);
-                  context.go('/profile');
+                  switchToTab(3);
                 },
               ),
 

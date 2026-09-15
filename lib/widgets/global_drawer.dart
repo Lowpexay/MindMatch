@@ -9,8 +9,6 @@ import '../services/auth_service.dart';
 import '../widgets/user_avatar.dart';
 import '../utils/app_colors.dart';
 import '../screens/emotional_reports_screen.dart';
-import '../screens/eventlog_report_screen.dart';
-import '../screens/profile_screen.dart';
 import '../screens/main_navigation.dart';
 import '../screens/luma_chat_screen.dart';
 
@@ -24,14 +22,15 @@ class GlobalDrawer extends StatelessWidget {
     final authService = Provider.of<AuthService>(context);
     final user = authService.currentUser;
 
-  final scheme = Theme.of(context).colorScheme;
+    final scheme = Theme.of(context).colorScheme;
 
     return Drawer(
       child: Column(
         children: [
           // Header do drawer — responsive height to avoid overflow on small screens
           Builder(builder: (context) {
-            final headerHeight = min(200.0, MediaQuery.of(context).size.height * 0.25);
+            final headerHeight =
+                min(200.0, MediaQuery.of(context).size.height * 0.25);
             return Container(
               height: headerHeight,
               width: double.infinity,
@@ -45,90 +44,95 @@ class GlobalDrawer extends StatelessWidget {
                   end: Alignment.bottomRight,
                 ),
               ),
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Builder(builder: (context) {
-                  // Avatar size scales with header height to avoid vertical overflow
-                  final avatarDiameter = min(80.0, headerHeight * 0.5);
-                  final avatarRadius = avatarDiameter / 2;
-                  return FutureBuilder<Map<String, dynamic>?>(
-                    future: user != null
-                        ? Provider.of<FirebaseService>(context, listen: false).getUserProfile(user.uid)
-                        : Future.value(null),
-                    builder: (context, snapshot) {
-                      String? imageUrlFromDoc;
-                      Uint8List? imageBytes;
-                      String? nameFromDoc;
-                      String? emailFromDoc;
-                      if (snapshot.hasData && snapshot.data != null) {
-                        final profile = snapshot.data!;
-                        imageUrlFromDoc = (profile['profileImageUrl'] ?? profile['photoURL']) as String?;
-                        nameFromDoc = (profile['displayName'] ?? profile['name']) as String?;
-                        emailFromDoc = (profile['email']) as String?;
-                        final base64 = profile['profileImageBase64'] as String?;
-                        if (base64 != null && base64.isNotEmpty) {
-                          try {
-                            imageBytes = base64Decode(base64);
-                          } catch (_) {
-                            imageBytes = null;
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Builder(builder: (context) {
+                    // Avatar size scales with header height to avoid vertical overflow
+                    final avatarDiameter = min(80.0, headerHeight * 0.5);
+                    final avatarRadius = avatarDiameter / 2;
+                    return FutureBuilder<Map<String, dynamic>?>(
+                      future: user != null
+                          ? Provider.of<FirebaseService>(context, listen: false)
+                              .getUserProfile(user.uid)
+                          : Future.value(null),
+                      builder: (context, snapshot) {
+                        String? imageUrlFromDoc;
+                        Uint8List? imageBytes;
+                        String? nameFromDoc;
+                        String? emailFromDoc;
+                        if (snapshot.hasData && snapshot.data != null) {
+                          final profile = snapshot.data!;
+                          imageUrlFromDoc = (profile['profileImageUrl'] ??
+                              profile['photoURL']) as String?;
+                          nameFromDoc = (profile['displayName'] ??
+                              profile['name']) as String?;
+                          emailFromDoc = (profile['email']) as String?;
+                          final base64 =
+                              profile['profileImageBase64'] as String?;
+                          if (base64 != null && base64.isNotEmpty) {
+                            try {
+                              imageBytes = base64Decode(base64);
+                            } catch (_) {
+                              imageBytes = null;
+                            }
                           }
                         }
-                      }
 
-                      final effectiveUrl = imageUrlFromDoc ?? user?.photoURL;
-                      final displayName = nameFromDoc ?? user?.displayName ?? 'Usuário';
-                      final displayEmail = emailFromDoc ?? user?.email ?? '';
+                        final effectiveUrl = imageUrlFromDoc ?? user?.photoURL;
+                        final displayName =
+                            nameFromDoc ?? user?.displayName ?? 'Usuário';
+                        final displayEmail = emailFromDoc ?? user?.email ?? '';
 
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: avatarDiameter,
-                            height: avatarDiameter,
-                            child: UserAvatar(
-                              imageUrl: effectiveUrl,
-                              imageBytes: imageBytes,
-                              radius: avatarRadius,
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: avatarDiameter,
+                              height: avatarDiameter,
+                              child: UserAvatar(
+                                imageUrl: effectiveUrl,
+                                imageBytes: imageBytes,
+                                radius: avatarRadius,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Name and email to the right
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  displayName,
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: scheme.onPrimary,
+                            const SizedBox(width: 12),
+                            // Name and email to the right
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    displayName,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: scheme.onPrimary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  displayEmail,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: scheme.onPrimary.withOpacity(0.85),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    displayEmail,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: scheme.onPrimary.withOpacity(0.85),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      );
-                    },
-                  );
-                }),
+                          ],
+                        );
+                      },
+                    );
+                  }),
+                ),
               ),
-            ),
             );
           }),
 
@@ -142,31 +146,21 @@ class GlobalDrawer extends StatelessWidget {
                   icon: Icons.home,
                   title: 'Início',
                   subtitle: 'Tela principal',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _navigateToHome(context);
-                  },
+                  onTap: () => _selectTab(context, 0),
                 ),
-                
                 _buildMenuItem(
                   context,
                   icon: Icons.video_library,
                   title: 'Cursos',
                   subtitle: 'Conteúdo e evolução',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _navigateToCourses(context);
-                  },
+                  onTap: () => _selectTab(context, 1),
                 ),
                 _buildMenuItem(
                   context,
                   icon: Icons.chat_bubble_outline,
                   title: 'Conversas',
                   subtitle: 'Chats com usuários',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _navigateToConversations(context);
-                  },
+                  onTap: () => _selectTab(context, 2),
                 ),
                 _buildMenuItem(
                   context,
@@ -178,20 +172,14 @@ class GlobalDrawer extends StatelessWidget {
                     _openAiChat(context);
                   },
                 ),
-                
                 const Divider(height: 32),
-                
                 _buildMenuItem(
                   context,
                   icon: Icons.person,
                   title: 'Meu Perfil',
                   subtitle: 'Ver informações pessoais',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _navigateToProfile(context);
-                  },
+                  onTap: () => _selectTab(context, 3),
                 ),
-                
                 _buildMenuItem(
                   context,
                   icon: Icons.analytics,
@@ -202,20 +190,7 @@ class GlobalDrawer extends StatelessWidget {
                     _showReports(context);
                   },
                 ),
-                
-                _buildMenuItem(
-                  context,
-                  icon: Icons.security,
-                  title: 'Relatório EventLog',
-                  subtitle: 'Logins e segurança',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showEventLogReports(context);
-                  },
-                ),
-                
                 const Divider(height: 32),
-                
                 _buildMenuItem(
                   context,
                   icon: Icons.settings,
@@ -232,7 +207,6 @@ class GlobalDrawer extends StatelessWidget {
                     }
                   },
                 ),
-                
                 _buildMenuItem(
                   context,
                   icon: Icons.help_outline,
@@ -243,7 +217,6 @@ class GlobalDrawer extends StatelessWidget {
                     _showHelp(context);
                   },
                 ),
-                
                 _buildMenuItem(
                   context,
                   icon: Icons.info_outline,
@@ -254,9 +227,7 @@ class GlobalDrawer extends StatelessWidget {
                     _showAbout(context);
                   },
                 ),
-                
                 const Divider(height: 32),
-                
                 _buildMenuItem(
                   context,
                   icon: Icons.logout,
@@ -268,7 +239,6 @@ class GlobalDrawer extends StatelessWidget {
                     _confirmLogout(context);
                   },
                 ),
-                
                 const SizedBox(height: 20),
               ],
             ),
@@ -326,38 +296,17 @@ class GlobalDrawer extends StatelessWidget {
     );
   }
 
-  void _navigateToHome(BuildContext context) {
-    // Navega para a aba Home (índice 0)
+  void _selectTab(BuildContext context, int index) {
     final state = MainNavigation.mainNavigationKey.currentState;
-    if (state != null) {
-      state.switchToTab(0);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Navegando para Início...'),
-          backgroundColor: AppColors.primary,
-        ),
-      );
+    if (state == null) {
+      _fallbackSnack(context, 'Não foi possível trocar de seção.');
+      return;
     }
-  }
 
-  void _navigateToCourses(BuildContext context) {
-    final state = MainNavigation.mainNavigationKey.currentState;
-    if (state != null) {
-      state.switchToTab(1);
-    } else {
-      _fallbackSnack(context, 'Navegando para Cursos...');
-    }
-  }
-
-  void _navigateToConversations(BuildContext context) {
-    // Novo índice das conversas = 2
-    final state = MainNavigation.mainNavigationKey.currentState;
-    if (state != null) {
-      state.switchToTab(2);
-    } else {
-      _fallbackSnack(context, 'Navegando para Conversas...');
-    }
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (state.mounted) state.switchToTab(index);
+    });
   }
 
   void _openAiChat(BuildContext context) {
@@ -366,92 +315,14 @@ class GlobalDrawer extends StatelessWidget {
       // Abrir AI Chat como rota sem tentar fechar a MainNavigation (evita comportamento de "fechar app")
       MainNavigation.openAIChat();
     } else {
-        // Fallback se não estiver na estrutura principal
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => LumaChatScreen(mode: userRole),
-          ),
-        );
+      // Fallback se não estiver na estrutura principal
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => LumaChatScreen(mode: userRole),
+        ),
+      );
     }
-  }
-
-  void _navigateToProfile(BuildContext context) {
-    Navigator.of(context).pop();
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
-      isScrollControlled: true,
-      builder: (ctx) {
-        final scheme = Theme.of(ctx).colorScheme;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 6),
-                Container(width: 40, height: 6, decoration: BoxDecoration(color: scheme.onSurface.withOpacity(0.12), borderRadius: BorderRadius.circular(4))),
-                const SizedBox(height: 14),
-                Row(children: [
-                  UserAvatar(radius: 28),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Meu Perfil', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: scheme.onSurface)), const SizedBox(height: 4), Text('Gerencie sua conta', style: TextStyle(color: scheme.onSurface.withOpacity(0.7)))])),
-                ]),
-                const SizedBox(height: 12),
-                const Divider(),
-                ListTile(
-                  leading: Container(width: 44, height: 44, decoration: BoxDecoration(color: scheme.primary.withOpacity(0.12), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.edit, color: scheme.primary)),
-                  title: const Text('Ver Perfil'),
-                  subtitle: const Text('Alterar informações pessoais'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen()));
-                  },
-                ),
-                ListTile(
-                  leading: Container(width: 44, height: 44, decoration: BoxDecoration(color: scheme.primary.withOpacity(0.12), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.settings, color: scheme.primary)),
-                  title: const Text('Configurações'),
-                  subtitle: const Text('Preferências do app'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    try {
-                      context.push('/settings');
-                    } catch (_) {
-                      Navigator.pushNamed(context, '/settings');
-                    }
-                  },
-                ),
-                ListTile(
-                  leading: Container(width: 44, height: 44, decoration: BoxDecoration(color: scheme.primary.withOpacity(0.12), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.help_outline, color: scheme.primary)),
-                  title: const Text('Ajuda e Suporte'),
-                  subtitle: const Text('Central de ajuda'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _showHelp(context);
-                  },
-                ),
-                const Divider(),
-                ListTile(
-                  leading: Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.red.withOpacity(0.12), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.logout, color: Colors.red)),
-                  title: const Text('Sair', style: TextStyle(color: Colors.red)),
-                  subtitle: const Text('Fazer logout da conta'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _confirmLogout(context);
-                  },
-                ),
-                const SizedBox(height: 18),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
   void _fallbackSnack(BuildContext context, String msg) {
@@ -468,15 +339,6 @@ class GlobalDrawer extends StatelessWidget {
       context,
       MaterialPageRoute(
         builder: (context) => const EmotionalReportsScreen(),
-      ),
-    );
-  }
-
-  void _showEventLogReports(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const EventLogReportScreen(),
       ),
     );
   }
@@ -514,12 +376,12 @@ class GlobalDrawer extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: const Text('Sobre o MindMatch'),
         content: const Text(
-          'MindMatch v1.0.0\n\n'
-          'Um aplicativo inovador que conecta pessoas '
-          'com base em afinidades emocionais e valores, '
-          'promovendo relacionamentos mais significativos.\n\n'
-          '© 2025 MindMatch Team\n'
-          'Desenvolvido com 💙 para conectar mentes',
+          'MindMatch\n\n'
+          'Uma plataforma de saúde mental que aproxima pacientes e psicólogos '
+          'de forma acolhedora e segura. O app oferece checkups emocionais, '
+          'acompanhamento da rotina, conteúdos de bem-estar, conversas e o apoio '
+          'da Luma, nossa assistente de inteligência artificial.\n\n'
+          'Desenvolvido para promover cuidado, conexão e evolução emocional.',
         ),
         actions: [
           TextButton(
@@ -548,12 +410,13 @@ class GlobalDrawer extends StatelessWidget {
           TextButton(
             onPressed: () async {
               try {
-                final authService = Provider.of<AuthService>(context, listen: false);
-                
+                final authService =
+                    Provider.of<AuthService>(context, listen: false);
+
                 // Fazer logout
                 await authService.signOut();
                 print('✅ SignOut realizado com sucesso');
-                
+
                 // Usar GoRouter para limpar toda a pilha e ir para login
                 if (context.mounted) {
                   print('✅ Navegando para /login');

@@ -7,6 +7,9 @@ class PsychologistNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MainNavigation(userRole: 'PSYCHOLOGIST');
+    return MainNavigation(
+      key: MainNavigation.mainNavigationKey,
+      userRole: 'PSYCHOLOGIST',
+    );
   }
 }

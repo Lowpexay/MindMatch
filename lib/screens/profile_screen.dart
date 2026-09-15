@@ -72,7 +72,6 @@ class ProfileScreen extends StatelessWidget {
                         name: name,
                         role: role == 'PATIENT' ? 'Paciente' : _roleLabel(role),
                         age: age,
-                        city: city,
                         imageUrl:
                             profileImageUrl.isNotEmpty ? profileImageUrl : null,
                         imageBytes: profileImageBytes,
@@ -200,7 +199,6 @@ class _ProfileHeader extends StatelessWidget {
   final String name;
   final String role;
   final int age;
-  final String city;
   final String? imageUrl;
   final Uint8List? imageBytes;
   final String rating;
@@ -212,7 +210,6 @@ class _ProfileHeader extends StatelessWidget {
       {required this.name,
       required this.role,
       required this.age,
-      required this.city,
       required this.imageUrl,
       required this.imageBytes,
       this.rating = '',
@@ -235,7 +232,7 @@ class _ProfileHeader extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      fontSize: 17,
+                      fontSize: 19,
                       fontWeight: FontWeight.w800,
                       color: scheme.onSurface))),
           if (verified) ...[
@@ -248,7 +245,7 @@ class _ProfileHeader extends StatelessWidget {
             style: const TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
-                fontSize: 13)),
+                fontSize: 14)),
         const SizedBox(height: 5),
         if (rating.isNotEmpty)
           Row(children: [
@@ -257,28 +254,16 @@ class _ProfileHeader extends StatelessWidget {
             Text(rating,
                 style: TextStyle(
                     color: scheme.onSurface,
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: FontWeight.w700)),
             if (reviews.isNotEmpty)
               Text(' ($reviews avaliações)',
                   style:
-                      TextStyle(color: scheme.onSurfaceVariant, fontSize: 11)),
+                      TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
           ])
         else
           Text(age > 0 ? '$age anos' : 'Idade não informada',
-              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
-        const SizedBox(height: 2),
-        Row(children: [
-          Icon(Icons.location_on_outlined,
-              size: 14, color: scheme.onSurfaceVariant),
-          const SizedBox(width: 3),
-          Expanded(
-              child: Text(city,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style:
-                      TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)))
-        ])
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 14)),
       ])),
       IconButton(
           onPressed: onEdit,
@@ -354,7 +339,7 @@ class _ProfessionalSections extends StatelessWidget {
               Text(_value(data['availabilityHours']),
                   style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600)),
             ]),
           ],
@@ -422,7 +407,7 @@ class _PlanChip extends StatelessWidget {
         child: Text(label,
             style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 11)),
+                fontSize: 13)),
       );
 }
 
@@ -441,7 +426,7 @@ class _DayChip extends StatelessWidget {
         child: Text(label,
             style: const TextStyle(
                 color: AppColors.primary,
-                fontSize: 11,
+                fontSize: 13,
                 fontWeight: FontWeight.w700)),
       );
 }
@@ -454,7 +439,7 @@ class _EmptyProfileText extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(text,
       style: TextStyle(
-          color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11));
+          color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13));
 }
 
 class _InfoBanner extends StatelessWidget {
@@ -478,7 +463,7 @@ class _InfoBanner extends StatelessWidget {
           Text(text,
               style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 12,
+                  fontSize: 14,
                   height: 1.35))
         ]),
       );
@@ -512,7 +497,7 @@ class _ProfileCard extends StatelessWidget {
               style: TextStyle(
                   fontWeight: FontWeight.w800,
                   color: scheme.onSurface,
-                  fontSize: 13))
+                  fontSize: 15))
         ]),
         const SizedBox(height: 8),
         ...children,
@@ -536,14 +521,14 @@ class _ProfileRow extends StatelessWidget {
               child: Text(label,
                   style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 11))),
+                      fontSize: 13))),
           Expanded(
               child: Text(value,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600)))
         ]),
       );
@@ -562,7 +547,7 @@ class _AttachmentRow extends StatelessWidget {
         Text('Documentos',
             style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 11)),
+                fontSize: 13)),
         const Spacer(),
         Container(
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
@@ -576,7 +561,7 @@ class _AttachmentRow extends StatelessWidget {
               Text('$count arquivo${count == 1 ? '' : 's'}',
                   style: const TextStyle(
                       color: AppColors.primary,
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600))
             ])),
         const SizedBox(width: 5),

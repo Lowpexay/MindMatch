@@ -24,7 +24,8 @@ class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key, this.userRole = 'PATIENT'});
 
   // Chave global para acessar a própria MainNavigation
-  static final GlobalKey<_MainNavigationState> mainNavigationKey = GlobalKey<_MainNavigationState>();
+  static final GlobalKey<_MainNavigationState> mainNavigationKey =
+      GlobalKey<_MainNavigationState>();
   // Chave global para acessar o drawer
   static final GlobalKey<ScaffoldState> scaffoldKey =
       GlobalKey<ScaffoldState>();
@@ -32,7 +33,8 @@ class MainNavigation extends StatefulWidget {
   // Chave para futuras interações com a aba de cursos (se necessário)
   static final GlobalKey debugCoursesPlaceholderKey = GlobalKey();
   // Chave global para acessar métodos da ConversationsScreen
-  static final GlobalKey<ConversationsScreenState> conversationsKey = GlobalKey<ConversationsScreenState>();
+  static final GlobalKey<ConversationsScreenState> conversationsKey =
+      GlobalKey<ConversationsScreenState>();
   // AI Chat não é mais uma aba fixa; abriremos como overlay / rota separada.
   static final GlobalKey aiChatKey = GlobalKey();
   // Última aba ativa (para exibir seleção quando abrirmos o AI Chat com navbar)
@@ -61,7 +63,8 @@ class MainNavigation extends StatefulWidget {
   State<MainNavigation> createState() => _MainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation> with TickerProviderStateMixin {
+class _MainNavigationState extends State<MainNavigation>
+    with TickerProviderStateMixin {
   int _currentIndex = 0;
   bool _notificationServiceInitialized = false;
   String _userName = ''; // Nome do usuário
@@ -82,7 +85,8 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
     _screens = [
       HomeScreen(userRole: widget.userRole),
       const CoursesScreen(),
-      ConversationsScreen(key: MainNavigation.conversationsKey, userRole: widget.userRole),
+      ConversationsScreen(
+          key: MainNavigation.conversationsKey, userRole: widget.userRole),
       const ProfileScreen(),
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -95,7 +99,8 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
   Future<void> _loadHeaderImage() async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+      final firebaseService =
+          Provider.of<FirebaseService>(context, listen: false);
       final userId = authService.currentUser?.uid;
       if (userId != null) {
         final userProfile = await firebaseService.getUserProfile(userId);
@@ -124,13 +129,16 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
   Future<void> _loadUserName() async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+      final firebaseService =
+          Provider.of<FirebaseService>(context, listen: false);
       final userId = authService.currentUser?.uid;
 
       if (userId != null) {
         final userProfile = await firebaseService.getUserProfile(userId);
         setState(() {
-          _userName = userProfile?['name'] ?? authService.currentUser?.displayName ?? '';
+          _userName = userProfile?['name'] ??
+              authService.currentUser?.displayName ??
+              '';
         });
         print('👤 Nome do usuário carregado no header: $_userName');
       }
@@ -148,7 +156,8 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      final globalNotificationService = Provider.of<GlobalNotificationService>(context, listen: false);
+      final globalNotificationService =
+          Provider.of<GlobalNotificationService>(context, listen: false);
 
       if (authService.isAuthenticated) {
         await globalNotificationService.initialize(authService);
@@ -183,7 +192,8 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => LumaChatScreen(key: MainNavigation.aiChatKey, mode: widget.userRole),
+        builder: (_) => LumaChatScreen(
+            key: MainNavigation.aiChatKey, mode: widget.userRole),
       ),
     );
   }
@@ -271,8 +281,10 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
       toolbarHeight: 80,
       leading: Builder(
         builder: (context) => IconButton(
-          onPressed: () => MainNavigation.scaffoldKey.currentState?.openDrawer(),
-          icon: Icon(Icons.menu, color: isDark ? Colors.white : AppColors.textPrimary),
+          onPressed: () =>
+              MainNavigation.scaffoldKey.currentState?.openDrawer(),
+          icon: Icon(Icons.menu,
+              color: isDark ? Colors.white : AppColors.textPrimary),
         ),
       ),
       title: Column(
@@ -311,7 +323,8 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
             child: IconButton(
               onPressed: () {
                 // Chamar método da ConversationsScreen usando a chave global
-                MainNavigation.conversationsKey.currentState?.showConversationOptions();
+                MainNavigation.conversationsKey.currentState
+                    ?.showConversationOptions();
               },
               icon: Icon(
                 Icons.more_vert,
@@ -355,109 +368,124 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkSurface : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle visual
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark ? Colors.white24 : AppColors.gray300,
-                borderRadius: BorderRadius.circular(2),
+      isScrollControlled: true,
+      enableDrag: true,
+      builder: (context) => SafeArea(
+        top: false,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.darkSurface
+                : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle visual
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white24
+                      : AppColors.gray300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // Header do perfil
-            Row(
-              children: [
-                UserAvatar(
-                  imageBytes: _headerImageBytes,
-                  radius: 24,
-                  useAuthPhoto: true,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Meu Perfil',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimary,
-                        ),
-                      ),
-                      Text(
-                        'Gerencie sua conta',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
+              // Header do perfil
+              Row(
+                children: [
+                  UserAvatar(
+                    imageBytes: _headerImageBytes,
+                    radius: 24,
+                    useAuthPhoto: true,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Meu Perfil',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.white
+                                    : AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Gerencie sua conta',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.white70
+                                    : AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 25),
 
-            // Opções do menu
-            _buildMenuOption(
-              icon: Icons.edit,
-              title: 'Ver Perfil',
-              subtitle: 'Alterar informações pessoais',
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/profile');
-              },
-            ),
+              // Opções do menu
+              _buildMenuOption(
+                icon: Icons.edit,
+                title: 'Ver Perfil',
+                subtitle: 'Alterar informações pessoais',
+                onTap: () {
+                  Navigator.pop(context);
+                  context.go('/profile');
+                },
+              ),
 
-            _buildMenuOption(
-              icon: Icons.settings,
-              title: 'Configurações',
-              subtitle: 'Preferências do app',
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/settings');
-              },
-            ),
+              _buildMenuOption(
+                icon: Icons.settings,
+                title: 'Configurações',
+                subtitle: 'Preferências do app',
+                onTap: () {
+                  Navigator.pop(context);
+                  context.go('/settings');
+                },
+              ),
 
-            _buildMenuOption(
-              icon: Icons.help_outline,
-              title: 'Ajuda e Suporte',
-              subtitle: 'Central de ajuda',
-              onTap: () {
-                Navigator.pop(context);
-                _showHelpDialog();
-              },
-            ),
+              _buildMenuOption(
+                icon: Icons.help_outline,
+                title: 'Ajuda e Suporte',
+                subtitle: 'Central de ajuda',
+                onTap: () {
+                  Navigator.pop(context);
+                  _showHelpDialog();
+                },
+              ),
 
-            const Divider(height: 24),
+              const Divider(),
 
-            _buildMenuOption(
-              icon: Icons.logout,
-              title: 'Sair',
-              subtitle: 'Fazer logout da conta',
-              iconColor: Colors.red,
-              textColor: Colors.red,
-              onTap: () async {
-                Navigator.pop(context);
-                await _handleLogout();
-              },
-            ),
+              _buildMenuOption(
+                icon: Icons.logout,
+                title: 'Sair',
+                subtitle: 'Fazer logout da conta',
+                iconColor: Colors.red,
+                textColor: Colors.red,
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _handleLogout();
+                },
+              ),
 
-            // Espaço para SafeArea
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
-          ],
+              // Espaço para SafeArea
+              // SizedBox(height: MediaQuery.of(context).padding.bottom),
+            ],
+          ),
         ),
       ),
     );
@@ -492,20 +520,27 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w600,
-          color: textColor ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimary),
+          color: textColor ??
+              (Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : AppColors.textPrimary),
         ),
       ),
       subtitle: Text(
         subtitle,
         style: TextStyle(
           fontSize: 14,
-          color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : AppColors.textSecondary,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white70
+              : AppColors.textSecondary,
         ),
       ),
       trailing: Icon(
         Icons.arrow_forward_ios,
         size: 16,
-        color: Theme.of(context).brightness == Brightness.dark ? Colors.white38 : AppColors.gray400,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white38
+            : AppColors.gray400,
       ),
     );
   }
@@ -519,7 +554,8 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
           backgroundColor: isDark ? AppColors.darkSurface : null,
           title: Text(
             'Ajuda e Suporte',
-            style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary),
+            style:
+                TextStyle(color: isDark ? Colors.white : AppColors.textPrimary),
           ),
           content: Text(
             'MindMatch - Conectando pessoas com afinidades emocionais.\n\n'
@@ -527,7 +563,8 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
             '💙 Para suporte: mindmatch@exemplo.com\n\n'
             'Este app foi desenvolvido para promover conexões humanas '
             'significativas baseadas em bem-estar emocional.',
-            style: TextStyle(color: isDark ? Colors.white70 : AppColors.textSecondary),
+            style: TextStyle(
+                color: isDark ? Colors.white70 : AppColors.textSecondary),
           ),
           actions: [
             TextButton(
@@ -562,4 +599,3 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
     }
   }
 }
-

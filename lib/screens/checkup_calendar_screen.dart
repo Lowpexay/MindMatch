@@ -33,9 +33,10 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
       ),
       body: Consumer2<CheckupStreakService, DailyCheckupHistoryService>(
         builder: (context, streakService, historyService, child) {
-          final monthCheckups = historyService.getCheckupsForMonth(_selectedMonth);
+          final monthCheckups =
+              historyService.getCheckupsForMonth(_selectedMonth);
           final last7DaysStats = historyService.getLast7DaysStats();
-          
+
           return Column(
             children: [
               // Header com estatísticas
@@ -55,10 +56,11 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
                   historyService: historyService,
                 ),
               ),
-              
+
               // Navegação do mês
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -68,13 +70,16 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
                     ),
                     Builder(
                       builder: (context) {
-                        final isDark = Theme.of(context).brightness == Brightness.dark;
+                        final isDark =
+                            Theme.of(context).brightness == Brightness.dark;
                         return Text(
                           _getMonthYearString(_selectedMonth),
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white.withOpacity(0.9) : AppColors.textPrimary,
+                            color: isDark
+                                ? Colors.white.withOpacity(0.9)
+                                : AppColors.textPrimary,
                           ),
                         );
                       },
@@ -86,7 +91,7 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
                   ],
                 ),
               ),
-              
+
               // Calendário
               Expanded(
                 child: Container(
@@ -94,7 +99,7 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
                   child: _buildCalendar(streakService),
                 ),
               ),
-              
+
               // Legenda
               Container(
                 padding: const EdgeInsets.all(20),
@@ -114,33 +119,41 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+      String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.2),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
-          ),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white.withOpacity(0.8),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withOpacity(0.8),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -198,7 +211,7 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
     // Usar GridView.count com shrinkWrap para caber no header.
     return GridView.count(
       crossAxisCount: crossAxisCount,
-      childAspectRatio: 1.05,
+      childAspectRatio: 0.9,
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
       shrinkWrap: true,
@@ -210,8 +223,9 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
   Widget _buildCalendar(CheckupStreakService streakService) {
     final monthData = streakService.getMonthData(_selectedMonth);
     final today = DateTime.now();
-    final firstDayOfWeek = DateTime(_selectedMonth.year, _selectedMonth.month, 1).weekday;
-    
+    final firstDayOfWeek =
+        DateTime(_selectedMonth.year, _selectedMonth.month, 1).weekday;
+
     return Column(
       children: [
         // Cabeçalho dos dias da semana
@@ -230,7 +244,7 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
                 .toList(),
           ),
         ),
-        
+
         // Grade do calendário
         Expanded(
           child: GridView.builder(
@@ -244,14 +258,14 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
             itemCount: 42, // 6 semanas * 7 dias
             itemBuilder: (context, index) {
               final dayIndex = index - (firstDayOfWeek % 7);
-              
+
               if (dayIndex < 0 || dayIndex >= monthData.length) {
                 return Container(); // Espaços vazios
               }
-              
+
               final dayData = monthData[dayIndex];
               final isToday = _isSameDay(dayData.date, today);
-              
+
               return _buildDayCell(dayData, isToday);
             },
           ),
@@ -264,7 +278,7 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     Color backgroundColor;
     Color textColor;
-    
+
     if (isToday) {
       backgroundColor = AppColors.primary;
       textColor = Colors.white;
@@ -273,9 +287,9 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
       textColor = Colors.white;
     } else {
       backgroundColor = isDark ? AppColors.blackFont : AppColors.whiteBack;
-      textColor =  isDark ? AppColors.whiteBack : AppColors.blackFont;
+      textColor = isDark ? AppColors.whiteBack : AppColors.blackFont;
     }
-    
+
     return Container(
       decoration: BoxDecoration(
         color: backgroundColor,
@@ -342,16 +356,26 @@ class _CheckupCalendarScreenState extends State<CheckupCalendarScreen> {
 
   String _getMonthYearString(DateTime date) {
     const months = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro'
     ];
-    
+
     return '${months[date.month - 1]} ${date.year}';
   }
 
   bool _isSameDay(DateTime date1, DateTime date2) {
     return date1.year == date2.year &&
-           date1.month == date2.month &&
-           date1.day == date2.day;
+        date1.month == date2.month &&
+        date1.day == date2.day;
   }
 }

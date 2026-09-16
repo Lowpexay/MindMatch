@@ -310,10 +310,10 @@ Baseado nos princípios da **Society 5.0** (Sociedade 5.0), integrando tecnologi
 - ✅ **Security Events**: Logs de segurança e tentativas de acesso
 - ✅ **Business Intelligence**: Relatórios para tomada de decisão
 
-### 🎯 **17/08/2025 - Chat por Voz com Luma**
+### 🎯 **17/08/2025 - Chat com Luma**
 
 **🗣️ Nova Experiência de Voz:**
-- ✅ **Chat por Voz Completo**: Luma agora fala suas respostas usando ElevenLabs TTS
+- ✅ **Chat por Voz Completo**: interação por voz com reconhecimento de fala
 - ✅ **Modo Visual da Luma**: Interface dedicada para conversa por voz com avatar animado  
 - ✅ **Duas Modalidades**: Usuário pode escolher entre chat por texto ou por voz
 - ✅ **Controles Intuitivos**: Toque para parar/continuar a fala
@@ -328,12 +328,6 @@ Baseado nos princípios da **Society 5.0** (Sociedade 5.0), integrando tecnologi
 - Suporte emocional personalizado
 - **🆕 Configuração persistente de modo (texto/voz)**
 
-**🔊 Sistema de TTS:**
-- ✅ **ElevenLabs Integration**: Integração completa com API de Text-to-Speech
-- ✅ **Voz Rachel**: Configurada voz feminina natural e estável
-- ✅ **Controle de Estado**: Sistema robusto para gerenciar estado da fala
-- ✅ **Fallback System**: Sistema de fallback para garantir funcionamento
-
 **🎨 Melhorias na Interface:**
 - ✅ **Material Widget Fix**: Corrigidos erros de "No Material widget found"
 - ✅ **Botão Atualizado**: Mudado para "Falar com a Luma" no modo voz
@@ -341,7 +335,7 @@ Baseado nos princípios da **Society 5.0** (Sociedade 5.0), integrando tecnologi
 - ✅ **Widget da Luma**: Novo componente visual com animações para modo voz
 
 **⚙️ Arquitetura Técnica:**
-- ✅ **Serviços Modulares**: ElevenLabsService independente e reutilizável
+- ✅ **Serviços Modulares**: serviços de IA e reconhecimento de fala independentes
 - ✅ **Adaptador de Preferências**: Sistema para gerenciar configurações do usuário
 - ✅ **Estados Visuais**: Animações e indicadores visuais para modo voz
 - ✅ **Cleanup de Código**: Removido código de teste experimental
@@ -383,12 +377,9 @@ Baseado nos princípios da **Society 5.0** (Sociedade 5.0), integrando tecnologi
 - Perfis detalhados com interesses e objetivos
 - Limitação inteligente de sugestões (máximo 6 usuários)
 
-### 🎧 **🆕 Sistema de Text-to-Speech**
-- Integração com ElevenLabs TTS API
-- Voz feminina natural (Rachel)
-- Controle de reprodução em tempo real
-- Estados visuais para feedback do usuário
-- Sistema de fallback robusto
+### 🎧 **🆕 Sistema de interação por voz**
+- Reconhecimento de fala para entrada de mensagens
+- Modo visual da Luma
 
 ### 🔐 **Segurança & Privacidade**
 - Autenticação Firebase (Email, Google, Apple)
@@ -426,7 +417,6 @@ Baseado nos princípios da **Society 5.0** (Sociedade 5.0), integrando tecnologi
 - [x] Suporte emocional personalizado
 - [x] Interface de chat natural
 - [x] Histórico de conversas
-- [x] **🆕 Chat por voz com TTS (ElevenLabs)**
 - [x] **🆕 Modo visual da Luma com avatar**
 - [x] **🆕 Escolha entre modo texto/voz**
 - [x] **🆕 Controles de reprodução (play/pause)**
@@ -532,11 +522,9 @@ firestore/
 - **Firebase Storage** - Armazenamento de arquivos
 - **Firebase Cloud Functions** - Funções serverless
 
-### 🤖 **Inteligência Artificial & TTS**
+### 🤖 **Inteligência Artificial**
 - **Google Gemini 1.5 Flash** - IA conversacional
 - **Gemini API** - Geração de conteúdo
-- **🆕 ElevenLabs TTS** - Síntese de voz natural
-- **🆕 Voice API Integration** - Controle de reprodução
 - **Prompt Engineering** - Otimização de respostas
 
 ### 🔧 **Ferramentas de Desenvolvimento**
@@ -588,11 +576,6 @@ firestore/
    - Gere uma API key
    - Adicione no arquivo `lib/services/gemini_service.dart`
    
-   **🆕 ElevenLabs TTS API:**
-   - Acesse [ElevenLabs](https://elevenlabs.io/)
-   - Crie uma conta e gere uma API key
-   - Adicione no arquivo `lib/config/api_keys.dart`
-
 5. **Execute o aplicativo**
    ```bash
    flutter run
@@ -646,7 +629,6 @@ mindmatch-app/
 │   │   ├── auth_service.dart
 │   │   ├── firebase_service.dart
 │   │   ├── gemini_service.dart
-│   │   ├── elevenlabs_service.dart          # 🆕 Serviço TTS
 │   │   └── preferences_service.dart         # 🆕 Gerenciar preferências
 │   ├── 📊 models/
 │   │   ├── user_model.dart
@@ -695,10 +677,9 @@ dependencies:
   image_picker: ^1.0.4
   shared_preferences: ^2.2.2
   
-  # 🆕 Text-to-Speech & Audio
-  http: ^1.1.2                  # Para ElevenLabs API
+  # HTTP & API
+  http: ^1.1.2
   dio: ^5.3.4                   # HTTP client otimizado
-  audioplayers: ^5.2.1         # Reprodução de áudio
   
   # Utilities
   intl: ^0.19.0

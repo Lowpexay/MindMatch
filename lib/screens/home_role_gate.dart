@@ -24,7 +24,8 @@ class _HomeRoleGateState extends State<HomeRoleGate> {
     if (_profileFuture != null) return;
 
     final authService = Provider.of<AuthService>(context, listen: false);
-    final firebaseService = Provider.of<FirebaseService>(context, listen: false);
+    final firebaseService =
+        Provider.of<FirebaseService>(context, listen: false);
     final userId = authService.currentUser?.uid;
     _profileFuture = userId == null
         ? Future<Map<String, dynamic>?>.value(null)
@@ -59,7 +60,7 @@ class _HomeRoleGateState extends State<HomeRoleGate> {
           return const PsychologistNavigation();
         }
 
-        return const MainNavigation();
+        return MainNavigation(key: MainNavigation.mainNavigationKey);
       },
     );
   }

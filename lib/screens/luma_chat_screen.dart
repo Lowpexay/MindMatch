@@ -1040,7 +1040,14 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
                         Navigator.pushNamed(context, '/scheduleAppointment', arguments: profileMap);
                       }
                     },
-                    child: const Text('Marcar consulta'),
+                    child: const Text(
+                      'Marcar consulta',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),

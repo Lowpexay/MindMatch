@@ -80,14 +80,14 @@ flutter:
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/images/luma_chat_avatar.png"
+  image_path: "assets/images/luma_com_fundo.png"
   min_sdk_android: 21 # android min sdk min:16, default 21
   web:
     generate: true
-    image_path: "assets/images/luma_chat_avatar.png"
+    image_path: "assets/images/luma_com_fundo.png"
   windows:
     generate: true
-    image_path: "assets/images/luma_chat_avatar.png"
+    image_path: "assets/images/luma_com_fundo.png"
   macos:
     generate: true
-    image_path: "assets/images/luma_chat_avatar.png"
+    image_path: "assets/images/luma_com_fundo.png"

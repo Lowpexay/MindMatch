@@ -1301,37 +1301,59 @@ class _LumaChatScreenState extends State<LumaChatScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       color: Theme.of(context).scaffoldBackgroundColor,
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              textInputAction: TextInputAction.send,
-              enabled: !_isLoading,
-              decoration: InputDecoration(
-                hintText: _isLoading ? 'Luma está pensando...' : 'Digite aqui...',
-                fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                filled: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+          if (widget.mode != 'PSYCHOLOGIST' && _messages.length > 1)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: OutlinedButton.icon(
+                  onPressed: _isLoading ? null : _recordOrAskConsent,
+                  icon: Icon(_recordingConsent ? Icons.check_circle_outline : Icons.bookmark_add_outlined),
+                  label: Text(_recordingConsent ? 'Conversa registrada' : 'Registrar conversa'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.green.shade800,
+                    side: BorderSide(color: Colors.green.shade300),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                ),
               ),
-              onSubmitted: (_) => _handleSend(),
             ),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  textInputAction: TextInputAction.send,
+                  enabled: !_isLoading,
+                  decoration: InputDecoration(
+                    hintText: _isLoading ? 'Luma está pensando...' : 'Digite aqui...',
+                    fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                    filled: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                  ),
+                  onSubmitted: (_) => _handleSend(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              CircleAvatar(
+                backgroundColor: _isLoading ? Colors.grey : Colors.green.shade700,
+                child: IconButton(
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.send, color: Colors.white),
+                  onPressed: _isLoading ? null : _handleSend,
+                ),
+              )
+            ],
           ),
-          const SizedBox(width: 8),
-          CircleAvatar(
-            backgroundColor: _isLoading ? Colors.grey : Colors.green.shade700,
-            child: IconButton(
-              icon: _isLoading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.send, color: Colors.white),
-              onPressed: _isLoading ? null : _handleSend,
-            ),
-          )
         ],
       ),
     );

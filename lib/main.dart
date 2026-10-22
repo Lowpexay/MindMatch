@@ -451,7 +451,7 @@ class _SplashScreenState extends State<SplashScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(60),
                 child: Image.asset(
-                  'assets/images/luma_com_fundo.png',
+                  'assets/images/mindmatch_app_logo.png',
                   width: 120,
                   height: 120,
                   fit: BoxFit.contain, // Mudando para contain para preservar transparência

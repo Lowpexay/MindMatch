@@ -94,7 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(40),
             child: Image.asset(
-              'assets/images/luma_com_fundo.png',
+              'assets/images/mindmatch_app_logo.png',
               fit: BoxFit.cover,
               errorBuilder: (c, e, s) => Container(
                 decoration: BoxDecoration(
